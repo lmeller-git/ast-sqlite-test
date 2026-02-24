@@ -1,0 +1,7 @@
+[workspace]
+members = []
+resolver = "3"
+
+[workspace.dependencies]
+
+[profile.release]
