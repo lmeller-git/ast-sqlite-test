@@ -1,0 +1,4 @@
+# ignored files for rust code
+**/target
+
+# ignored files for pyhton code
