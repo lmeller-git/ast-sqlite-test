@@ -5,6 +5,7 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+sqlparser.workspace = true
 
 [lib]
 name = "lib_sql_test"
@@ -12,3 +13,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = "0.28.2"
+sqlparser = { workspace = true }

@@ -15,5 +15,8 @@ license = "MIT"
 repository = "https://github.com/lmeller-git/ast-sqlite-test"
 
 [workspace.dependencies]
+sqlparser = "0.61.0"
+anyhow = "1.0.102"
+thiserror = "2.0.18"
 
 [profile.release]
