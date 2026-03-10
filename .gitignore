@@ -2,3 +2,7 @@
 **/target
 
 # ignored files for pyhton code
+**/__pycache__
+
+# other
+**/.coverage

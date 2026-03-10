@@ -1,0 +1,12 @@
+[project]
+name = "sql-fuzz"
+version = "0.1.0"
+license = "MIT"
+requires-python = ">=3.7"
+dependencies = [
+    "sqloxide @ file:///${PROJECT_ROOT}/extern/sqloxide",
+]
+
+[build-system]
+requires = ["maturin>=1.0"]
+build-backend = "maturin"

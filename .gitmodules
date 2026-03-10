@@ -1,0 +1,6 @@
+[submodule "extern/sqloxide"]
+	path = extern/sqloxide
+	url = https://github.com/lmeller-git/sqloxide.git
+[submodule "extern/sqlparser-rs"]
+	path = extern/sqlparser-rs
+	url = https://github.com/lmeller-git/datafusion-sqlparser-rs

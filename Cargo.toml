@@ -1,13 +1,16 @@
 [workspace]
 resolver = "3"
 members = [
-  "crates/*"
+  "crates/*",
+  "extern/sqlparser-rs",
+  "extern/sqloxide"
 ]
 default-members = [
   "crates/*"
 ]
 
 [workspace.package]
+name = "sql-fuzz"
 version = "0.1.0"
 authors = []
 edition = "2024"
@@ -15,8 +18,13 @@ license = "MIT"
 repository = "https://github.com/lmeller-git/ast-sqlite-test"
 
 [workspace.dependencies]
-sqlparser = "0.61.0"
 anyhow = "1.0.102"
 thiserror = "2.0.18"
+sqloxide = { path = "extern/sqloxide" }
+sqlparser = { path = "extern/sqlparser-rs" }
+
+[patch.crates-io]
+sqlparser = { path = "extern/sqlparser-rs" }
+sqloxide = { path = "extern/sqloxide" }
 
 [profile.release]
