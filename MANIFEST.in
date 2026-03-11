@@ -1,0 +1,4 @@
+include Cargo.toml
+include crates/ffi/Cargo.toml
+recursive-include crates *
+recursive-include python *

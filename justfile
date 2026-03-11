@@ -1,0 +1,15 @@
+build:
+    uvx poetry run maturin develop --release
+
+build-debug:
+    uvx poetry run maturin develop
+
+test: build-debug
+    uvx poetry run pytest tests/
+
+test-rust:
+    cargo test --workspace
+
+lint:
+    cargo clippy --workspace
+    uvx poetry run ruff check python/

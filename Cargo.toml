@@ -3,7 +3,6 @@ resolver = "3"
 members = [
   "crates/*",
   "extern/sqlparser-rs",
-  "extern/sqloxide"
 ]
 default-members = [
   "crates/*"
@@ -20,11 +19,10 @@ repository = "https://github.com/lmeller-git/ast-sqlite-test"
 [workspace.dependencies]
 anyhow = "1.0.102"
 thiserror = "2.0.18"
-sqloxide = { path = "extern/sqloxide" }
-sqlparser = { path = "extern/sqlparser-rs" }
+sqlparser = { path = "extern/sqlparser-rs", features = ["serde", "visitor"] }
+serde = "1.0.228"
 
 [patch.crates-io]
 sqlparser = { path = "extern/sqlparser-rs" }
-sqloxide = { path = "extern/sqloxide" }
 
 [profile.release]

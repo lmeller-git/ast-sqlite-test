@@ -1,12 +1,19 @@
 [project]
-name = "sql-fuzz"
+name = "sql-fuzzer"
 version = "0.1.0"
 license = "MIT"
 requires-python = ">=3.7"
-dependencies = [
-    "sqloxide @ file:///${PROJECT_ROOT}/extern/sqloxide",
-]
 
 [build-system]
 requires = ["maturin>=1.0"]
 build-backend = "maturin"
+
+[tool.maturin]
+# point maturin at the ffi crate, not the workspace root
+manifest-path = "crates/ffi/Cargo.toml"
+module-name = "lib_sql_fuzzer.lib_sql_fuzzer"  # exposes as sql_fuzzer._native in Python
+features = ["pyo3/extension-module"]
+python-source = "python"
+
+[tool.ruff]
+cache-dir = ".ruff_cache"
