@@ -5,11 +5,9 @@ build-debug:
     uvx poetry run maturin develop
 
 test: build
-    uvx poetry run pytest tests/
-
-test-rust:
+    uvx poetry run pytest
     cargo test --workspace
 
 lint:
-    cargo clippy --workspace
+    cargo clippy --no-deps
     uvx poetry run ruff check python/
