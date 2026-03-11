@@ -4,7 +4,7 @@ build:
 build-debug:
     uvx poetry run maturin develop
 
-test: build-debug
+test: build
     uvx poetry run pytest tests/
 
 test-rust:
