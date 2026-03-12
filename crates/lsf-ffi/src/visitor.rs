@@ -45,7 +45,7 @@ pub fn extract_relations(py: Python, parsed_query: &Bound<'_, PyAny>) -> PyResul
 
     let mut relations = Vec::new();
     for statement in statements {
-        visit_relations(&statement, |relation| {
+        _ = visit_relations(&statement, |relation| {
             relations.push(relation.clone());
             ControlFlow::<()>::Continue(())
         });
@@ -64,7 +64,7 @@ pub fn mutate_relations(
     let mut statements = depythonize_query(parsed_query)?;
 
     for statement in &mut statements {
-        visit_relations_mut(statement, |table| {
+        _ = visit_relations_mut(statement, |table| {
             for section in &mut table.0 {
                 let ObjectNamePart::Identifier(ident) = section else {
                     todo!()
@@ -101,7 +101,7 @@ pub fn mutate_expressions(
     let mut statements: Vec<Statement> = depythonize_query(parsed_query)?;
 
     for statement in &mut statements {
-        visit_expressions_mut(statement, |expr| {
+        _ = visit_expressions_mut(statement, |expr| {
             let converted_expr = match pythonize::pythonize(py, expr) {
                 Ok(val) => val,
                 Err(e) => {
@@ -149,7 +149,7 @@ pub fn extract_expressions(py: Python, parsed_query: &Bound<'_, PyAny>) -> PyRes
 
     let mut expressions = Vec::new();
     for statement in statements {
-        visit_expressions(&statement, |expr| {
+        _ = visit_expressions(&statement, |expr| {
             expressions.push(expr.clone());
             ControlFlow::<()>::Continue(())
         });
