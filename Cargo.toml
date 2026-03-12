@@ -8,7 +8,7 @@ default-members = [
 ]
 
 [workspace.package]
-name = "sql-fuzz"
+name = "lsf"
 version = "0.1.0"
 authors = []
 edition = "2024"
@@ -20,6 +20,8 @@ anyhow = "1.0.102"
 thiserror = "2.0.18"
 sqlparser = { path = "extern/sqlparser-rs", features = ["serde", "visitor"] }
 serde = "1.0.228"
+lsf-core = { path = "crates/lsf-core" }
+lsf-engine = { path = "crates/lsf-engine" }
 
 [patch.crates-io]
 sqlparser = { path = "extern/sqlparser-rs" }

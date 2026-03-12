@@ -64,7 +64,7 @@ fn restore_ast(_py: Python, ast: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
 }
 
 #[pymodule]
-fn lib_sql_fuzzer(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn lib_sf(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_sql, m)?)?;
     m.add_function(wrap_pyfunction!(restore_ast, m)?)?;
     // TODO: maybe refactor into seperate module

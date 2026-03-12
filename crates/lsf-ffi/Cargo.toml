@@ -1,5 +1,5 @@
 [package]
-name = "sql-fuzzer-ffi"
+name = "lib-sf"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -7,7 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [lib]
-name = "lib_sql_fuzzer"
+name = "lib_sf"
 crate-type = ["cdylib"]
 
 [dependencies]
@@ -15,3 +15,5 @@ pyo3 = { version = "0.28.2", features = ["extension-module"]}
 pythonize = { version = "0.28.0", features = ["serde_json"] }
 serde = {workspace = true }
 sqlparser = { workspace = true }
+lsf-core = { workspace = true }
+lsf-engine = { workspace = true }

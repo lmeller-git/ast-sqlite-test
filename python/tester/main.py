@@ -1,4 +1,4 @@
-from lib_sql_fuzzer import parse_sql
+from lib_sf import parse_sql
 
 
 def main():
