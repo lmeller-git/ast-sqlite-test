@@ -16,7 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          submodules: true
 
       - name: set up
         uses: actions/setup-python@v4
@@ -31,7 +31,7 @@ jobs:
           uv run maturin develop --release
 
       - name: run
-        run: pytest --cov --cov-branch --cov-report=xml
+        run: uv run pytest --cov --cov-branch --cov-report=xml
 
       - name: Uploa to codecov.io
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # tag=v5.5.2
