@@ -6,11 +6,7 @@ use core::ops::ControlFlow;
 use pyo3::{exceptions::PyValueError, prelude::*};
 use serde::Serialize;
 use sqlparser::ast::{
-    ObjectNamePart,
-    Statement,
-    visit_expressions,
-    visit_expressions_mut,
-    visit_relations,
+    ObjectNamePart, Statement, visit_expressions, visit_expressions_mut, visit_relations,
     visit_relations_mut,
 };
 
