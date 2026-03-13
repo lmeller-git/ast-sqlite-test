@@ -15,7 +15,7 @@ use sqlparser::ast::{
 };
 
 // Refactored function for handling depythonization
-fn depythonize_query(parsed_query: &Bound<'_, PyAny>) -> Result<Vec<Statement>, PyErr> {
+pub(crate) fn depythonize_query(parsed_query: &Bound<'_, PyAny>) -> Result<Vec<Statement>, PyErr> {
     match pythonize::depythonize(parsed_query) {
         Ok(statements) => Ok(statements),
         Err(e) => {
@@ -27,7 +27,7 @@ fn depythonize_query(parsed_query: &Bound<'_, PyAny>) -> Result<Vec<Statement>, 
     }
 }
 
-fn pythonize_query_output<T>(py: Python, output: Vec<T>) -> PyResult<Py<PyAny>>
+pub(crate) fn pythonize_query_output<T>(py: Python, output: Vec<T>) -> PyResult<Py<PyAny>>
 where
     T: Sized + Serialize,
 {
@@ -160,4 +160,24 @@ pub fn extract_expressions(py: Python, parsed_query: &Bound<'_, PyAny>) -> PyRes
     }
 
     pythonize_query_output(py, expressions)
+}
+
+#[cfg(test)]
+mod tests {
+    use pyo3::{PyResult, Python};
+    use sqlparser::ast::{Set, Statement};
+
+    use crate::visitor::{depythonize_query, pythonize_query_output};
+
+    #[test]
+    fn pythonize_roundtrip() {
+        Python::initialize();
+        Python::attach(|py| -> PyResult<()> {
+            let stmts = vec![Statement::Set(Set::SetNamesDefault {})];
+            let query = pythonize_query_output(py, stmts.clone()).unwrap();
+            assert_eq!(depythonize_query(&query.into_bound(py)).unwrap(), stmts);
+            Ok(())
+        })
+        .unwrap()
+    }
 }

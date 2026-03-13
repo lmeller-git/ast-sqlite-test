@@ -38,11 +38,15 @@ jobs:
         if: hashFiles('Cargo.lock') == ''
         run: cargo generate-lockfile
       # https://twitter.com/jonhoo/status/1571290371124260865
-      - name: cargo test --locked
-        run: cargo test --locked --all-features --all-targets
+      - name: cargo test --locked workspace
+        run: cargo test --exclude lib-sf --exclude sqlparser --exclude sqlparser_derive --workspace --locked --all-features --all-targets
       # https://github.com/rust-lang/cargo/issues/6669
-      - name: cargo test --doc
-        run: cargo test --locked --all-features --doc
+      - name: cargo test --doc workspace
+        run: cargo test --exclude lib-sf --exclude sqlparser --exclude sqlparser_derive --workspace --locked --all-features --doc
+      - name: cargo test libs-sf ffi
+        run: cargo test -p lib-sf --no-default-features --locked --all-targets
+      - name: cargo test --doc libs-sf ffi
+        run: cargo test -p lib-sf --no-default-features --locked --doc
   minimal:
     # This action chooses the oldest version of the dependencies permitted by Cargo.toml to ensure
     # that this crate is compatible with the minimal version that this crate and its dependencies
@@ -84,8 +88,10 @@ jobs:
         run: rustup default stable
       - name: cargo update -Zminimal-versions
         run: cargo +nightly update -Zminimal-versions
-      - name: cargo test
-        run: cargo test --locked --all-features --all-targets
+      - name: cargo test workspace
+        run: cargo test --exclude lib-sf --exclude sqlparser --exclude sqlparser_derive --workspace --locked --all-features --all-targets
+      - name: cargo test libs-sf ffi
+        run: cargo test -p lib-sf --no-default-features --locked --all-targets
   os-check:
     # run cargo test on mac and windows
     runs-on: ${{ matrix.os }}
@@ -111,8 +117,10 @@ jobs:
       - name: cargo generate-lockfile
         if: hashFiles('Cargo.lock') == ''
         run: cargo generate-lockfile
-      - name: cargo test
-        run: cargo test --locked --all-features --all-targets
+      - name: cargo test workspace
+        run: cargo test --exclude lib-sf --exclude sqlparser --exclude sqlparser_derive --workspace --locked --all-features --all-targets
+      - name: cargo test libs-sf ffi
+        run: cargo test -p lib-sf --no-default-features --locked --all-targets
   coverage:
     # use llvm-cov to build and collect coverage and outputs in a format that
     # is compatible with codecov.io
@@ -153,13 +161,16 @@ jobs:
       - name: cargo generate-lockfile
         if: hashFiles('Cargo.lock') == ''
         run: cargo generate-lockfile
-      - name: cargo llvm-cov
-        run: cargo llvm-cov --locked --all-features --lcov --output-path lcov.info
+      - name: cargo llvm-cov workspace
+        run: cargo llvm-cov --locked --all-features --lcov --output-path lcov_workspace.info --workspace --exclude sqlparser --exclude lib-sf --exclude sqlparser_derive
+      - name: cargo llvm-cov lib-sf ffi
+        run: cargo llvm-cov --locked --lcov --output-path lcov_libsf.info -p lib-sf --no-default-features
       - name: Record Rust version
         run: echo "RUST=$(rustc --version)" >> "$GITHUB_ENV"
       - name: Upload to codecov.io
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # tag=v5.5.2
         with:
+          files: lcov_libsf.info,lcov_workspace.info
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
           env_vars: OS,RUST

@@ -8,10 +8,14 @@ repository.workspace = true
 
 [lib]
 name = "lib_sf"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["extension-module"]
+extension-module = ["pyo3/extension-module"]
 
 [dependencies]
-pyo3 = { version = "0.28.2", features = ["extension-module"]}
+pyo3 = { version = "0.28.2" }
 pythonize = { version = "0.28.0", features = ["serde_json"] }
 serde = {workspace = true }
 sqlparser = { workspace = true }
