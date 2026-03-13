@@ -8,7 +8,6 @@ default-members = [
 ]
 
 [workspace.package]
-name = "lsf"
 version = "0.1.0"
 authors = []
 edition = "2024"

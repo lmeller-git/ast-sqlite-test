@@ -2,7 +2,10 @@
 name = "lib_sf"
 version = "0.1.0"
 license = "MIT"
+license-files = ["LICENSE", "crates/lsf-ffi/LICENSE-sqloxide"]
 requires-python = ">=3.7"
+readme = "README.md"
+description = "Project 1 for course Automated Software Testing ETH"
 
 [build-system]
 requires = ["maturin>=1.0"]
@@ -17,3 +20,6 @@ python-source = "python"
 
 [tool.ruff]
 cache-dir = ".ruff_cache"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402"]

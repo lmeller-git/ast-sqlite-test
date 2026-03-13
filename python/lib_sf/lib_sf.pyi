@@ -168,7 +168,8 @@ class Insert(TypedDict("Insert", {"or": Any | None})):
     partitioned: Any | None
     after_columns: list[Any]
     table: bool
-    on: dict[str, Any] | None  # e.g. {"OnConflict": {"conflict_target": None, "action": "DoNothing"}},
+    # e.g. {"OnConflict": {"conflict_target": None, "action": "DoNothing"}}
+    on: dict[str, Any] | None
     returning: Any | None
     replace_into: bool
     priority: Any | None
