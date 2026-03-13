@@ -1,3 +1,9 @@
-**/.coverage
+# ignored files for rust code
+**/target
 
-**/__pycache__/
+# ignored files for pyhton code
+**/__pycache__
+
+# other
+**/.coverage
+**.so

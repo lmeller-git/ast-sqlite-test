@@ -1,0 +1,3 @@
+[submodule "extern/sqlparser-rs"]
+	path = extern/sqlparser-rs
+	url = https://github.com/lmeller-git/datafusion-sqlparser-rs
