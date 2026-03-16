@@ -19,7 +19,7 @@ jobs:
           submodules: true
 
       - name: set up
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
