@@ -29,8 +29,10 @@ jobs:
       - name: cargo generate-lockfile
         if: hashFiles('Cargo.lock') == ''
         run: cargo generate-lockfile
-      - name: cargo test --locked
-        run: cargo test --locked --all-features --all-targets
+      - name: cargo test workspace
+        run: cargo test --exclude lib-sf --exclude sqlparser --exclude sqlparser_derive --workspace --locked --all-features --all-targets
+      - name: cargo test libs-sf ffi
+        run: cargo test -p lib-sf --no-default-features --locked --all-targets
   # https://twitter.com/alcuadrado/status/1571291687837732873
   update:
     # This action checks that updating the dependencies of this crate to the latest available that
@@ -55,8 +57,13 @@ jobs:
       - name: cargo update
         if: hashFiles('Cargo.lock') != ''
         run: cargo update
-      - name: cargo test
+      - name: cargo test workspace
         if: hashFiles('Cargo.lock') != ''
-        run: cargo test --locked --all-features --all-targets
+        run: cargo test --exclude lib-sf --exclude sqlparser --exclude sqlparser_derive --workspace --locked --all-features --all-targets
+        env:
+          RUSTFLAGS: -D deprecated
+      - name: cargo test lib-sf ffi
+        if: hashFiles('Cargo.lock') != ''
+        run: cargo test -p lib-sf --no-default-features --locked --all-targets
         env:
           RUSTFLAGS: -D deprecated
