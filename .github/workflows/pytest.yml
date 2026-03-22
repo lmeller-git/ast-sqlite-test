@@ -46,8 +46,8 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           env_vars: OS,PYTHON
   os-check:
-    runs-on: $${{ matrix.os }}
-    name: ${{ matrix.ox }} / python
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.os }} / python
     strategy:
       fail-fast: false
       matrix:
