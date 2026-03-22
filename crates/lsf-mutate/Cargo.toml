@@ -1,5 +1,5 @@
 [package]
-name = "lsf-engine"
+name = "lsf-mutate"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -12,5 +12,4 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 lsf-core = { workspace = true }
-lsf-mutate = { workspace = true }
-indexmap = "2.13.0"
+rand = { workspace = true }

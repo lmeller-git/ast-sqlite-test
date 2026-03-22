@@ -1,16 +1,26 @@
 // Adapted from sqloxide (https://github.com/wseaton/sqloxide)
 // Original author: Will Eaton — MIT License
 
-use pyo3::{exceptions::PyValueError, prelude::*};
+use engine::{Engine, SchedulerBuilder, StrategyBuilder};
+use lsf_core::entry::{CorpusEntry as RawCorpusEntry, ID as RawID, RawEntry as RawestEntry};
+use pyo3::{exceptions::PyValueError, prelude::*, pymodule};
 use sqlparser::{
     dialect::{dialect_from_str, *},
     parser::Parser,
 };
+use visitor::{
+    depythonize_query,
+    extract_expressions,
+    extract_relations,
+    mutate_expressions,
+    mutate_relations,
+    pythonize_query_output,
+};
 
+use crate::engine::{SeedGeneratorBuilder, SelectedGeneration};
+
+mod engine;
 mod visitor;
-use visitor::{extract_expressions, extract_relations, mutate_expressions, mutate_relations};
-
-use crate::visitor::{depythonize_query, pythonize_query_output};
 
 /// Function to parse SQL statements from a string. Returns a list with
 /// one item per query statement.
@@ -49,16 +59,89 @@ fn restore_ast(_py: Python, ast: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
         .map(std::string::ToString::to_string)
         .collect::<Vec<String>>())
 }
+#[pyclass(from_py_object)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
+pub struct ID(RawID);
+
+#[pymethods]
+impl ID {
+    #[new]
+    pub fn new() -> Self {
+        Self(RawID::next())
+    }
+}
+
+impl From<RawID> for ID {
+    fn from(value: RawID) -> Self {
+        ID(value)
+    }
+}
+
+#[pyclass(from_py_object)]
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CorpusEntry(RawCorpusEntry);
+
+#[pymethods]
+impl CorpusEntry {
+    #[getter]
+    pub fn id(&self) -> ID {
+        self.0.id().into()
+    }
+
+    pub fn as_ast(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        pythonize_query_output(py, self.0.ast().clone())
+    }
+}
+
+#[pyclass]
+#[derive(Debug, PartialEq, Eq)]
+pub struct RawEntry(Option<RawestEntry>);
+
+#[pymethods]
+impl RawEntry {
+    #[getter]
+    pub fn id(&self) -> ID {
+        self.0.as_ref().unwrap().id().into()
+    }
+
+    pub fn as_ast(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        pythonize_query_output(py, self.0.as_ref().unwrap().ast().clone())
+    }
+
+    pub fn into_corpus_entry(&mut self) -> CorpusEntry {
+        CorpusEntry(
+            self.0
+                .take()
+                .unwrap()
+                .into_corpus_entry(lsf_core::entry::Meta {}),
+        )
+    }
+}
 
 #[pymodule]
-fn lib_sf(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn lib_sf(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_sql, m)?)?;
     m.add_function(wrap_pyfunction!(restore_ast, m)?)?;
-    // TODO: maybe refactor into seperate module
-    m.add_function(wrap_pyfunction!(extract_relations, m)?)?;
-    m.add_function(wrap_pyfunction!(mutate_relations, m)?)?;
-    m.add_function(wrap_pyfunction!(extract_expressions, m)?)?;
-    m.add_function(wrap_pyfunction!(mutate_expressions, m)?)?;
+
+    m.add_class::<ID>()?;
+    m.add_class::<RawEntry>()?;
+    m.add_class::<CorpusEntry>()?;
+
+    let engine = PyModule::new(py, "engine")?;
+    engine.add_class::<Engine>()?;
+    engine.add_class::<StrategyBuilder>()?;
+    engine.add_class::<SchedulerBuilder>()?;
+    engine.add_class::<SeedGeneratorBuilder>()?;
+    engine.add_class::<SelectedGeneration>()?;
+    m.add_submodule(&engine)?;
+
+    let visitor = PyModule::new(py, "visitor")?;
+    visitor.add_function(wrap_pyfunction!(extract_relations, m)?)?;
+    visitor.add_function(wrap_pyfunction!(mutate_relations, m)?)?;
+    visitor.add_function(wrap_pyfunction!(extract_expressions, m)?)?;
+    visitor.add_function(wrap_pyfunction!(mutate_expressions, m)?)?;
+    m.add_submodule(&visitor)?;
+
     Ok(())
 }
 

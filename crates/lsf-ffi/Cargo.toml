@@ -21,3 +21,4 @@ serde = {workspace = true }
 sqlparser = { workspace = true }
 lsf-core = { workspace = true }
 lsf-engine = { workspace = true }
+lsf-mutate = { workspace = true }
