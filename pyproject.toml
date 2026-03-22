@@ -6,6 +6,14 @@ license-files = ["LICENSE", "crates/lsf-ffi/LICENSE-sqloxide"]
 requires-python = ">=3.7"
 readme = "README.md"
 description = "Project 1 for course Automated Software Testing ETH"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "pytest",
+  "pytest-cov",
+  "maturin"
+]
 
 [build-system]
 requires = ["maturin>=1.0"]
