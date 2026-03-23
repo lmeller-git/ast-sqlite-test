@@ -5,13 +5,27 @@ use rand::random_range;
 use sqlparser::ast::visit_relations_mut;
 use thiserror::Error;
 
+mod afl;
+mod control;
+mod ident;
+mod random_mutate;
+mod recurse;
+mod slice;
+
+pub use afl::*;
+pub use control::*;
+pub use ident::*;
+pub use random_mutate::*;
+pub use recurse::*;
+pub use slice::*;
+
 pub trait MutationStrategy: Send + Sync {
     fn breed(
         &self,
         parent: &RawEntry,
         parent_gen: &[ID],
         mapping: &HashMap<ID, CorpusEntry>,
-    ) -> Result<RawEntry, MutationError>;
+    ) -> Result<MutationState, MutationError>;
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
@@ -29,14 +43,17 @@ impl MutationStrategy for Merger {
         parent: &RawEntry,
         parent_gen: &[ID],
         mapping: &HashMap<ID, CorpusEntry>,
-    ) -> Result<RawEntry, MutationError> {
+    ) -> Result<MutationState, MutationError> {
         let other_idx = random_range(..parent_gen.len());
         if let Some(other) = mapping.get(&parent_gen[other_idx]) {
             let mut new = parent.ast().clone();
             new.extend(other.ast().iter().cloned());
-            Ok(RawEntry::new(new, vec![parent.id(), other.id()]))
+            Ok(MutationState::Mutated(RawEntry::new(
+                new,
+                [parent.id(), other.id()].into(),
+            )))
         } else {
-            Err(MutationError::TODO)
+            Err(MutationError::NOPARENT(parent_gen[other_idx]))
         }
     }
 }
@@ -58,7 +75,7 @@ impl MutationStrategy for RandomUpperCase {
         parent: &RawEntry,
         _parent_gen: &[ID],
         _mapping: &HashMap<ID, CorpusEntry>,
-    ) -> Result<RawEntry, MutationError> {
+    ) -> Result<MutationState, MutationError> {
         let mut ast = parent.ast().clone();
 
         _ = visit_relations_mut(&mut ast, |relation| {
@@ -79,27 +96,34 @@ impl MutationStrategy for RandomUpperCase {
             }
         });
 
-        Ok(RawEntry::new(ast, vec![parent.id()]))
+        Ok(MutationState::Mutated(RawEntry::new(
+            ast,
+            [parent.id()].into(),
+        )))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum MutationState {
+    Mutated(RawEntry),
+    Unchanged,
+}
+
+impl MutationState {
+    pub fn into_option(self) -> Option<RawEntry> {
+        match self {
+            Self::Mutated(some) => Some(some),
+            Self::Unchanged => None,
+        }
     }
 }
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum MutationError {
-    #[error("TODO")]
-    TODO,
-}
-
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+    #[error("No entry with id {0:?} exists in mapping.")]
+    NOPARENT(ID),
+    #[error("The AST of node {0:?} is invalid for the purpose of this mutation")]
+    INVALIDAST(ID),
+    #[error("No mutation was done")]
+    NOOP,
 }
