@@ -7,7 +7,15 @@ use lsf_engine::{
     Schedule,
     SelectedGeneration as RawSelectedGeneration,
 };
-use lsf_mutate::{Merger, MutationStrategy, RandomUpperCase};
+use lsf_mutate::{
+    Merger,
+    MutationStrategy,
+    RandomMutationSampler,
+    RandomUpperCase,
+    SliceIn,
+    TableGuard,
+    TableNameScramble,
+};
 use pyo3::prelude::*;
 
 use crate::{CorpusEntry, RawEntry};
@@ -43,6 +51,14 @@ impl Engine {
 
     pub fn snapshot(&self) -> Vec<CorpusEntry> {
         self.0.snapshot().into_iter().map(CorpusEntry).collect()
+    }
+
+    pub fn clear_strategies(&mut self) {
+        self.0.clear_strategies();
+    }
+
+    pub fn add_strategy(&mut self, mut strategy: PyRefMut<StrategyBuilder>) {
+        self.0.add_strategy(strategy.0.take().unwrap());
     }
 }
 
@@ -102,6 +118,34 @@ impl StrategyBuilder {
     #[staticmethod]
     pub fn merger() -> Self {
         Self(Some(Box::new(Merger) as Box<dyn MutationStrategy>))
+    }
+
+    #[staticmethod]
+    pub fn random_sampler(max_choices: usize, mut choices: Vec<PyRefMut<StrategyBuilder>>) -> Self {
+        Self(Some(Box::new(RandomMutationSampler::new(
+            max_choices,
+            choices
+                .iter_mut()
+                .map(|strat| strat.0.take().unwrap())
+                .collect(),
+        ))))
+    }
+
+    #[staticmethod]
+    pub fn slice_in() -> Self {
+        Self(Some(Box::new(SliceIn {}) as Box<dyn MutationStrategy>))
+    }
+
+    #[staticmethod]
+    pub fn table_scrambler() -> Self {
+        Self(Some(
+            Box::new(TableNameScramble {}) as Box<dyn MutationStrategy>
+        ))
+    }
+
+    #[staticmethod]
+    pub fn table_guard() -> Self {
+        Self(Some(Box::new(TableGuard {}) as Box<dyn MutationStrategy>))
     }
 }
 

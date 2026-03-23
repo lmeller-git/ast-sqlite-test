@@ -1,7 +1,12 @@
-use std::{collections::HashMap, fmt::Debug, ops::RangeBounds, path::PathBuf};
+use std::{
+    collections::{BTreeSet, HashMap},
+    fmt::Debug,
+    ops::RangeBounds,
+    path::PathBuf,
+};
 
 use lsf_core::entry::{CorpusEntry, ID, RawEntry};
-use lsf_mutate::MutationStrategy;
+use lsf_mutate::{MutationState, MutationStrategy};
 use sqlparser::{dialect::SQLiteDialect, parser::Parser};
 
 use crate::schedule::{Queue, Schedule};
@@ -48,16 +53,23 @@ impl Engine {
             .iter()
             .filter_map(|entry| {
                 if let Some(parent_entry) = self.corpus.get(entry) {
-                    let mut entry = parent_entry.raw().clone();
-                    let mut strategies = self.strategies.iter();
-                    while let Some(strategy) = strategies.next()
-                        && let Ok(new) = strategy
-                            .breed(&entry, &next_batch, &self.corpus)
-                            .inspect_err(|e| eprintln!("\x1b[31mMUTATION ERROR\x1b[0m : {:?}", e))
-                    {
-                        entry = new;
+                    let mut state = MutationState::Unchanged;
+                    let mut current_parent = parent_entry.raw();
+
+                    for strategy in &self.strategies {
+                        if let Ok(MutationState::Mutated(next)) =
+                            strategy.breed(current_parent, &next_batch, &self.corpus)
+                        {
+                            state = MutationState::Mutated(next);
+                            current_parent = if let MutationState::Mutated(next_parent) = &state {
+                                next_parent
+                            } else {
+                                unreachable!()
+                            }
+                        }
                     }
-                    (entry.ast() != parent_entry.ast()).then_some(entry)
+
+                    state.into_option()
                 } else {
                     None
                 }
@@ -191,8 +203,10 @@ impl LiteralSeeder {
 impl ObtainSeed for LiteralSeeder {
     fn obtain(&self) -> Vec<CorpusEntry> {
         let mut v = Vec::new();
-        if let Ok(ast) = Parser::parse_sql(&SQLiteDialect {}, &self.lit) {
-            v.push(RawEntry::new(ast, Vec::new()).into_corpus_entry(lsf_core::entry::Meta {}));
+        if let Ok(ast) = Parser::parse_sql(&SQLiteDialect {}, &self.lit)
+            .inspect_err(|e| eprintln!("could not parse sql \n{}\n due to {:?}\n", self.lit, e))
+        {
+            v.push(RawEntry::new(ast, BTreeSet::new()).into_corpus_entry(lsf_core::entry::Meta {}));
         }
         v
     }
