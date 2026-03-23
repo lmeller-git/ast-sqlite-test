@@ -12,7 +12,7 @@ use lsf_mutate::{
     MutationStrategy,
     RandomMutationSampler,
     RandomUpperCase,
-    SliceIn,
+    SpliceIn,
     TableGuard,
     TableNameScramble,
 };
@@ -26,13 +26,16 @@ pub struct Engine(RawEngine);
 #[pymethods]
 impl Engine {
     #[new]
+    #[pyo3(signature = (scheduler, strategies, rng_seed = 42))]
     pub fn new(
         mut scheduler: PyRefMut<SchedulerBuilder>,
         mut strategies: Vec<PyRefMut<StrategyBuilder>>,
+        rng_seed: u64,
     ) -> Self {
         Self(RawEngine::new(
             scheduler.0.take().unwrap(),
             strategies.iter_mut().map(|s| s.0.take().unwrap()).collect(),
+            rng_seed,
         ))
     }
 
@@ -138,7 +141,7 @@ impl StrategyBuilder {
 
     #[staticmethod]
     pub fn slice_in() -> Self {
-        Self(Some(Box::new(SliceIn {}) as Box<dyn MutationStrategy>))
+        Self(Some(Box::new(SpliceIn {}) as Box<dyn MutationStrategy>))
     }
 
     #[staticmethod]

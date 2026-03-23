@@ -3,8 +3,7 @@ from lib_sf import engine, restore_ast
 
 def main():
     mutation_engine = engine.Engine(
-        engine.SchedulerBuilder.fifo(),
-        [engine.StrategyBuilder.table_guard()],
+        engine.SchedulerBuilder.fifo(), [engine.StrategyBuilder.table_guard()], 42
     )
 
     mutation_engine.populate(
@@ -40,6 +39,7 @@ def main():
             ),
         ]
     )
+
     next_gen = mutation_engine.mutate_batch(8)
     selected = [raw.into_corpus_entry() for raw in next_gen.into_members()]
     mutation_engine.commit_generation(engine.SelectedGeneration(selected))

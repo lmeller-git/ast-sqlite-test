@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use lsf_core::entry::{CorpusEntry, ID, RawEntry};
-use rand::random_range;
+use rand::{Rng, RngExt};
 use sqlparser::ast::visit_relations_mut;
 use thiserror::Error;
 
@@ -28,6 +28,7 @@ pub trait MutationStrategy: Send + Sync {
         parent: &RawEntry,
         parent_gen: &[ID],
         mapping: &HashMap<ID, CorpusEntry>,
+        rng: &mut dyn Rng,
     ) -> Result<MutationState, MutationError>;
 }
 
@@ -46,8 +47,9 @@ impl MutationStrategy for Merger {
         parent: &RawEntry,
         parent_gen: &[ID],
         mapping: &HashMap<ID, CorpusEntry>,
+        rng: &mut dyn Rng,
     ) -> Result<MutationState, MutationError> {
-        let other_idx = random_range(..parent_gen.len());
+        let other_idx = rng.random_range(..parent_gen.len());
         if let Some(other) = mapping.get(&parent_gen[other_idx]) {
             let mut new = parent.ast().clone();
             new.extend(other.ast().iter().cloned());
@@ -78,11 +80,12 @@ impl MutationStrategy for RandomUpperCase {
         parent: &RawEntry,
         _parent_gen: &[ID],
         _mapping: &HashMap<ID, CorpusEntry>,
+        rng: &mut dyn Rng,
     ) -> Result<MutationState, MutationError> {
         let mut ast = parent.ast().clone();
 
         _ = visit_relations_mut(&mut ast, |relation| {
-            let rd = random_range(0.0..=1.);
+            let rd = rng.random_range(0.0..=1.);
             for id in &mut relation.0 {
                 match id {
                     sqlparser::ast::ObjectNamePart::Identifier(id) => {
@@ -134,6 +137,7 @@ pub enum MutationError {
 
 #[cfg(test)]
 pub(crate) fn test_single_mutation(sql: &str, expected: &str, strategy: Box<dyn MutationStrategy>) {
+    use rand::{SeedableRng, rngs::SmallRng};
     use sqlparser::{dialect::SQLiteDialect, parser::Parser};
 
     let parsed = Parser::parse_sql(&SQLiteDialect {}, sql).unwrap();
@@ -148,6 +152,7 @@ pub(crate) fn test_single_mutation(sql: &str, expected: &str, strategy: Box<dyn 
                 entry.clone().into_corpus_entry(lsf_core::entry::Meta {}),
             )]
             .into()),
+            &mut SmallRng::seed_from_u64(42),
         )
         .unwrap();
     let MutationState::Mutated(child) = res else {

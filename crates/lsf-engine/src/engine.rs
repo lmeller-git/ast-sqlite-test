@@ -7,6 +7,7 @@ use std::{
 
 use lsf_core::entry::{CorpusEntry, ID, RawEntry};
 use lsf_mutate::{MutationState, MutationStrategy};
+use rand::{SeedableRng, rngs::SmallRng};
 use sqlparser::{dialect::SQLiteDialect, parser::Parser};
 
 use crate::schedule::{Queue, Schedule};
@@ -16,6 +17,7 @@ pub struct Engine {
     scheduler: Box<dyn Schedule>,
     active: Queue<ID>,
     strategies: Vec<Box<dyn MutationStrategy>>,
+    rng: SmallRng,
 }
 
 impl Debug for Engine {
@@ -29,12 +31,17 @@ impl Debug for Engine {
 }
 
 impl Engine {
-    pub fn new(scheduler: Box<dyn Schedule>, strategies: Vec<Box<dyn MutationStrategy>>) -> Self {
+    pub fn new(
+        scheduler: Box<dyn Schedule>,
+        strategies: Vec<Box<dyn MutationStrategy>>,
+        rng_seed: u64,
+    ) -> Self {
         Self {
             scheduler,
             strategies,
             corpus: Default::default(),
             active: Default::default(),
+            rng: SmallRng::seed_from_u64(rng_seed),
         }
     }
 
@@ -52,7 +59,9 @@ impl Engine {
     }
 
     pub fn mutate_batch(&mut self, batch_size: usize) -> Generation {
-        let next_batch = self.scheduler.next_batch(&mut self.active, batch_size);
+        let next_batch = self
+            .scheduler
+            .next_batch(&mut self.active, batch_size, &mut self.rng);
         next_batch
             .iter()
             .filter_map(|entry| {
@@ -62,7 +71,7 @@ impl Engine {
 
                     for strategy in &self.strategies {
                         if let Ok(MutationState::Mutated(next)) =
-                            strategy.breed(current_parent, &next_batch, &self.corpus)
+                            strategy.breed(current_parent, &next_batch, &self.corpus, &mut self.rng)
                         {
                             state = MutationState::Mutated(next);
                             current_parent = if let MutationState::Mutated(next_parent) = &state {
@@ -107,7 +116,11 @@ impl Engine {
     }
 
     pub fn snapshot(&self) -> Vec<CorpusEntry> {
-        self.corpus.values().cloned().collect()
+        let mut snapshot: Vec<CorpusEntry> = self.corpus.values().cloned().collect();
+        // sort snapshot, to ensure same output across runs/snapshots, as this is created from std::collections::HashMap.
+        // This may actually be necessary if a snapshot could at some point be fed back into the engine
+        snapshot.sort_by_key(|item| item.id());
+        snapshot
     }
 }
 
@@ -118,10 +131,12 @@ pub struct Generation {
 }
 
 impl Generation {
+    #[allow(dead_code)]
     fn new() -> Self {
         Self::with_capacity(0)
     }
 
+    #[allow(dead_code)]
     fn with_capacity(cap: usize) -> Self {
         Self {
             members: Vec::with_capacity(cap),
@@ -182,6 +197,7 @@ pub trait ObtainSeed: Send + Sync {
     fn obtain(&self) -> Vec<CorpusEntry>;
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct SeedDirReader {
     dir: PathBuf,
@@ -218,14 +234,14 @@ impl ObtainSeed for LiteralSeeder {
 
 #[cfg(test)]
 mod tests {
-    use lsf_mutate::{RandomUpperCase, SliceIn};
+    use lsf_mutate::{RandomUpperCase, SpliceIn};
 
     use super::*;
     use crate::FIFOScheduler;
 
     #[test]
     fn engine_functionality() {
-        let mut engine = Engine::new(Box::new(FIFOScheduler {}), vec![Box::new(SliceIn {})]);
+        let mut engine = Engine::new(Box::new(FIFOScheduler {}), vec![Box::new(SpliceIn {})], 42);
         engine.clear_strategies();
         assert!(engine.strategies.is_empty());
         engine.add_strategy(Box::new(RandomUpperCase::new(1.)));
@@ -254,7 +270,7 @@ mod tests {
             "SELECT a FROM b".to_string(),
         ))]);
 
-        engine.add_strategy(Box::new(SliceIn {}));
+        engine.add_strategy(Box::new(SpliceIn {}));
         assert!(!engine.mutate_batch(1).members().is_empty());
     }
 }

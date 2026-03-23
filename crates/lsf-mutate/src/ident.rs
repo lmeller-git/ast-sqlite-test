@@ -1,5 +1,5 @@
 use lsf_core::entry::RawEntry;
-use rand::random_range;
+use rand::{Rng, RngExt};
 use sqlparser::ast::{
     CreateTable,
     ObjectName,
@@ -22,6 +22,7 @@ impl MutationStrategy for TableNameScramble {
         parent: &lsf_core::entry::RawEntry,
         _parent_gen: &[lsf_core::entry::ID],
         _mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut tables = Vec::new();
 
@@ -54,7 +55,7 @@ impl MutationStrategy for TableNameScramble {
                 let ObjectName(name_parts) = relation;
                 for part in name_parts {
                     if let ObjectNamePart::Identifier(ident) = part {
-                        let random_choice = random_range(..tables.len());
+                        let random_choice = rng.random_range(..tables.len());
                         ident.value = tables[random_choice].clone();
                         child_is_mutated = true;
                     }
@@ -82,6 +83,7 @@ impl MutationStrategy for TableGuard {
         parent: &RawEntry,
         _parent_gen: &[lsf_core::entry::ID],
         _mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        _rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut child_ast = parent.ast().clone();
         let mut mutation_occured = false;

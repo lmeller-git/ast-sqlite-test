@@ -235,6 +235,7 @@ dependencies = [
  "indexmap",
  "lsf-core",
  "lsf-mutate",
+ "rand",
  "serde",
  "sqlparser",
  "thiserror",

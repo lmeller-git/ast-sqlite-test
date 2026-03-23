@@ -1,5 +1,5 @@
 use lsf_core::entry::RawEntry;
-use rand::random_range;
+use rand::{Rng, RngExt};
 
 use crate::{MutationState, MutationStrategy};
 
@@ -30,8 +30,9 @@ impl MutationStrategy for RandomMutationSampler {
         parent: &lsf_core::entry::RawEntry,
         parent_gen: &[lsf_core::entry::ID],
         mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        rng: &mut dyn Rng,
     ) -> Result<MutationState, crate::MutationError> {
-        let n_chosen = random_range(self.choose_min..=self.choose_max);
+        let n_chosen = rng.random_range(self.choose_min..=self.choose_max);
         if n_chosen == 0 {
             return Ok(MutationState::Unchanged);
         }
@@ -40,9 +41,9 @@ impl MutationStrategy for RandomMutationSampler {
         let mut current_parent: &RawEntry = parent;
 
         for i in 0..n_chosen {
-            let chosen_strategy = random_range(..self.choices.len());
+            let chosen_strategy = rng.random_range(..self.choices.len());
             if let Ok(MutationState::Mutated(mut next)) =
-                self.choices[chosen_strategy].breed(current_parent, parent_gen, mapping)
+                self.choices[chosen_strategy].breed(current_parent, parent_gen, mapping, rng)
             {
                 if i > 0 && status != MutationState::Unchanged {
                     next.parents_mut().extend(current_parent.parents());
@@ -62,10 +63,11 @@ impl MutationStrategy for RandomMutationSampler {
 
 #[cfg(test)]
 mod tests {
+    use rand::{SeedableRng, rngs::SmallRng};
     use sqlparser::{dialect::SQLiteDialect, parser::Parser};
 
     use super::*;
-    use crate::{RandomUpperCase, SliceIn, test_single_mutation};
+    use crate::{RandomUpperCase, SpliceIn, test_single_mutation};
 
     #[test]
     fn random_sampler() {
@@ -79,7 +81,7 @@ mod tests {
         let res = RandomMutationSampler::new(
             1,
             1,
-            vec![Box::new(RandomUpperCase::new(1.)), Box::new(SliceIn {})],
+            vec![Box::new(RandomUpperCase::new(1.)), Box::new(SpliceIn {})],
         )
         .breed(
             &entry,
@@ -89,6 +91,7 @@ mod tests {
                 entry.clone().into_corpus_entry(lsf_core::entry::Meta {}),
             )]
             .into()),
+            &mut SmallRng::seed_from_u64(42),
         )
         .unwrap();
         let MutationState::Mutated(child) = res else {
@@ -110,7 +113,11 @@ mod tests {
         test_single_mutation(
             sql,
             expected3,
-            Box::new(RandomMutationSampler::new(2, 2, vec![Box::new(SliceIn {})])),
+            Box::new(RandomMutationSampler::new(
+                2,
+                2,
+                vec![Box::new(SpliceIn {})],
+            )),
         );
     }
 }
