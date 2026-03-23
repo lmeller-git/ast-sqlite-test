@@ -34,3 +34,18 @@ impl MutationStrategy for SliceIn {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_single_mutation;
+
+    #[test]
+    fn slice_basic() {
+        test_single_mutation(
+            "SELECT A FROM B",
+            "SELECT A FROM B; SELECT A FROM B",
+            Box::new(SliceIn {}),
+        );
+    }
+}

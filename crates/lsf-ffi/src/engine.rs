@@ -121,9 +121,14 @@ impl StrategyBuilder {
     }
 
     #[staticmethod]
-    pub fn random_sampler(max_choices: usize, mut choices: Vec<PyRefMut<StrategyBuilder>>) -> Self {
+    pub fn random_sampler(
+        max_choices: usize,
+        min_choices: usize,
+        mut choices: Vec<PyRefMut<StrategyBuilder>>,
+    ) -> Self {
         Self(Some(Box::new(RandomMutationSampler::new(
             max_choices,
+            min_choices,
             choices
                 .iter_mut()
                 .map(|strat| strat.0.take().unwrap())

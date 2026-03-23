@@ -19,8 +19,12 @@ pub struct Engine {
 }
 
 impl Debug for Engine {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Fuzing Engine")
+            .field("corpus", &self.corpus)
+            .field("breeding population", &self.active)
+            .field("n strategies", &self.strategies.len())
+            .finish()
     }
 }
 
@@ -209,5 +213,48 @@ impl ObtainSeed for LiteralSeeder {
             v.push(RawEntry::new(ast, BTreeSet::new()).into_corpus_entry(lsf_core::entry::Meta {}));
         }
         v
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use lsf_mutate::{RandomUpperCase, SliceIn};
+
+    use super::*;
+    use crate::FIFOScheduler;
+
+    #[test]
+    fn engine_functionality() {
+        let mut engine = Engine::new(Box::new(FIFOScheduler {}), vec![Box::new(SliceIn {})]);
+        engine.clear_strategies();
+        assert!(engine.strategies.is_empty());
+        engine.add_strategy(Box::new(RandomUpperCase::new(1.)));
+
+        assert!(engine.mutate_batch(16).members().is_empty());
+
+        engine.populate(vec![Box::new(LiteralSeeder::new(
+            "SELECT a FROM b".to_string(),
+        ))]);
+
+        assert!(engine.mutate_batch(0).members().is_empty());
+        let mut children = engine.mutate_batch(1);
+        assert!(!children.members().is_empty());
+        assert!(engine.mutate_batch(1).members().is_empty());
+
+        engine.commit_generation(
+            children
+                .drain(..)
+                .map(|raw| raw.into_corpus_entry(lsf_core::entry::Meta {}))
+                .collect(),
+        );
+        engine.clear_strategies();
+        assert!(engine.mutate_batch(1).members().is_empty());
+
+        engine.populate(vec![Box::new(LiteralSeeder::new(
+            "SELECT a FROM b".to_string(),
+        ))]);
+
+        engine.add_strategy(Box::new(SliceIn {}));
+        assert!(!engine.mutate_batch(1).members().is_empty());
     }
 }

@@ -12,10 +12,13 @@ mod random_mutate;
 mod recurse;
 mod slice;
 
+#[allow(unused_imports)]
 pub use afl::*;
 pub use control::*;
 pub use ident::*;
+#[allow(unused_imports)]
 pub use random_mutate::*;
+#[allow(unused_imports)]
 pub use recurse::*;
 pub use slice::*;
 
@@ -80,20 +83,21 @@ impl MutationStrategy for RandomUpperCase {
 
         _ = visit_relations_mut(&mut ast, |relation| {
             let rd = random_range(0.0..=1.);
-            match &mut relation.0[0] {
-                sqlparser::ast::ObjectNamePart::Identifier(id) => {
-                    if rd <= self.threshhold {
-                        id.value = id.value.to_ascii_uppercase();
+            for id in &mut relation.0 {
+                match id {
+                    sqlparser::ast::ObjectNamePart::Identifier(id) => {
+                        if rd <= self.threshhold {
+                            id.value = id.value.to_ascii_uppercase();
+                        }
                     }
-                    std::ops::ControlFlow::Continue::<()>(())
-                }
-                sqlparser::ast::ObjectNamePart::Function(func) => {
-                    if rd <= self.threshhold {
-                        func.name.value = func.name.value.to_ascii_uppercase();
+                    sqlparser::ast::ObjectNamePart::Function(func) => {
+                        if rd <= self.threshhold {
+                            func.name.value = func.name.value.to_ascii_uppercase();
+                        }
                     }
-                    std::ops::ControlFlow::Continue::<()>(())
                 }
             }
+            std::ops::ControlFlow::Continue::<()>(())
         });
 
         Ok(MutationState::Mutated(RawEntry::new(
@@ -126,4 +130,60 @@ pub enum MutationError {
     INVALIDAST(ID),
     #[error("No mutation was done")]
     NOOP,
+}
+
+#[cfg(test)]
+pub(crate) fn test_single_mutation(sql: &str, expected: &str, strategy: Box<dyn MutationStrategy>) {
+    use sqlparser::{dialect::SQLiteDialect, parser::Parser};
+
+    let parsed = Parser::parse_sql(&SQLiteDialect {}, sql).unwrap();
+    let entry = RawEntry::new(parsed, Default::default());
+
+    let res = strategy
+        .breed(
+            &entry,
+            &[entry.id()],
+            &([(
+                entry.id(),
+                entry.clone().into_corpus_entry(lsf_core::entry::Meta {}),
+            )]
+            .into()),
+        )
+        .unwrap();
+    let MutationState::Mutated(child) = res else {
+        panic!()
+    };
+
+    assert_eq!(
+        expected,
+        child
+            .ast()
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+            .join("; ")
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_merger() {
+        test_single_mutation(
+            "SELECT A FROM B",
+            "SELECT A FROM B; SELECT A FROM B",
+            Box::new(Merger {}),
+        );
+    }
+
+    #[test]
+    fn random_upper() {
+        test_single_mutation(
+            "CREATE TABLE b (); SELECT a FROM b",
+            "CREATE TABLE B (); SELECT a FROM B",
+            Box::new(RandomUpperCase::new(1.)),
+        );
+    }
 }

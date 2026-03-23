@@ -92,3 +92,32 @@ impl AsRef<RawEntry> for CorpusEntry {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn id_unique() {
+        let id1 = ID::next();
+        let id2 = ID::next();
+        assert!(id2 > id1);
+
+        let raw = RawEntry::new(vec![], [].into());
+        let raw2 = RawEntry::new(vec![], [].into());
+        assert!(raw.id() > id2);
+        assert!(raw2.id() > raw.id());
+    }
+
+    #[test]
+    fn entry() {
+        let raw = RawEntry::new(vec![], [].into());
+        let raw2 = RawEntry::new(vec![], [raw.id()].into());
+        assert_ne!(raw, raw2);
+        assert!(raw.parents().next().is_none());
+        assert_eq!(*raw2.parents().next().unwrap(), raw.id());
+
+        let entry = raw.clone().into_corpus_entry(Meta {});
+        assert_eq!(*entry, raw);
+    }
+}

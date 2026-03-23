@@ -106,3 +106,26 @@ impl MutationStrategy for TableGuard {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_single_mutation;
+    #[test]
+    fn table_name_scrambler() {
+        test_single_mutation(
+            "CREATE TABLE A (); SELECT BAR FROM C; SELECT FOO FROM A",
+            "CREATE TABLE A (); SELECT BAR FROM A; SELECT FOO FROM A",
+            Box::new(TableNameScramble {}),
+        );
+    }
+
+    #[test]
+    fn table_guard() {
+        test_single_mutation(
+            "CREATE TABLE A (); CREATE TABLE A ()",
+            "CREATE TABLE IF NOT EXISTS A (); CREATE TABLE IF NOT EXISTS A ()",
+            Box::new(TableGuard {}),
+        );
+    }
+}
