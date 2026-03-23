@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeSet,
     ops::{Deref, DerefMut},
     sync::atomic::AtomicU32,
 };
@@ -26,12 +27,12 @@ pub struct Meta {}
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct RawEntry {
     id: ID,
-    parents: Vec<ID>,
+    parents: BTreeSet<ID>,
     ast: AST,
 }
 
 impl RawEntry {
-    pub fn new(ast: AST, parents: Vec<ID>) -> Self {
+    pub fn new(ast: AST, parents: BTreeSet<ID>) -> Self {
         Self {
             id: ID::next(),
             parents,
@@ -51,8 +52,12 @@ impl RawEntry {
         &self.ast
     }
 
-    pub fn parents(&self) -> &[ID] {
-        &self.parents
+    pub fn parents(&self) -> impl Iterator<Item = &ID> {
+        self.parents.iter()
+    }
+
+    pub fn parents_mut(&mut self) -> &mut BTreeSet<ID> {
+        &mut self.parents
     }
 }
 
@@ -84,6 +89,6 @@ impl DerefMut for CorpusEntry {
 
 impl AsRef<RawEntry> for CorpusEntry {
     fn as_ref(&self) -> &RawEntry {
-        &**self
+        self
     }
 }
