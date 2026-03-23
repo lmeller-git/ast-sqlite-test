@@ -12,6 +12,7 @@ use lsf_mutate::{
     MutationStrategy,
     RandomMutationSampler,
     RandomUpperCase,
+    Randomly,
     SpliceIn,
     TableGuard,
     TableNameScramble,
@@ -102,7 +103,7 @@ pub struct SchedulerBuilder(Option<Box<dyn Schedule>>);
 impl SchedulerBuilder {
     #[staticmethod]
     pub fn fifo() -> Self {
-        Self(Some(Box::new(RawFIFOScheduler {}) as Box<dyn Schedule>))
+        Self(Some(Box::new(RawFIFOScheduler {})))
     }
 }
 
@@ -112,15 +113,13 @@ pub struct StrategyBuilder(Option<Box<dyn MutationStrategy>>);
 #[pymethods]
 impl StrategyBuilder {
     #[staticmethod]
-    pub fn random_uppercase(threshhold: f32) -> Self {
-        Self(Some(
-            Box::new(RandomUpperCase::new(threshhold)) as Box<dyn MutationStrategy>
-        ))
+    pub fn uppercase() -> Self {
+        Self(Some(Box::new(RandomUpperCase::new())))
     }
 
     #[staticmethod]
     pub fn merger() -> Self {
-        Self(Some(Box::new(Merger) as Box<dyn MutationStrategy>))
+        Self(Some(Box::new(Merger)))
     }
 
     #[staticmethod]
@@ -140,20 +139,26 @@ impl StrategyBuilder {
     }
 
     #[staticmethod]
-    pub fn slice_in() -> Self {
-        Self(Some(Box::new(SpliceIn {}) as Box<dyn MutationStrategy>))
+    pub fn randomize(mut strategy: PyRefMut<StrategyBuilder>, probability: f64) -> Self {
+        Self(Some(Box::new(Randomly::new(
+            strategy.0.take().unwrap(),
+            probability,
+        ))))
+    }
+
+    #[staticmethod]
+    pub fn splice_in() -> Self {
+        Self(Some(Box::new(SpliceIn {})))
     }
 
     #[staticmethod]
     pub fn table_scrambler() -> Self {
-        Self(Some(
-            Box::new(TableNameScramble {}) as Box<dyn MutationStrategy>
-        ))
+        Self(Some(Box::new(TableNameScramble {})))
     }
 
     #[staticmethod]
     pub fn table_guard() -> Self {
-        Self(Some(Box::new(TableGuard {}) as Box<dyn MutationStrategy>))
+        Self(Some(Box::new(TableGuard {})))
     }
 }
 
@@ -164,8 +169,6 @@ pub struct SeedGeneratorBuilder(Option<Box<dyn ObtainSeed>>);
 impl SeedGeneratorBuilder {
     #[staticmethod]
     pub fn literal(lit: &str) -> Self {
-        Self(Some(
-            Box::new(LiteralSeeder::new(lit.to_string())) as Box<dyn ObtainSeed>
-        ))
+        Self(Some(Box::new(LiteralSeeder::new(lit.to_string()))))
     }
 }

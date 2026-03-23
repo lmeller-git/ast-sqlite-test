@@ -244,7 +244,7 @@ mod tests {
         let mut engine = Engine::new(Box::new(FIFOScheduler {}), vec![Box::new(SpliceIn {})], 42);
         engine.clear_strategies();
         assert!(engine.strategies.is_empty());
-        engine.add_strategy(Box::new(RandomUpperCase::new(1.)));
+        engine.add_strategy(Box::new(RandomUpperCase::new()));
 
         assert!(engine.mutate_batch(16).members().is_empty());
 

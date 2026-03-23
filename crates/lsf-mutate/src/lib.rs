@@ -6,21 +6,21 @@ use sqlparser::ast::visit_relations_mut;
 use thiserror::Error;
 
 mod afl;
-mod control;
 mod ident;
 mod random_mutate;
 mod recurse;
-mod slice;
+mod sample;
+mod splice;
 
 #[allow(unused_imports)]
 pub use afl::*;
-pub use control::*;
 pub use ident::*;
 #[allow(unused_imports)]
 pub use random_mutate::*;
 #[allow(unused_imports)]
 pub use recurse::*;
-pub use slice::*;
+pub use sample::*;
+pub use splice::*;
 
 pub trait MutationStrategy: Send + Sync {
     fn breed(
@@ -63,14 +63,12 @@ impl MutationStrategy for Merger {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct RandomUpperCase {
-    threshhold: f32,
-}
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct RandomUpperCase {}
 
 impl RandomUpperCase {
-    pub fn new(threshhold: f32) -> Self {
-        Self { threshhold }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -80,33 +78,35 @@ impl MutationStrategy for RandomUpperCase {
         parent: &RawEntry,
         _parent_gen: &[ID],
         _mapping: &HashMap<ID, CorpusEntry>,
-        rng: &mut dyn Rng,
+        _rng: &mut dyn Rng,
     ) -> Result<MutationState, MutationError> {
         let mut ast = parent.ast().clone();
+        let mut was_mutated = false;
 
         _ = visit_relations_mut(&mut ast, |relation| {
-            let rd = rng.random_range(0.0..=1.);
             for id in &mut relation.0 {
                 match id {
                     sqlparser::ast::ObjectNamePart::Identifier(id) => {
-                        if rd <= self.threshhold {
-                            id.value = id.value.to_ascii_uppercase();
-                        }
+                        id.value = id.value.to_ascii_uppercase();
+                        was_mutated = true;
                     }
                     sqlparser::ast::ObjectNamePart::Function(func) => {
-                        if rd <= self.threshhold {
-                            func.name.value = func.name.value.to_ascii_uppercase();
-                        }
+                        func.name.value = func.name.value.to_ascii_uppercase();
+                        was_mutated = true;
                     }
                 }
             }
             std::ops::ControlFlow::Continue::<()>(())
         });
 
-        Ok(MutationState::Mutated(RawEntry::new(
-            ast,
-            [parent.id()].into(),
-        )))
+        if was_mutated {
+            Ok(MutationState::Mutated(RawEntry::new(
+                ast,
+                [parent.id()].into(),
+            )))
+        } else {
+            Ok(MutationState::Unchanged)
+        }
     }
 }
 
@@ -188,7 +188,7 @@ mod tests {
         test_single_mutation(
             "CREATE TABLE b (); SELECT a FROM b",
             "CREATE TABLE B (); SELECT a FROM B",
-            Box::new(RandomUpperCase::new(1.)),
+            Box::new(RandomUpperCase::new()),
         );
     }
 }

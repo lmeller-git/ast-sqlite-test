@@ -48,7 +48,7 @@ def main():
     [
         mutation_engine.add_strategy(strat)
         for strat in [
-            engine.StrategyBuilder.slice_in(),
+            engine.StrategyBuilder.splice_in(),
             engine.StrategyBuilder.table_scrambler(),
         ]
     ]

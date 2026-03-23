@@ -3,6 +3,7 @@ use rand::{Rng, RngExt};
 
 use crate::{MutationState, MutationStrategy};
 
+/// applies a random sample with replacement of size choose_max..=choose_min from choices
 pub struct RandomMutationSampler {
     choices: Vec<Box<dyn MutationStrategy>>,
     choose_max: usize,
@@ -61,6 +62,37 @@ impl MutationStrategy for RandomMutationSampler {
     }
 }
 
+/// applies the strategy over with probability prob
+pub struct Randomly {
+    over: Box<dyn MutationStrategy>,
+    prob: f64,
+}
+
+impl Randomly {
+    pub fn new(over: Box<dyn MutationStrategy>, probability: f64) -> Self {
+        Self {
+            over,
+            prob: probability,
+        }
+    }
+}
+
+impl MutationStrategy for Randomly {
+    fn breed(
+        &self,
+        parent: &RawEntry,
+        parent_gen: &[lsf_core::entry::ID],
+        mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        rng: &mut dyn Rng,
+    ) -> Result<MutationState, crate::MutationError> {
+        if rng.random_bool(self.prob) {
+            self.over.breed(parent, parent_gen, mapping, rng)
+        } else {
+            Ok(MutationState::Unchanged)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use rand::{SeedableRng, rngs::SmallRng};
@@ -81,7 +113,7 @@ mod tests {
         let res = RandomMutationSampler::new(
             1,
             1,
-            vec![Box::new(RandomUpperCase::new(1.)), Box::new(SpliceIn {})],
+            vec![Box::new(RandomUpperCase::new()), Box::new(SpliceIn {})],
         )
         .breed(
             &entry,
@@ -118,6 +150,15 @@ mod tests {
                 2,
                 vec![Box::new(SpliceIn {})],
             )),
+        );
+    }
+
+    #[test]
+    fn randomly() {
+        test_single_mutation(
+            "SELECT a FROM b",
+            "SELECT a FROM B",
+            Box::new(Randomly::new(Box::new(RandomUpperCase::new()), 1.)),
         );
     }
 }
