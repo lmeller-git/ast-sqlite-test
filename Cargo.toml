@@ -17,10 +17,12 @@ repository = "https://github.com/lmeller-git/ast-sqlite-test"
 [workspace.dependencies]
 anyhow = "1.0.102"
 thiserror = "2.0.18"
-sqlparser = { path = "extern/sqlparser-rs", features = ["serde", "visitor"] }
+rand = "0.10.0"
 serde = "1.0.228"
+sqlparser = { path = "extern/sqlparser-rs", features = ["serde", "visitor"] }
 lsf-core = { path = "crates/lsf-core" }
 lsf-engine = { path = "crates/lsf-engine" }
+lsf-mutate = { path = "crates/lsf-mutate" }
 
 [patch.crates-io]
 sqlparser = { path = "extern/sqlparser-rs" }
