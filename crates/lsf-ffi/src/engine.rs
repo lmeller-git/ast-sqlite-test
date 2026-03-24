@@ -5,6 +5,7 @@ use lsf_engine::{
     LiteralSeeder,
     ObtainSeed,
     Schedule,
+    SeedDirReader,
     SelectedGeneration as RawSelectedGeneration,
 };
 use lsf_mutate::{
@@ -170,5 +171,10 @@ impl SeedGeneratorBuilder {
     #[staticmethod]
     pub fn literal(lit: &str) -> Self {
         Self(Some(Box::new(LiteralSeeder::new(lit.to_string()))))
+    }
+
+    #[staticmethod]
+    pub fn dir_reader(dir: &str) -> Self {
+        Self(Some(Box::new(SeedDirReader::new(dir.into()))))
     }
 }

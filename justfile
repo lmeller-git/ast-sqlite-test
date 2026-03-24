@@ -4,19 +4,19 @@ build:
 build-debug:
     uvx poetry run maturin develop
 
-run: build
-    python python/tester/main.py
+run *args: build
+    python python/tester/main.py {{args}}
 
-run-debug: build-debug
-    python python/tester/main.py
+run-debug *args: build-debug
+    python python/tester/main.py {{args}}
 
-test: build test-rust test-py
+test: build-debug test-rust test-py
 
-test-rust: build
+test-rust: build-debug
     cargo test -p lib-sf --no-default-features --locked --all-targets
     cargo test --exclude lib-sf --exclude sqlparser --exclude sqlparser_derive --workspace --locked --all-features --all-targets
 
-test-py: build
+test-py: build-debug
     uvx poetry run pytest
 
 lint:

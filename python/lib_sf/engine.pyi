@@ -30,6 +30,8 @@ class StrategyBuilder:
 class SeedGeneratorBuilder:
     @staticmethod
     def literal(lit: str) -> SeedGeneratorBuilder: ...
+    @staticmethod
+    def dir_reader(dir: str) -> SeedGeneratorBuilder: ...
 
 class Engine:
     def __init__(

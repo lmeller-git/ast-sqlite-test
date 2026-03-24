@@ -1,6 +1,8 @@
 use std::{
     collections::{BTreeSet, HashMap},
     fmt::Debug,
+    fs,
+    io::{self, Read},
     ops::RangeBounds,
     path::PathBuf,
 };
@@ -203,9 +205,52 @@ pub struct SeedDirReader {
     dir: PathBuf,
 }
 
+impl SeedDirReader {
+    pub fn new(path: PathBuf) -> Self {
+        Self { dir: path }
+    }
+
+    fn collect_contents(&self) -> Result<Vec<CorpusEntry>, io::Error> {
+        let entries = fs::read_dir(&self.dir)?;
+        let mut contents = Vec::with_capacity(entries.size_hint().0);
+        let mut buffer = String::new();
+
+        for entry in entries {
+            let entry = entry?;
+            let path = entry.path();
+            if let Some(b"sql") = path.extension().map(|ext| ext.as_encoded_bytes()) {
+                let f = fs::File::open(&path)?;
+                let mut reader = io::BufReader::new(f);
+
+                _ = reader.read_to_string(&mut buffer)?;
+                if let Ok(ast) = Parser::parse_sql(&SQLiteDialect {}, &buffer).inspect_err(|e| {
+                    eprintln!(
+                        "could not parse sql\n{}in file {}, due to {e:?}\n",
+                        &buffer,
+                        path.display()
+                    )
+                }) {
+                    contents.push(
+                        RawEntry::new(ast, [].into()).into_corpus_entry(lsf_core::entry::Meta {}),
+                    );
+                }
+                buffer.clear();
+            }
+        }
+        println!(
+            "parsed {} testaces from {}",
+            contents.len(),
+            self.dir.display()
+        );
+        Ok(contents)
+    }
+}
+
 impl ObtainSeed for SeedDirReader {
     fn obtain(&self) -> Vec<CorpusEntry> {
-        todo!()
+        self.collect_contents()
+            .inspect_err(|e| eprintln!("could not read dir {}, due to {e:?}", self.dir.display()))
+            .unwrap_or_default()
     }
 }
 

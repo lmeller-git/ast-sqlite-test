@@ -1,19 +1,17 @@
 from lib_sf import engine, restore_ast
+from argparse import ArgumentParser
 
 
-def main():
+def main(args):
     mutation_engine = engine.Engine(
         engine.SchedulerBuilder.fifo(), [engine.StrategyBuilder.table_guard()], 42
     )
 
     mutation_engine.populate(
         [
-            engine.SeedGeneratorBuilder.literal(
-                "\
-                CREATE TABLE b;\
-                SELECT a FROM b;\
-                "
-            ),
+            engine.SeedGeneratorBuilder.dir_reader("../project1_workspace/seeds/")
+            if args.seeds is not None
+            else engine.SeedGeneratorBuilder.literal("CREATE TABLE B; SELECT a FROM B"),
             engine.SeedGeneratorBuilder.literal(
                 "\
                 CREATE TABLE t0(c0 REAL UNIQUE);\
@@ -60,9 +58,9 @@ def main():
 
     snapshot = mutation_engine.snapshot()
 
-    print("snapshot:\n")
+    print(f"\nsnapshot with length {snapshot.__len__()}:\n")
     for member in snapshot:
-        print(restore_ast(member.as_ast()), end="\n")
+        print(restore_ast(member.as_ast()), end="\n\n")
 
 
 def add(n1: int, n2: int) -> int:
@@ -70,4 +68,7 @@ def add(n1: int, n2: int) -> int:
 
 
 if __name__ == "__main__":
-    main()
+    parser = ArgumentParser()
+    parser.add_argument("--seeds", default=None, type=str)
+    args = parser.parse_args()
+    main(args)
