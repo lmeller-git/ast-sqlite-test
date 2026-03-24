@@ -9,7 +9,7 @@ def main(args):
 
     mutation_engine.populate(
         [
-            engine.SeedGeneratorBuilder.dir_reader("../project1_workspace/seeds/")
+            engine.SeedGeneratorBuilder.dir_reader(args.seeds)
             if args.seeds is not None
             else engine.SeedGeneratorBuilder.literal("CREATE TABLE B; SELECT a FROM B"),
             engine.SeedGeneratorBuilder.literal(
