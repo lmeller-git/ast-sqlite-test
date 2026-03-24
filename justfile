@@ -10,6 +10,9 @@ run *args: build
 run-debug *args: build-debug
     python python/tester/main.py {{args}}
 
+tarball:
+    uvx poetry build
+
 test: build-debug test-rust test-py
 
 test-rust: build-debug
