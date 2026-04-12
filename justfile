@@ -5,10 +5,10 @@ build-debug:
     uvx poetry run maturin develop
 
 run *args: build
-    python python/tester/main.py {{args}}
+    uvx poetry run python python/tester/main.py {{args}}
 
 run-debug *args: build-debug
-    python python/tester/main.py {{args}}
+    uvx poetry run python python/tester/main.py {{args}}
 
 tarball:
     uvx poetry build
