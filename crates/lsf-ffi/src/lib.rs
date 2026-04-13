@@ -2,7 +2,7 @@
 // Original author: Will Eaton — MIT License
 
 use engine::{Engine, SchedulerBuilder, StrategyBuilder};
-use lsf_core::entry::{CorpusEntry as RawCorpusEntry, ID as RawID, RawEntry as RawestEntry};
+use lsf_core::entry::{CorpusEntry as RawCorpusEntry, ID as RawID, Meta, RawEntry as RawestEntry};
 use pyo3::{exceptions::PyValueError, prelude::*, pymodule};
 use sqlparser::{
     dialect::{dialect_from_str, *},
@@ -48,17 +48,19 @@ fn parse_sql(py: Python, sql: String, dialect: String) -> PyResult<Py<PyAny>> {
     Ok(output)
 }
 
-/// This utility function allows reconstituing a modified AST back into list of SQL queries.
+/// This utility function allows reconstituing a modified AST back into a SQL query.
 #[pyfunction]
 #[pyo3(text_signature = "(ast)")]
-fn restore_ast(_py: Python, ast: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
+fn restore_ast(_py: Python, ast: &Bound<'_, PyAny>) -> PyResult<String> {
     let parse_result = depythonize_query(ast)?;
 
     Ok(parse_result
         .iter()
         .map(std::string::ToString::to_string)
-        .collect::<Vec<String>>())
+        .collect::<Vec<String>>()
+        .join(";"))
 }
+
 #[pyclass(from_py_object)]
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct ID(RawID);
@@ -108,13 +110,71 @@ impl RawEntry {
         pythonize_query_output(py, self.0.as_ref().unwrap().ast().clone())
     }
 
-    pub fn into_corpus_entry(&mut self) -> CorpusEntry {
-        CorpusEntry(
-            self.0
-                .take()
-                .unwrap()
-                .into_corpus_entry(lsf_core::entry::Meta {}),
-        )
+    pub fn into_corpus_entry(&mut self, meta: TestMeta) -> CorpusEntry {
+        CorpusEntry(self.0.take().unwrap().into_corpus_entry(meta.0))
+    }
+}
+
+#[pyclass(from_py_object)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub struct TestMeta(Meta);
+
+#[pymethods]
+impl TestMeta {
+    #[new]
+    #[pyo3(signature = (exec_time, new_cov_nodes = 0, triggers_bug = false, is_valid_syntax = true))]
+    pub fn new(
+        exec_time: u32,
+        new_cov_nodes: usize,
+        triggers_bug: bool,
+        is_valid_syntax: bool,
+    ) -> Self {
+        Self(Meta {
+            triggers_bug,
+            is_valid_syntax,
+            new_cov_nodes,
+            exec_time,
+        })
+    }
+
+    #[getter]
+    pub fn triggers_bug(&self) -> bool {
+        self.0.triggers_bug
+    }
+
+    #[getter]
+    pub fn is_valid_syntax(&self) -> bool {
+        self.0.is_valid_syntax
+    }
+
+    #[getter]
+    pub fn exec_time(&self) -> u32 {
+        self.0.exec_time
+    }
+
+    #[getter]
+    pub fn new_cov_nodes(&self) -> usize {
+        self.0.new_cov_nodes
+    }
+
+    #[setter]
+    pub fn set_triggers_bug(&mut self, triggers_bug: bool) {
+        self.0.triggers_bug = triggers_bug
+    }
+
+    #[setter]
+    pub fn set_valid_syntax(&mut self, is_valid_syntax: bool) {
+        self.0.is_valid_syntax = is_valid_syntax
+    }
+
+    #[setter]
+    pub fn set_exec_time(&mut self, exec_time: u32) {
+        self.0.exec_time = exec_time
+    }
+
+    #[setter]
+    pub fn set_new_cov_nodes(&mut self, new_cov_nodes: usize) {
+        self.0.new_cov_nodes = new_cov_nodes
     }
 }
 
@@ -126,6 +186,7 @@ fn lib_sf(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ID>()?;
     m.add_class::<RawEntry>()?;
     m.add_class::<CorpusEntry>()?;
+    m.add_class::<TestMeta>()?;
 
     let engine = PyModule::new(py, "engine")?;
     engine.add_class::<Engine>()?;

@@ -1,9 +1,10 @@
 from lib_sf import engine, restore_ast
+from lib_sf.lib_sf import TestMeta
 from oracle import SqliteExecutor, DuplicateDetector
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 
 
-def main(args):
+def main(args: Namespace):
     mutation_engine = engine.Engine(
         engine.SchedulerBuilder.fifo(), [engine.StrategyBuilder.table_guard()], 42
     )
@@ -55,7 +56,7 @@ def main(args):
 
         # Keep only successful, non-duplicate queries
         if result.is_success() and not dedup.is_duplicate(result):
-            selected.append(raw.into_corpus_entry())
+            selected.append(raw.into_corpus_entry(TestMeta(0)))
             print(f"[BATCH 0] SUCCESS: hash={result.result_hash}, rows={result.output_rows}")
         elif result.is_error():
             dedup.record_error(result)
@@ -65,10 +66,7 @@ def main(args):
     mutation_engine.clear_strategies()
     [
         mutation_engine.add_strategy(strat)
-        for strat in [
-            engine.StrategyBuilder.splice_in(),
-            engine.StrategyBuilder.table_scrambler(),
-        ]
+        for strat in [engine.StrategyBuilder.splice_in(), engine.StrategyBuilder.table_scrambler()]
     ]
 
     for i in range(0, 5):
@@ -81,7 +79,7 @@ def main(args):
             if result.is_error():
                 dedup.record_error(result)
             if not dedup.is_duplicate(result):
-                selected.append(raw.into_corpus_entry())
+                selected.append(raw.into_corpus_entry(TestMeta(0)))
 
         mutation_engine.commit_generation(engine.SelectedGeneration(selected))
 
@@ -97,7 +95,9 @@ def main(args):
         query = restore_ast(member.as_ast())
         result = executor.execute(query)
         status_symbol = "✓" if result.is_success() else "✗"
-        print(f"{status_symbol} Query {i+1}: {result.status.value} ({result.execution_time:.4f}s)")
+        print(
+            f"{status_symbol} Query {i + 1}: {result.status.value} ({result.execution_time:.4f}s)"
+        )
         if result.is_success():
             print(f"  Output: {result.output_rows} rows, hash={result.result_hash}")
             successful_count += 1
@@ -110,13 +110,13 @@ def main(args):
 
     # Print oracle statistics
     stats = dedup.get_stats()
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("ORACLE STATISTICS")
-    print("="*60)
+    print("=" * 60)
     print(f"Unique successful queries: {stats['unique_results']}")
     print(f"Successful queries in snapshot: {successful_count}/{len(list(snapshot))}")
     print(f"Error breakdown: {stats['error_types']}")
-    print("="*60)
+    print("=" * 60)
 
 
 def add(n1: int, n2: int) -> int:
@@ -125,6 +125,6 @@ def add(n1: int, n2: int) -> int:
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--seeds", default=None, type=str)
+    _ = parser.add_argument("--seeds", default=None, type=str)
     args = parser.parse_args()
     main(args)

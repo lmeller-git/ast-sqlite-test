@@ -1,15 +1,19 @@
-from lib_sf import CorpusEntry, RawEntry
+from .lib_sf import CorpusEntry, RawEntry
+
 
 class Generation:
     def into_members(self) -> list[RawEntry]: ...
+
 
 class SelectedGeneration:
     def __init__(self, members: list[CorpusEntry]) -> None: ...
     def push(self, member: CorpusEntry) -> None: ...
 
+
 class SchedulerBuilder:
     @staticmethod
     def fifo() -> SchedulerBuilder: ...
+
 
 class StrategyBuilder:
     @staticmethod
@@ -17,7 +21,9 @@ class StrategyBuilder:
     @staticmethod
     def merger() -> StrategyBuilder: ...
     @staticmethod
-    def random_sampler(max_choices: int, min_choixes: int, choices: list[StrategyBuilder]) -> StrategyBuilder: ...
+    def random_sampler(
+        max_choices: int, min_choixes: int, choices: list[StrategyBuilder]
+    ) -> StrategyBuilder: ...
     @staticmethod
     def randomize(strategy: StrategyBuilder, probability: float) -> StrategyBuilder: ...
     @staticmethod
@@ -27,11 +33,13 @@ class StrategyBuilder:
     @staticmethod
     def table_guard() -> StrategyBuilder: ...
 
+
 class SeedGeneratorBuilder:
     @staticmethod
     def literal(lit: str) -> SeedGeneratorBuilder: ...
     @staticmethod
     def dir_reader(dir: str) -> SeedGeneratorBuilder: ...
+
 
 class Engine:
     def __init__(

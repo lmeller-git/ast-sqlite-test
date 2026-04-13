@@ -22,7 +22,12 @@ impl ID {
 }
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub struct Meta {}
+pub struct Meta {
+    pub triggers_bug: bool,
+    pub is_valid_syntax: bool,
+    pub new_cov_nodes: usize,
+    pub exec_time: u32,
+}
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct RawEntry {

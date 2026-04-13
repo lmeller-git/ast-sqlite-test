@@ -13,6 +13,7 @@ from contextlib import contextmanager
 
 class ExecutionStatus(Enum):
     """Status of SQL query execution."""
+
     SUCCESS = "success"
     SYNTAX_ERROR = "syntax_error"
     RUNTIME_ERROR = "runtime_error"
@@ -23,6 +24,7 @@ class ExecutionStatus(Enum):
 @dataclass
 class ExecutionResult:
     """Result of executing a SQL query."""
+
     status: ExecutionStatus
     result_hash: str
     execution_time: float
@@ -39,7 +41,7 @@ class ExecutionResult:
         return self.status in [
             ExecutionStatus.SYNTAX_ERROR,
             ExecutionStatus.RUNTIME_ERROR,
-            ExecutionStatus.CRASH
+            ExecutionStatus.CRASH,
         ]
 
     def __hash__(self):
@@ -107,7 +109,7 @@ class SqliteExecutor:
                         execution_time=elapsed,
                         error_message=str(e),
                         error_type="OperationalError",
-                        output_rows=0
+                        output_rows=0,
                     )
                 except sqlite3.ProgrammingError as e:
                     # Syntax error
@@ -118,7 +120,7 @@ class SqliteExecutor:
                         execution_time=elapsed,
                         error_message=str(e),
                         error_type="ProgrammingError",
-                        output_rows=0
+                        output_rows=0,
                     )
                 except Exception as e:
                     # Unexpected error
@@ -129,7 +131,7 @@ class SqliteExecutor:
                         execution_time=elapsed,
                         error_message=str(e),
                         error_type=type(e).__name__,
-                        output_rows=0
+                        output_rows=0,
                     )
 
                 # Fetch results and compute hash from last query
@@ -142,7 +144,7 @@ class SqliteExecutor:
                         status=ExecutionStatus.SUCCESS,
                         result_hash=result_hash,
                         execution_time=elapsed,
-                        output_rows=len(rows)
+                        output_rows=len(rows),
                     )
                 except Exception as e:
                     elapsed = time.time() - start_time
@@ -152,7 +154,7 @@ class SqliteExecutor:
                         execution_time=elapsed,
                         error_message=str(e),
                         error_type=type(e).__name__,
-                        output_rows=0
+                        output_rows=0,
                     )
 
         except Exception as e:
@@ -164,7 +166,7 @@ class SqliteExecutor:
                 execution_time=elapsed,
                 error_message=str(e),
                 error_type=type(e).__name__,
-                output_rows=0
+                output_rows=0,
             )
 
     @staticmethod
@@ -186,15 +188,15 @@ class SqliteExecutor:
             normalized.append(tuple(normalized_row))
 
         # Create hash
-        hash_input = str(sorted(normalized)).encode('utf-8')
+        hash_input = str(sorted(normalized)).encode("utf-8")
         return hashlib.sha256(hash_input).hexdigest()[:16]
 
     @staticmethod
     def _hash_error(error_msg: str) -> str:
         """Hash error message for duplicate error detection."""
         # Normalize error message (remove line numbers, etc.)
-        normalized = ''.join(c for c in error_msg if c.isalpha() or c.isspace())
-        hash_input = normalized.encode('utf-8')
+        normalized = "".join(c for c in error_msg if c.isalpha() or c.isspace())
+        hash_input = normalized.encode("utf-8")
         return hashlib.sha256(hash_input).hexdigest()[:16]
 
 
@@ -218,12 +220,8 @@ class DuplicateDetector:
     def record_error(self, result: ExecutionResult) -> None:
         """Record error for deduplication."""
         if result.error_type:
-            self.error_hashes[result.error_type] = \
-                self.error_hashes.get(result.error_type, 0) + 1
+            self.error_hashes[result.error_type] = self.error_hashes.get(result.error_type, 0) + 1
 
     def get_stats(self) -> dict:
         """Get deduplication statistics."""
-        return {
-            "unique_results": len(self.seen_hashes),
-            "error_types": self.error_hashes
-        }
+        return {"unique_results": len(self.seen_hashes), "error_types": self.error_hashes}

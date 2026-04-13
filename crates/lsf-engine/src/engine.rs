@@ -231,7 +231,8 @@ impl SeedDirReader {
                     )
                 }) {
                     contents.push(
-                        RawEntry::new(ast, [].into()).into_corpus_entry(lsf_core::entry::Meta {}),
+                        RawEntry::new(ast, [].into())
+                            .into_corpus_entry(lsf_core::entry::Meta::default()),
                     );
                 }
                 buffer.clear();
@@ -271,7 +272,10 @@ impl ObtainSeed for LiteralSeeder {
         if let Ok(ast) = Parser::parse_sql(&SQLiteDialect {}, &self.lit)
             .inspect_err(|e| eprintln!("could not parse sql \n{}\n due to {:?}\n", self.lit, e))
         {
-            v.push(RawEntry::new(ast, BTreeSet::new()).into_corpus_entry(lsf_core::entry::Meta {}));
+            v.push(
+                RawEntry::new(ast, BTreeSet::new())
+                    .into_corpus_entry(lsf_core::entry::Meta::default()),
+            );
         }
         v
     }
@@ -305,7 +309,7 @@ mod tests {
         engine.commit_generation(
             children
                 .drain(..)
-                .map(|raw| raw.into_corpus_entry(lsf_core::entry::Meta {}))
+                .map(|raw| raw.into_corpus_entry(lsf_core::entry::Meta::default()))
                 .collect(),
         );
         engine.clear_strategies();
