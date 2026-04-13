@@ -45,21 +45,21 @@ def main(args):
     # Initialize executor and duplicate detector
     executor = SqliteExecutor(timeout=5.0)
     dedup = DuplicateDetector()
-    
+
     next_gen = mutation_engine.mutate_batch(8)
     selected = []
     for raw in next_gen.into_members():
         # Execute query and check for validity
         query = restore_ast(raw.as_ast())
         result = executor.execute(query)
-        
+
         # Keep only successful, non-duplicate queries
         if result.is_success() and not dedup.is_duplicate(result):
             selected.append(raw.into_corpus_entry())
             print(f"[BATCH 0] SUCCESS: hash={result.result_hash}, rows={result.output_rows}")
         elif result.is_error():
             dedup.record_error(result)
-    
+
     mutation_engine.commit_generation(engine.SelectedGeneration(selected))
 
     mutation_engine.clear_strategies()
@@ -77,18 +77,18 @@ def main(args):
         for raw in next_gen.into_members():
             query = restore_ast(raw.as_ast())
             result = executor.execute(query)
-            
+
             if result.is_success() and not dedup.is_duplicate(result):
                 selected.append(raw.into_corpus_entry())
             elif result.is_error():
                 dedup.record_error(result)
-        
+
         mutation_engine.commit_generation(engine.SelectedGeneration(selected))
 
     snapshot = mutation_engine.snapshot()
 
     print(f"\nsnapshot with length {snapshot.__len__()}:\n")
-    
+
     # Test snapshot queries against oracle to show results
     print("SNAPSHOT QUERY EXECUTION RESULTS:")
     print("-" * 60)
@@ -107,7 +107,7 @@ def main(args):
             print(f"  Error: {result.error_type} - {result.error_message[:60]}")
         print(f"  SQL: {query[:80]}{'...' if len(query) > 80 else ''}")
         print()
-    
+
     # Print oracle statistics
     stats = dedup.get_stats()
     print("\n" + "="*60)
