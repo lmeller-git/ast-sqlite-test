@@ -78,10 +78,10 @@ def main(args):
             query = restore_ast(raw.as_ast())
             result = executor.execute(query)
 
-            if result.is_success() and not dedup.is_duplicate(result):
-                selected.append(raw.into_corpus_entry())
-            elif result.is_error():
+            if result.is_error():
                 dedup.record_error(result)
+            if not dedup.is_duplicate(result):
+                selected.append(raw.into_corpus_entry())
 
         mutation_engine.commit_generation(engine.SelectedGeneration(selected))
 
