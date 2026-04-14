@@ -65,3 +65,60 @@ mutate_batch will return CropusEntrys along with attached tokens.
 submit_selected will take CorpusEntry along with the attached tokens.
 
 tokens of invalid queries may be returned individually via retrun_token
+
+
+## Pseudo code:
+
+
+Event loop:
+
+  max_edges = init()
+
+  ipc_token_queue = IPCQueue(n_workers, max_edges)
+
+  engine = Engine(ipc_token_queue, ...)
+
+  todo_queue = Queue()
+
+  done_queue = Queue()
+
+  executor start (todo, done, ipc)
+
+  loop
+
+    batch = engine.mutate_batch()
+
+    todo_queue.extend(batch)
+
+    if done is not empty:
+
+      oracle test (test, result)
+
+      engine.add_back(test, result, token)
+
+    else:
+
+      engine.gc
+
+  end
+
+
+executor event loop:
+
+  loop
+
+    if todo_queue not empty:
+
+      dispatch worker (test, token)
+
+      done_queue.add(test, result, token)
+
+  end
+
+worker:
+
+      token = ipc_token_queue.get_one
+
+      execute test
+
+      return res, token

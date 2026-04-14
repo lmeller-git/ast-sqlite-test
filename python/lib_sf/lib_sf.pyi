@@ -2,7 +2,6 @@
 # Original author: Will Eaton — MIT License
 
 from typing import Any, Generic, Literal, TypeAlias, TypedDict, TypeVar
-from dataclasses import dataclass
 from . import engine as engine
 from . import visitor as visitor
 
@@ -24,23 +23,13 @@ class ID:
 class CorpusEntry:
     def id(self) -> ID: ...
     def as_ast(self) -> list[Statement]: ...
+    def to_sql_string(self) -> str: ...
 
 
 class RawEntry:
     def id(self) -> ID: ...
     def as_ast(self) -> list[Statement]: ...
-    def into_corpus_entry(self, meta: TestMeta) -> CorpusEntry: ...
-
-
-@dataclass
-class TestMeta:
-    def __init__(
-        self,
-        exec_time: int,
-        new_cov_nodes: int = 0,
-        triggers_bug: bool = False,
-        is_valid_syntax: bool = True,
-    ) -> None: ...
+    def to_sql_string(self) -> str: ...
 
 
 T = TypeVar("T")

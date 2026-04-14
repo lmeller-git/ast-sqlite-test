@@ -23,6 +23,7 @@ sqlparser = { path = "extern/sqlparser-rs", features = ["serde", "visitor"] }
 lsf-core = { path = "crates/lsf-core" }
 lsf-engine = { path = "crates/lsf-engine" }
 lsf-mutate = { path = "crates/lsf-mutate" }
+lsf-cov = { path = "crates/lsf-cov" }
 
 [patch.crates-io]
 sqlparser = { path = "extern/sqlparser-rs" }

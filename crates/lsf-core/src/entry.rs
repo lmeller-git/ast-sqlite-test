@@ -122,7 +122,7 @@ mod tests {
         assert!(raw.parents().next().is_none());
         assert_eq!(*raw2.parents().next().unwrap(), raw.id());
 
-        let entry = raw.clone().into_corpus_entry(Meta {});
+        let entry = raw.clone().into_corpus_entry(Meta::default());
         assert_eq!(*entry, raw);
     }
 }
