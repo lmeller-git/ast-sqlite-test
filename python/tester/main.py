@@ -1,10 +1,62 @@
 from lib_sf import engine
 from argparse import ArgumentParser, Namespace
+import asyncio
+from asyncio import PriorityQueue
+from lib_sf.lib_sf import RawEntry
 
 
-def main(args: Namespace):
-    ipc_queue = engine.IPCTokenQueue(1, 1)
+async def fuzzing_loop(
+    mutation_engine: engine.Engine,
+    ipc_queue: engine.IPCTokenQueue,
+    oracle_queue: PriorityQueue[tuple[int, engine.TestResult]],
+):
+    async def run_single_mutation(entry: RawEntry):
+        # TODO wait
+        token = ipc_queue.pop()
+        if token is None:
+            return
 
+        result = await execute_query("sqlite", entry.to_sql_string(), {"token_env": token.as_env()})
+
+        mutation_engine.commit_test_result(entry, result)
+
+        priority = 1
+        await oracle_queue.put((priority, result))
+
+    while True:
+        batch = mutation_engine.mutate_batch(8)
+        tasks = [run_single_mutation(entry) for entry in batch.into_members()]
+        _ = await asyncio.gather(*tasks)
+
+
+async def oracle(
+    mutation_engine: engine.Engine, incoming: PriorityQueue[tuple[int, engine.TestResult]]
+):
+    while True:
+        _priority, next_item = await incoming.get()
+
+        expected = await execute_query(
+            "sqlite3 ref", "TODO: should likely put the entry into the TestResult"
+        )
+        if expected != next_item:
+            print("found bug")
+
+        incoming.task_done()
+
+
+async def execute_query(
+    cmd: str, query: str, env: dict[str, str] | None = None
+) -> engine.TestResult | None:
+    # TODO spawn the tasks (maybe on a sparate thread)
+    pass
+
+
+async def init() -> int:
+    return 0
+
+async def main(args: Namespace):
+    max_edges = await init()
+    ipc_queue = engine.IPCTokenQueue(8, max_edges)
     mutation_engine = engine.Engine(
         engine.SchedulerBuilder.fifo(), [engine.StrategyBuilder.table_guard()], ipc_queue, 42
     )
@@ -22,16 +74,12 @@ def main(args: Namespace):
                 SELECT 1 FROM t0 WHERE 3175546974276630385 < c0;\
                 "
             ),
-
         ]
     )
 
-    next_gen = mutation_engine.mutate_batch(8)
+    oracle_queue = PriorityQueue(1024)
 
-    for raw in next_gen.into_members():
-        token = ipc_queue.pop()
-        if token is not None:
-            mutation_engine.commit_test_result(raw, engine.TestResult(0, token))
+    # TODO: force add guarded queries back to engine or skip this entirely
 
     mutation_engine.clear_strategies()
     [
@@ -44,6 +92,11 @@ def main(args: Namespace):
     for entry in snapshot:
         print(entry.to_sql_string())
 
+    _ = await asyncio.gather(
+        fuzzing_loop(mutation_engine, ipc_queue, oracle_queue),
+        oracle(mutation_engine, oracle_queue),
+    )
+
 
 def add(n1: int, n2: int) -> int:
     return n1 + n2
@@ -53,4 +106,4 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     _ = parser.add_argument("--seeds", default=None, type=str)
     args = parser.parse_args()
-    main(args)
+    asyncio.run(main(args))
