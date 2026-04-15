@@ -1,8 +1,0 @@
-services:
-  fuzzer:
-    build: .
-    shm_size: '1gb'
-    volumes:
-      - ./out:/app/out
-    security_opt:
-      - seccomp:unconfined

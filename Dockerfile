@@ -2,9 +2,9 @@ FROM theosotr/sqlite3-test:latest
 
 USER root
 RUN apt-get update && apt-get install -y \
+    build-essential \
     clang \
     curl \
-    build-essential \
     python3
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -20,7 +20,10 @@ RUN ./configure && make sqlite3.c
 WORKDIR /app
 COPY . /app/
 
+RUN cp /app/test-db.sh /usr/bin/test-db
+RUN chmod +x /usr/bin/test-db
 
 RUN just build
 ENTRYPOINT []
-CMD ["just", "run", "/home/test/seeds"]
+
+CMD ["/usr/bin/test-db"]
