@@ -14,6 +14,11 @@ pub struct SharedMemHandle {
 
 impl SharedMemHandle {
     pub fn new(n_workers: usize, max_edges: usize) -> Self {
+        println!(
+            "creating {} tokens with size {}",
+            n_workers * TOKENS_PER_WORKER,
+            max_edges
+        );
         let queue = Queue::new(n_workers * TOKENS_PER_WORKER);
 
         for i in 0..n_workers * TOKENS_PER_WORKER {

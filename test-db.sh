@@ -2,4 +2,4 @@
 
 cd /app
 
-just run --seeds /home/test/seeds
+just run-docker --seeds /home/test/seeds

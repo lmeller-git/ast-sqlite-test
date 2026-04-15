@@ -1,8 +1,8 @@
-build: #build-target
+build:
     uv sync
     uv run maturin develop --release
 
-build-debug: #build-target
+build-debug:
     uv run maturin develop
 
 build-hooks:
@@ -11,10 +11,10 @@ build-hooks:
 build-target: build-hooks
     clang -O3 \
         -fsanitize-coverage=trace-pc-guard \
-        -o out/sqlite3_fuzz \
+        -o sqlite3/sqlite3_guarded \
         /home/test/sqlite3-src/sqlite3.c \
         /home/test/sqlite3-src/shell.c \
-        target/release/liblsf_hooks.a \
+        -Wl,--whole-archive target/release/liblsf_hooks.a -Wl,--no-whole-archive \
         -lpthread -ldl -lm
 
 run *args: build
@@ -22,6 +22,9 @@ run *args: build
 
 run-debug *args: build-debug
     uv run python python/tester/main.py {{args}}
+
+run-docker *args:
+        uv run python python/tester/main.py {{args}}
 
 tarball:
     uv build
