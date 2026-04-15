@@ -3,17 +3,22 @@ from argparse import ArgumentParser, Namespace
 import asyncio
 from asyncio import PriorityQueue
 from lib_sf.lib_sf import RawEntry
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
 import os
+import time
 
 
-@dataclass
+@dataclass(order=True)
 class TestCapture:
-    stdout: bytes
-    stderr: bytes
-    exit: int | None
+    stdout: bytes = field(compare=False)
+    stderr: bytes = field(compare=False)
+    exit_code: int | None = field(compare=False)
+    query: str = field(compare=False)
     exec_time: int
+
+    def __format__(self, format_spec: str) -> str:
+        return f"TestCapture {{\nstdout: {self.stdout.decode()}\nstdserr: {self.stderr.decode()}\nexit_code: {self.exit_code}\nexec_time:{self.exec_time}\nquery: {self.query}\n}}"
 
 
 async def fuzzing_loop(
@@ -22,47 +27,58 @@ async def fuzzing_loop(
     oracle_queue: PriorityQueue[tuple[int, TestCapture]],
 ):
     async def run_single_mutation(entry: RawEntry):
-        # TODO wait
+        # TODO add exponential backoff
         token = ipc_queue.pop()
-        if token is None:
-            return
+        while token is None:
+            await asyncio.sleep(0.01)
+            token = ipc_queue.pop()
 
         result = await execute_query(
-            "./sqlite3/sqlite3_guarded", entry.to_sql_string(), {"token_env": token.as_env()}
+            "./sqlite3/sqlite3_guarded", entry.to_sql_string(), {"FUZZER_SHMEM_PATH": token.as_env()}
         )
 
         mutation_engine.commit_test_result(entry, engine.TestResult(result.exec_time, token))
 
-        priority = 1
+        # TODO prio by time + ecit_code + stderr
+        priority = result.exec_time
         await oracle_queue.put((-priority, result))
 
     while True:
         batch = mutation_engine.mutate_batch(8)
-        tasks = [run_single_mutation(entry) for entry in batch.into_members()]
+        members = batch.into_members()
+
+        if not members:
+            await asyncio.sleep(0.1)
+            continue
+
+        tasks = [run_single_mutation(entry) for entry in members]
         _ = await asyncio.gather(*tasks)
-        break
 
 
 async def oracle(mutation_engine: engine.Engine, incoming: PriorityQueue[tuple[int, TestCapture]]):
-    return
     while True:
         _, next_item = await incoming.get()
 
-        expected = await execute_query(
-            "sqlite3 ref", "TODO: should likely put the entry into the TestResult"
-        )
-        if expected != next_item:
-            print("found bug")
+        expected = await execute_query("/usr/bin/sqlite3-3.39.4", next_item.query)
+
+        if (
+            expected.stderr != next_item.stderr
+            or expected.stdout != next_item.stdout
+            or expected.exit_code != next_item.exit_code
+        ):
+            print(
+                f"found bug in query: {next_item.query}\nExpected: {expected}\nFound: {next_item}"
+            )
 
         incoming.task_done()
-        break
 
 
 async def execute_query(cmd: str, query: str, env: dict[str, str] | None = None) -> TestCapture:
-    # TODO spawn the tasks (maybe on a sparate thread)
     full_env = os.environ.copy()
     if env is not None:
         full_env.update(env)
+
+    start_time = time.perf_counter_ns()
 
     proc = await asyncio.create_subprocess_exec(
         cmd,
@@ -73,7 +89,10 @@ async def execute_query(cmd: str, query: str, env: dict[str, str] | None = None)
     )
 
     stdout, stderr = await proc.communicate(input=query.encode())
-    return TestCapture(stdout, stderr, proc.returncode, 0)
+
+    exec_time = time.perf_counter_ns() - start_time
+
+    return TestCapture(stdout, stderr, proc.returncode, query, exec_time)
 
 
 async def init() -> int:
@@ -84,7 +103,7 @@ async def init() -> int:
     if not match:
         raise RuntimeError(
             f"Failed to find max edges in output.\n \
-            Return Code: {res.exit}\n \
+            Return Code: {res.exit_code}\n \
             Stdout: '{output}'\n \
             Stderr: '{res.stderr.decode()}'"
         )
@@ -99,8 +118,6 @@ async def main(args: Namespace):
     mutation_engine = engine.Engine(
         engine.SchedulerBuilder.fifo(), [engine.StrategyBuilder.table_guard()], ipc_queue, 42
     )
-
-    args.seeds = None
 
     mutation_engine.populate(
         [

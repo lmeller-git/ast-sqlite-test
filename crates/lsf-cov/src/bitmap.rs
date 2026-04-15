@@ -1,5 +1,7 @@
 // TODO maybe change this to bitvec/bitslice later to save memory
 
+static mut TOTAL_FOUND: usize = 0;
+
 #[derive(Debug)]
 pub struct EdgeMap {
     raw_map: Vec<u8>,
@@ -14,7 +16,7 @@ impl EdgeMap {
     }
 
     pub fn update<'a>(&mut self, other: EdgeMapView<'a>) -> usize {
-        assert_eq!(
+        debug_assert_eq!(
             self.raw_map.len(),
             other.raw_view.len(),
             "Map sizes must match"
@@ -53,6 +55,17 @@ impl EdgeMap {
                 new_edges += 1;
                 self.raw_map[i] = 1;
             }
+        }
+
+        unsafe {
+            TOTAL_FOUND += new_edges;
+        }
+
+        if new_edges > 0 {
+            println!(
+                "Total coverage so far: {}%",
+                unsafe { TOTAL_FOUND } / self.raw_map.len() * 100
+            )
         }
 
         new_edges

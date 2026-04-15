@@ -69,6 +69,9 @@ impl Engine {
     }
 
     pub fn mutate_batch(&mut self, batch_size: usize) -> Generation {
+        if self.active.is_empty() {
+            println!("queue is empty!!!");
+        }
         let next_batch = self
             .scheduler
             .next_batch(&mut self.active, batch_size, &mut self.rng);
@@ -116,6 +119,8 @@ impl Engine {
             return;
         }
 
+        println!("added new entry with {} new edges", new_edges);
+
         meta.new_cov_nodes = new_edges;
         let entry = raw_entry.into_corpus_entry(meta);
         self.commit_generation(SelectedGeneration {
@@ -155,6 +160,10 @@ impl Engine {
         // This may actually be necessary if a snapshot could at some point be fed back into the engine
         snapshot.sort_by_key(|item| item.id());
         snapshot
+    }
+
+    pub fn gc(&mut self) {
+        todo!()
     }
 }
 
