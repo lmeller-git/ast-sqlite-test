@@ -63,6 +63,9 @@ impl Engine {
     }
 
     pub fn mutate_batch(&mut self, batch_size: usize) -> Generation {
+        if self.active.is_empty() {
+            println!("queue is empty!!!");
+        }
         let next_batch = self
             .scheduler
             .next_batch(&self.corpus, batch_size, &mut self.rng);

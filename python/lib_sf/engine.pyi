@@ -10,6 +10,7 @@ class SchedulerBuilder:
     def weighted_random() -> SchedulerBuilder: ...
 
 
+
 class StrategyBuilder:
     @staticmethod
     def uppercase() -> StrategyBuilder: ...
