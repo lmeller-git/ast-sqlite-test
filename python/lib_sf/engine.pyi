@@ -7,7 +7,8 @@ class Generation:
 
 class SchedulerBuilder:
     @staticmethod
-    def fifo() -> SchedulerBuilder: ...
+    def weighted_random() -> SchedulerBuilder: ...
+
 
 
 class StrategyBuilder:

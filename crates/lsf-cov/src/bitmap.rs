@@ -63,8 +63,8 @@ impl EdgeMap {
 
         if new_edges > 0 {
             println!(
-                "Total coverage so far: {}%",
-                unsafe { TOTAL_FOUND } / self.raw_map.len() * 100
+                "Total coverage so far: {:.3}%",
+                unsafe { TOTAL_FOUND } as f64 / self.raw_map.len() as f64 * 100.0
             )
         }
 

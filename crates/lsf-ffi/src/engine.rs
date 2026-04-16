@@ -3,12 +3,12 @@ use std::sync::Arc;
 use lsf_cov::ipc::{IPCToken, SharedMemHandle};
 use lsf_engine::{
     Engine as RawEngine,
-    FIFOScheduler as RawFIFOScheduler,
     Generation as RawGeneration,
     LiteralSeeder,
     ObtainSeed,
     Schedule,
     SeedDirReader,
+    WeightedRandomScheduler,
 };
 use lsf_mutate::{
     Merger,
@@ -134,8 +134,8 @@ pub struct SchedulerBuilder(Option<Box<dyn Schedule>>);
 #[pymethods]
 impl SchedulerBuilder {
     #[staticmethod]
-    pub fn fifo() -> Self {
-        Self(Some(Box::new(RawFIFOScheduler {})))
+    pub fn weighted_random() -> Self {
+        Self(Some(Box::new(WeightedRandomScheduler {})))
     }
 }
 

@@ -1,80 +1,60 @@
-use lsf_core::entry::ID;
-use rand::{Rng, RngExt};
+use lsf_core::entry::{ID, Meta};
+use rand::{
+    Rng,
+    distr::{Distribution, weighted::WeightedIndex},
+};
 
-pub(crate) type Queue<T> = Vec<T>;
+use crate::Corpus;
 
 pub trait Schedule: Send + Sync {
-    fn next_batch(&self, from: &mut Queue<ID>, size: usize, rng: &mut dyn Rng) -> Vec<ID>;
+    fn next_batch(&self, from: &Corpus, size: usize, rng: &mut dyn Rng) -> Vec<ID>;
 
-    fn next(&self, from: &mut Queue<ID>, rng: &mut dyn Rng) -> Option<ID> {
+    fn next(&self, from: &Corpus, rng: &mut dyn Rng) -> Option<ID> {
         self.next_batch(from, 1, rng).into_iter().next()
     }
 }
 
-pub struct FIFOScheduler {}
+#[derive(Default)]
+pub struct WeightedRandomScheduler {}
 
-impl Schedule for FIFOScheduler {
-    fn next_batch(&self, from: &mut Queue<ID>, size: usize, _rng: &mut dyn Rng) -> Vec<ID> {
-        from.split_off(from.len() - size.min(from.len()))
+impl WeightedRandomScheduler {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    fn calculate_weight(meta: &Meta) -> f64 {
+        let mut weight = 1.;
+        weight += (meta.new_cov_nodes as f64) * 20.;
+        weight *= 10000. / (meta.exec_time as f64 + 1.);
+        weight
     }
 }
 
-pub struct RandomScheduler {}
+impl Schedule for WeightedRandomScheduler {
+    fn next_batch(&self, from: &Corpus, size: usize, rng: &mut dyn Rng) -> Vec<ID> {
+        if from.entries.is_empty() {
+            return Vec::new();
+        }
 
-impl Schedule for RandomScheduler {
-    fn next_batch(&self, from: &mut Queue<ID>, size: usize, rng: &mut dyn Rng) -> Vec<ID> {
-        (0..size.min(from.len()))
-            .map(|_| {
-                let chosen_idx = rng.random_range(..from.len());
-                from.swap_remove(chosen_idx)
-            })
+        let mut ids = Vec::with_capacity(from.entries.len());
+        let mut weights = Vec::with_capacity(from.entries.len());
+
+        for (id, entry) in from.entries.iter() {
+            ids.push(*id);
+            weights.push(Self::calculate_weight(entry.meta()));
+        }
+
+        let dist = match WeightedIndex::new(&weights) {
+            Ok(dist) => dist,
+            Err(_) => WeightedIndex::new(vec![1.; weights.len()]).unwrap(),
+        };
+
+        dist.sample_iter(rng)
+            .take(size)
+            .map(|idx| ids[idx])
             .collect()
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use rand::{SeedableRng, rngs::SmallRng};
-
-    use super::*;
-
-    #[test]
-    fn fifo() {
-        let scheduler = FIFOScheduler {};
-        let mut queue: Vec<ID> = (0..10).map(|_| ID::next()).collect();
-        let queue_clone = queue.clone();
-        let mut rng = SmallRng::seed_from_u64(42);
-
-        assert_eq!(
-            &scheduler.next_batch(&mut queue, 3, &mut rng),
-            &queue_clone[7..]
-        );
-        assert_eq!(
-            &scheduler.next_batch(&mut queue, 3, &mut rng),
-            &queue_clone[4..7]
-        );
-        assert_eq!(
-            &scheduler.next_batch(&mut queue, 10, &mut rng),
-            &queue_clone[..4]
-        );
-        assert!(scheduler.next(&mut queue, &mut rng).is_none());
-    }
-
-    #[test]
-    fn radom() {
-        let scheduler = RandomScheduler {};
-        let mut queue: Vec<ID> = (0..10).map(|_| ID::next()).collect();
-        let queue_clone = queue.clone();
-        let mut rng = SmallRng::seed_from_u64(42);
-
-        let batch = scheduler.next_batch(&mut queue, 3, &mut rng);
-        assert!(batch.len() == 3);
-        assert!(batch.iter().all(|ele| queue_clone.contains(ele)));
-
-        let batch = scheduler.next_batch(&mut queue, 10, &mut rng);
-        assert!(batch.len() == 7);
-        assert!(batch.iter().all(|ele| queue_clone.contains(ele)));
-
-        assert!(scheduler.next(&mut queue, &mut rng).is_none());
-    }
-}
+mod tests {}
