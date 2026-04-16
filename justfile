@@ -46,4 +46,4 @@ lint:
 
 run-docker:
     docker build -t ast-sqlite-fuzzer .
-    docker run -v $(pwd)/crashes:/app/crashes --init -it --rm ast-sqlite-fuzzer /usr/bin/test-db
+    docker run -v $(pwd)/crashes:/app/crashes -v $(pwd)/queries:/app/queries --init -it --rm ast-sqlite-fuzzer /usr/bin/test-db

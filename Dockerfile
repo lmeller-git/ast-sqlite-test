@@ -23,6 +23,7 @@ COPY test-db.sh /usr/bin/test-db
 RUN chmod +x /usr/bin/test-db
 RUN mkdir -p /app/sqlite3
 RUN mkdir -p /app/crashes
+RUN mkdir -p /app/queries
 
 COPY pyproject.toml uv.lock ./
 RUN uv sync --no-install-project
@@ -32,5 +33,6 @@ COPY . /app/
 RUN just build-target && just build
 
 VOLUME ["/app/crashes"]
+VOLUME ["/app/queries"]
 
 ENTRYPOINT []

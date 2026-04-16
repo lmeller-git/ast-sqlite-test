@@ -106,23 +106,29 @@ impl Engine {
         let new_edges = self.corpus.edge_map.update(shmem.as_edge_map());
         self.shmem_queue.push(shmem).expect("token was duplicated");
 
-        if new_edges.is_empty() {
+        let is_diverse = self
+            .corpus
+            .diversity
+            .try_insert(raw_entry.id(), raw_entry.ast());
+
+        if !is_diverse && new_edges.is_empty() {
             return;
         }
 
-        println!("added new entry with {} new edges", new_edges.len());
-
         meta.new_cov_nodes = new_edges.len();
         let entry = raw_entry.into_corpus_entry(meta);
-        let is_best = self.corpus.entry_rating.update_if_best(
-            entry.id(),
-            entry.ast().len(),
-            entry.meta().exec_time,
-            new_edges.into_iter(),
-        );
 
-        if !is_best {
-            return;
+        if !new_edges.is_empty() {
+            let is_best = self.corpus.entry_rating.update_if_best(
+                entry.id(),
+                entry.ast().len(),
+                entry.meta().exec_time,
+                new_edges.into_iter(),
+            );
+
+            if !is_best && !is_diverse {
+                return;
+            }
         }
 
         self.commit_generation(SelectedGeneration {
@@ -161,13 +167,18 @@ impl Engine {
     }
 
     pub fn gc(&mut self) {
-        let should_keep = self.corpus.entry_rating.get_best_entries();
+        let mut should_keep = self.corpus.entry_rating.get_best_entries();
+        should_keep.extend(&self.corpus.diversity.entries);
         println!(
             "keeping {:1} out of {:0} entries",
             self.corpus.entries.len(),
             should_keep.len()
         );
         self.corpus.entries.retain(|id, _| should_keep.contains(id));
+    }
+
+    pub fn corpus_size(&self) -> usize {
+        self.corpus.entries.len()
     }
 }
 

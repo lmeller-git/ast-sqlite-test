@@ -92,6 +92,10 @@ impl Engine {
     pub fn gc(&mut self) {
         self.0.gc();
     }
+
+    pub fn corpus_size(&self) -> usize {
+        self.0.corpus_size()
+    }
 }
 
 #[pyclass]
