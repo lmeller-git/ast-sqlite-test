@@ -11,6 +11,7 @@ mod random_mutate;
 mod recurse;
 mod sample;
 mod splice;
+mod values;
 
 #[allow(unused_imports)]
 pub use afl::*;
@@ -21,6 +22,7 @@ pub use random_mutate::*;
 pub use recurse::*;
 pub use sample::*;
 pub use splice::*;
+pub use values::*;
 
 pub trait MutationStrategy: Send + Sync {
     fn breed(

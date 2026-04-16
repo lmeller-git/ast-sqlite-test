@@ -63,9 +63,6 @@ impl Engine {
     }
 
     pub fn mutate_batch(&mut self, batch_size: usize) -> Generation {
-        if self.active.is_empty() {
-            println!("queue is empty!!!");
-        }
         let next_batch = self
             .scheduler
             .next_batch(&self.corpus, batch_size, &mut self.rng);
@@ -109,14 +106,25 @@ impl Engine {
         let new_edges = self.corpus.edge_map.update(shmem.as_edge_map());
         self.shmem_queue.push(shmem).expect("token was duplicated");
 
-        if new_edges == 0 {
+        if new_edges.is_empty() {
             return;
         }
 
-        println!("added new entry with {} new edges", new_edges);
+        println!("added new entry with {} new edges", new_edges.len());
 
-        meta.new_cov_nodes = new_edges;
+        meta.new_cov_nodes = new_edges.len();
         let entry = raw_entry.into_corpus_entry(meta);
+        let is_best = self.corpus.entry_rating.update_if_best(
+            entry.id(),
+            entry.ast().len(),
+            entry.meta().exec_time,
+            new_edges.into_iter(),
+        );
+
+        if !is_best {
+            return;
+        }
+
         self.commit_generation(SelectedGeneration {
             members: vec![entry],
         });
@@ -129,6 +137,10 @@ impl Engine {
                 .into_iter()
                 .map(|entry| (entry.id(), entry)),
         );
+    }
+
+    pub fn return_token(&mut self, token: Box<IPCToken>) {
+        self.shmem_queue.push(token).expect("token was duplicated");
     }
 
     pub fn populate(&mut self, seed_gens: Vec<Box<dyn ObtainSeed>>) {
@@ -149,7 +161,13 @@ impl Engine {
     }
 
     pub fn gc(&mut self) {
-        todo!()
+        let should_keep = self.corpus.entry_rating.get_best_entries();
+        println!(
+            "keeping {:1} out of {:0} entries",
+            self.corpus.entries.len(),
+            should_keep.len()
+        );
+        self.corpus.entries.retain(|id, _| should_keep.contains(id));
     }
 }
 

@@ -104,6 +104,10 @@ impl CorpusEntry {
             .collect::<Vec<String>>()
             .join(";")
     }
+
+    pub fn clone_raw(&self) -> RawEntry {
+        RawEntry(Some(self.0.raw().clone()))
+    }
 }
 
 #[pyclass]
