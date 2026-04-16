@@ -25,7 +25,7 @@ async def run_single_mutation(
     entry: RawEntry,
     ipc_queue: engine.IPCTokenQueue,
     mutation_engine: engine.Engine,
-    oracle_queue: asyncio.PriorityQueue[tuple[int, TestCapture]],
+    oracle_queue: asyncio.PriorityQueue[tuple[int, TestCapture | None]],
 ):
     # TODO add exponential backoff
     token = ipc_queue.pop()
@@ -34,7 +34,7 @@ async def run_single_mutation(
         token = ipc_queue.pop()
 
     result = await execute_query(
-        "./sqlite3/sqlite3_guarded",
+        "/home/test/sqlite3-src/build/sqlite3",
         entry.to_sql_string(),
         {"FUZZER_SHMEM_PATH": token.as_env(), "ASAN_OPTIONS": "detect_leaks=0"},
     )
@@ -108,7 +108,7 @@ async def execute_query(
 
 
 async def init() -> int:
-    res = await execute_query("./sqlite3/sqlite3_guarded", ".quit", {"FUZZER_INIT": "1"})
+    res = await execute_query("/home/test/sqlite3-src/build/sqlite3", ".quit", {"FUZZER_INIT": "1"})
     output = res.stdout.decode()
 
     match = re.search(r"FUZZER_INIT: max edges = (\d+)", output)

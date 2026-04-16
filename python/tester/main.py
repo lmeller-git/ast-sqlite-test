@@ -45,10 +45,20 @@ async def main(args: Namespace):
     [
         mutation_engine.add_strategy(strat)
         for strat in [
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.splice_in(), 0.6),
+            engine.StrategyBuilder.randomize(engine.StrategyBuilder.splice_in(), 0.5),
             engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_scrambler(), 0.3),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.op_flip(), 0.5),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.num_bounds(), 0.5),
+            engine.StrategyBuilder.random_sampler(
+                1,
+                5,
+                [
+                    engine.StrategyBuilder.op_flip(),
+                    engine.StrategyBuilder.num_bounds(),
+                    engine.StrategyBuilder.null_inject(),
+                    engine.StrategyBuilder.type_cast(),
+                    engine.StrategyBuilder.set_ops(),
+                    engine.StrategyBuilder.sub_query(),
+                ],
+            ),
         ]
     ]
 
@@ -72,7 +82,7 @@ async def main(args: Namespace):
 
     _ = await asyncio.gather(fuzzing_loop(mutation_engine, ipc_queue, oracle_queue), oracle_task)
 
-    print("after loop:\n")
+    print("Saving 10000 queries to ./queries/\n", flush=True)
 
     snapshot = mutation_engine.snapshot()
 

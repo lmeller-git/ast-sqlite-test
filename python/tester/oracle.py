@@ -78,13 +78,15 @@ def is_interesting_unilateral(capture: TestCapture) -> bool:
     return stderr_matches_any(capture.stderr, INTERESTING_UNILATERAL_PATTERNS)
 
 
-async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture]]):
+async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]):
     crash_counter = 0
     seen_signatures: set[bytes] = set()
     os.makedirs("crashes", exist_ok=True)
 
     while True:
         _, item = await incoming.get()
+        if item is None:
+            return
 
         bug_type: str | None = None
         notes: str = ""
@@ -153,12 +155,14 @@ async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture]]):
         incoming.task_done()
 
 
-async def oracle__(incoming: asyncio.PriorityQueue[tuple[int, TestCapture]]):
+async def oracle__(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]):
     crash_counter = 0
     os.makedirs("crashes", exist_ok=True)
 
     while True:
         _, next_item = await incoming.get()
+        if next_item is None:
+            return
 
         if next_item.is_hang_or_crash is not None and next_item.is_hang_or_crash == "CRASH":
             if b"Parse error" in next_item.stderr:

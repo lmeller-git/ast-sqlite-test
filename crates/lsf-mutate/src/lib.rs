@@ -11,6 +11,7 @@ mod random_mutate;
 mod recurse;
 mod sample;
 mod splice;
+mod structure;
 mod values;
 
 #[allow(unused_imports)]
@@ -22,6 +23,7 @@ pub use random_mutate::*;
 pub use recurse::*;
 pub use sample::*;
 pub use splice::*;
+pub use structure::*;
 pub use values::*;
 
 pub trait MutationStrategy: Send + Sync {

@@ -63,6 +63,9 @@ impl Engine {
     }
 
     pub fn mutate_batch(&mut self, batch_size: usize) -> Generation {
+        if batch_size == 0 {
+            return Generation { members: vec![] };
+        }
         let next_batch = self
             .scheduler
             .next_batch(&self.corpus, batch_size, &mut self.rng);
@@ -170,9 +173,9 @@ impl Engine {
         let mut should_keep = self.corpus.entry_rating.get_best_entries();
         should_keep.extend(&self.corpus.diversity.entries);
         println!(
-            "keeping {:1} out of {:0} entries",
+            "keeping {} out of {} entries",
+            should_keep.len(),
             self.corpus.entries.len(),
-            should_keep.len()
         );
         self.corpus.entries.retain(|id, _| should_keep.contains(id));
     }

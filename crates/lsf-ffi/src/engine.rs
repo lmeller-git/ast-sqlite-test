@@ -13,14 +13,18 @@ use lsf_engine::{
 use lsf_mutate::{
     Merger,
     MutationStrategy,
+    NullInject,
     NumericBounds,
     OperatorFlip,
     RandomMutationSampler,
     RandomUpperCase,
     Randomly,
+    SetOps,
     SpliceIn,
+    SubQuery,
     TableGuard,
     TableNameScramble,
+    TypeCast,
 };
 use pyo3::prelude::*;
 
@@ -170,8 +174,8 @@ impl StrategyBuilder {
 
     #[staticmethod]
     pub fn random_sampler(
-        max_choices: usize,
         min_choices: usize,
+        max_choices: usize,
         mut choices: Vec<PyRefMut<StrategyBuilder>>,
     ) -> Self {
         Self(Some(Box::new(RandomMutationSampler::new(
@@ -217,6 +221,29 @@ impl StrategyBuilder {
     #[pyo3(signature = (mutate_chance = 0.3))]
     pub fn num_bounds(mutate_chance: f64) -> Self {
         Self(Some(Box::new(NumericBounds { mutate_chance })))
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (mutation_chance = 0.3))]
+    pub fn null_inject(mutation_chance: f64) -> Self {
+        Self(Some(Box::new(NullInject { mutation_chance })))
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (mutation_chance = 0.3))]
+    pub fn type_cast(mutation_chance: f64) -> Self {
+        Self(Some(Box::new(TypeCast { mutation_chance })))
+    }
+
+    #[staticmethod]
+    pub fn set_ops() -> Self {
+        Self(Some(Box::new(SetOps {})))
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (mutation_chance = 0.3))]
+    pub fn sub_query(mutation_chance: f64) -> Self {
+        Self(Some(Box::new(SubQuery { mutation_chance })))
     }
 }
 

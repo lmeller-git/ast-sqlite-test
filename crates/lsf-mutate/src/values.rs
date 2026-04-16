@@ -1,6 +1,18 @@
 use lsf_core::entry::RawEntry;
 use rand::{Rng, RngExt};
-use sqlparser::ast::{BinaryOperator, Expr, Value, ValueWithSpan, visit_expressions_mut};
+use sqlparser::{
+    ast::{
+        BinaryOperator,
+        DataType,
+        Expr,
+        Ident,
+        ObjectNamePart,
+        Value,
+        ValueWithSpan,
+        visit_expressions_mut,
+    },
+    tokenizer::Span,
+};
 
 use crate::MutationStrategy;
 
@@ -99,6 +111,94 @@ impl MutationStrategy for OperatorFlip {
                 std::ops::ControlFlow::Continue::<()>(())
             });
         }
+
+        if child_is_mutated {
+            Ok(crate::MutationState::Mutated(RawEntry::new(
+                child_ast,
+                [parent.id()].into(),
+            )))
+        } else {
+            Ok(crate::MutationState::Unchanged)
+        }
+    }
+}
+
+pub struct NullInject {
+    pub mutation_chance: f64,
+}
+
+impl MutationStrategy for NullInject {
+    fn breed(
+        &self,
+        parent: &RawEntry,
+        _parent_gen: &[lsf_core::entry::ID],
+        _mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        rng: &mut dyn Rng,
+    ) -> Result<crate::MutationState, crate::MutationError> {
+        let mut child_ast = parent.ast().clone();
+        let mut child_is_mutated = false;
+
+        _ = visit_expressions_mut(&mut child_ast, |expr| {
+            if matches!(expr, Expr::Value(_) | Expr::Identifier(_))
+                && rng.random_bool(self.mutation_chance)
+            {
+                *expr = Expr::Value(ValueWithSpan {
+                    value: Value::Null,
+                    span: Span::empty(),
+                });
+                child_is_mutated = true;
+            }
+            std::ops::ControlFlow::Continue::<()>(())
+        });
+
+        if child_is_mutated {
+            Ok(crate::MutationState::Mutated(RawEntry::new(
+                child_ast,
+                [parent.id()].into(),
+            )))
+        } else {
+            Ok(crate::MutationState::Unchanged)
+        }
+    }
+}
+
+pub struct TypeCast {
+    pub mutation_chance: f64,
+}
+
+impl MutationStrategy for TypeCast {
+    fn breed(
+        &self,
+        parent: &RawEntry,
+        _parent_gen: &[lsf_core::entry::ID],
+        _mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        rng: &mut dyn Rng,
+    ) -> Result<crate::MutationState, crate::MutationError> {
+        const TYPES: &[&str] = &["INTEGER", "TEXT", "REAL", "BLOB", "NUMERIC", "BOOLEAN"];
+
+        let mut child_ast = parent.ast().clone();
+        let mut child_is_mutated = false;
+
+        _ = visit_expressions_mut(&mut child_ast, |expr| {
+            if !matches!(expr, Expr::Cast { .. }) && rng.random_bool(self.mutation_chance) {
+                let inner = expr.clone();
+                let ty = TYPES[rng.random_range(..TYPES.len())];
+                *expr = Expr::Cast {
+                    expr: Box::new(inner),
+                    data_type: DataType::Custom(
+                        sqlparser::ast::ObjectName(vec![ObjectNamePart::Identifier(Ident::new(
+                            ty,
+                        ))]),
+                        vec![],
+                    ),
+                    format: None,
+                    kind: sqlparser::ast::CastKind::Cast,
+                    array: false,
+                };
+                child_is_mutated = true;
+            }
+            std::ops::ControlFlow::Continue::<()>(())
+        });
 
         if child_is_mutated {
             Ok(crate::MutationState::Mutated(RawEntry::new(
