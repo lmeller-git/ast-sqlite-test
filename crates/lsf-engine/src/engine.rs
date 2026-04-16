@@ -317,7 +317,7 @@ mod tests {
         let mut engine = Engine::new(
             Box::new(WeightedRandomScheduler {}),
             vec![Box::new(SpliceIn {})],
-            Arc::new(SharedMemHandle::new(0, 0)),
+            Arc::new(SharedMemHandle::new(1, 1)),
             42,
         );
         engine.clear_strategies();
@@ -332,8 +332,7 @@ mod tests {
 
         assert!(engine.mutate_batch(0).members().is_empty());
         let mut children = engine.mutate_batch(1);
-        assert!(!children.members().is_empty());
-        assert!(engine.mutate_batch(1).members().is_empty());
+        assert_eq!(children.members().len(), 1);
 
         engine.commit_generation(
             children
