@@ -1,22 +1,9 @@
 build:
     uv sync
-    uv run maturin develop --release
+    # uv run maturin develop --release
 
 build-debug:
     uv run maturin develop
-
-build-hooks:
-    cargo build --release -p lsf-hooks
-
-build-target: build-hooks
-    clang -O3 \
-        -fsanitize=address \
-        -fsanitize-coverage=trace-pc-guard \
-        -o sqlite3/sqlite3_guarded \
-        /home/test/sqlite3-src/sqlite3.c \
-        /home/test/sqlite3-src/shell.c \
-        -Wl,--whole-archive target/release/liblsf_hooks.a -Wl,--no-whole-archive \
-        -lpthread -ldl -lm
 
 run *args: build
     uv run python python/tester/main.py {{args}}

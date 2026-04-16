@@ -8,3 +8,4 @@
 **/.coverage
 **.so
 crashes/
+queries/
