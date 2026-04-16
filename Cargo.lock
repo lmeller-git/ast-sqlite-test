@@ -329,6 +329,7 @@ name = "lsf-cov"
 version = "0.1.0"
 dependencies = [
  "bitvec",
+ "lsf-core",
  "nblf-queue",
  "shared_memory",
 ]

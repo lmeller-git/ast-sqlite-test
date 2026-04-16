@@ -1,9 +1,17 @@
 #![allow(clippy::missing_safety_doc)]
-use std::{env, mem};
+use std::{env, sync::OnceLock};
 
-use shared_memory::ShmemConf;
+use shared_memory::{Shmem, ShmemConf};
 
 static mut SHMEM_MAP: *mut u8 = std::ptr::null_mut();
+static SHMEM_GUARD: OnceLock<StoreShmem> = OnceLock::new();
+
+struct StoreShmem {
+    _shmem: Shmem,
+}
+
+unsafe impl Send for StoreShmem {}
+unsafe impl Sync for StoreShmem {}
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(start: *mut u32, stop: *mut u32) {
@@ -32,7 +40,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(start: *mut u32, st
         unsafe {
             SHMEM_MAP = shmem.as_ptr();
         }
-        mem::forget(shmem);
+        _ = SHMEM_GUARD.set(StoreShmem { _shmem: shmem });
     }
 }
 

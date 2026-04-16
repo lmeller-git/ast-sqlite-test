@@ -10,6 +10,7 @@ build-hooks:
 
 build-target: build-hooks
     clang -O3 \
+        -fsanitize=address \
         -fsanitize-coverage=trace-pc-guard \
         -o sqlite3/sqlite3_guarded \
         /home/test/sqlite3-src/sqlite3.c \
@@ -23,7 +24,7 @@ run *args: build
 run-debug *args: build-debug
     uv run python python/tester/main.py {{args}}
 
-run-docker *args:
+run-docker_ *args:
         uv run python python/tester/main.py {{args}}
 
 tarball:
@@ -41,3 +42,8 @@ test-py: build-debug
 lint:
     cargo clippy --no-deps
     uv run ruff check python/
+
+
+run-docker:
+    docker build -t ast-sqlite-fuzzer .
+    docker run -v $(pwd)/crashes:/app/crashes --init -it --rm ast-sqlite-fuzzer /usr/bin/test-db

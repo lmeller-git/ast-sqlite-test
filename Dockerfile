@@ -22,6 +22,7 @@ WORKDIR /app
 COPY test-db.sh /usr/bin/test-db
 RUN chmod +x /usr/bin/test-db
 RUN mkdir -p /app/sqlite3
+RUN mkdir -p /app/crashes
 
 COPY pyproject.toml uv.lock ./
 RUN uv sync --no-install-project
@@ -30,6 +31,6 @@ COPY . /app/
 
 RUN just build-target && just build
 
-ENTRYPOINT []
+VOLUME ["/app/crashes"]
 
-CMD ["/usr/bin/test-db"]
+ENTRYPOINT []

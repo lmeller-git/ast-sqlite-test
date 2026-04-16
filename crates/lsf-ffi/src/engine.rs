@@ -13,6 +13,8 @@ use lsf_engine::{
 use lsf_mutate::{
     Merger,
     MutationStrategy,
+    NumericBounds,
+    OperatorFlip,
     RandomMutationSampler,
     RandomUpperCase,
     Randomly,
@@ -71,6 +73,10 @@ impl Engine {
         );
     }
 
+    pub fn return_token(&mut self, mut token: PyRefMut<IPCTokenHandle>) {
+        self.0.return_token(token.0.take().unwrap());
+    }
+
     pub fn snapshot(&self) -> Vec<CorpusEntry> {
         self.0.snapshot().into_iter().map(CorpusEntry).collect()
     }
@@ -81,6 +87,10 @@ impl Engine {
 
     pub fn add_strategy(&mut self, mut strategy: PyRefMut<StrategyBuilder>) {
         self.0.add_strategy(strategy.0.take().unwrap());
+    }
+
+    pub fn gc(&mut self) {
+        self.0.gc();
     }
 }
 
@@ -191,6 +201,18 @@ impl StrategyBuilder {
     #[staticmethod]
     pub fn table_guard() -> Self {
         Self(Some(Box::new(TableGuard {})))
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (flip_chance = 0.3))]
+    pub fn op_flip(flip_chance: f64) -> Self {
+        Self(Some(Box::new(OperatorFlip { flip_chance })))
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (mutate_chance = 0.3))]
+    pub fn num_bounds(mutate_chance: f64) -> Self {
+        Self(Some(Box::new(NumericBounds { mutate_chance })))
     }
 }
 
