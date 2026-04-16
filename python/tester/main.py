@@ -34,7 +34,9 @@ async def fuzzing_loop(
             token = ipc_queue.pop()
 
         result = await execute_query(
-            "./sqlite3/sqlite3_guarded", entry.to_sql_string(), {"FUZZER_SHMEM_PATH": token.as_env()}
+            "./sqlite3/sqlite3_guarded",
+            entry.to_sql_string(),
+            {"FUZZER_SHMEM_PATH": token.as_env()},
         )
 
         mutation_engine.commit_test_result(entry, engine.TestResult(result.exec_time, token))
@@ -116,7 +118,10 @@ async def main(args: Namespace):
     print("found ", max_edges, " max_edges")
     ipc_queue = engine.IPCTokenQueue(8, max_edges)
     mutation_engine = engine.Engine(
-        engine.SchedulerBuilder.fifo(), [engine.StrategyBuilder.table_guard()], ipc_queue, 42
+        engine.SchedulerBuilder.weighted_random(),
+        [engine.StrategyBuilder.table_guard()],
+        ipc_queue,
+        42,
     )
 
     mutation_engine.populate(

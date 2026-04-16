@@ -8,22 +8,18 @@ use std::{
     sync::Arc,
 };
 
-use lsf_core::entry::{CorpusEntry, ID, Meta, RawEntry};
+use lsf_core::entry::{CorpusEntry, Meta, RawEntry};
 use lsf_cov::ipc::{IPCToken, SharedMemHandle};
 use lsf_mutate::{MutationState, MutationStrategy};
 use rand::{SeedableRng, rngs::SmallRng};
 use sqlparser::{dialect::SQLiteDialect, parser::Parser};
 
-use crate::{
-    Corpus,
-    schedule::{Queue, Schedule},
-};
+use crate::{Corpus, schedule::Schedule};
 
 pub struct Engine {
     corpus: Corpus,
     shmem_queue: Arc<SharedMemHandle>,
     scheduler: Box<dyn Schedule>,
-    active: Queue<ID>,
     strategies: Vec<Box<dyn MutationStrategy>>,
     rng: SmallRng,
 }
@@ -32,7 +28,6 @@ impl Debug for Engine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Fuzing Engine")
             .field("corpus", &self.corpus)
-            .field("breeding population", &self.active)
             .field("n strategies", &self.strategies.len())
             .finish()
     }
@@ -50,7 +45,6 @@ impl Engine {
             strategies,
             corpus: Corpus::new(shmem_queue.shmem_size),
             shmem_queue,
-            active: Default::default(),
             rng: SmallRng::seed_from_u64(rng_seed),
         }
     }
@@ -69,12 +63,9 @@ impl Engine {
     }
 
     pub fn mutate_batch(&mut self, batch_size: usize) -> Generation {
-        if self.active.is_empty() {
-            println!("queue is empty!!!");
-        }
         let next_batch = self
             .scheduler
-            .next_batch(&mut self.active, batch_size, &mut self.rng);
+            .next_batch(&self.corpus, batch_size, &mut self.rng);
         next_batch
             .iter()
             .filter_map(|entry| {
@@ -129,28 +120,20 @@ impl Engine {
     }
 
     pub fn commit_generation(&mut self, generation: SelectedGeneration) {
-        let ids = generation
-            .members()
-            .iter()
-            .map(|entry| entry.id())
-            .collect::<Vec<_>>();
         self.corpus.entries.extend(
             generation
                 .members
                 .into_iter()
                 .map(|entry| (entry.id(), entry)),
         );
-        self.active.extend(ids);
     }
 
     pub fn populate(&mut self, seed_gens: Vec<Box<dyn ObtainSeed>>) {
         for generator in seed_gens {
             let seeds = generator.obtain();
-            let ids = seeds.iter().map(|seed| seed.id()).collect::<Vec<_>>();
             self.corpus
                 .entries
                 .extend(seeds.into_iter().map(|seed| (seed.id(), seed)));
-            self.active.extend(ids);
         }
     }
 
@@ -327,12 +310,12 @@ mod tests {
     use lsf_mutate::{RandomUpperCase, SpliceIn};
 
     use super::*;
-    use crate::FIFOScheduler;
+    use crate::WeightedRandomScheduler;
 
     #[test]
     fn engine_functionality() {
         let mut engine = Engine::new(
-            Box::new(FIFOScheduler {}),
+            Box::new(WeightedRandomScheduler {}),
             vec![Box::new(SpliceIn {})],
             Arc::new(SharedMemHandle::new(0, 0)),
             42,

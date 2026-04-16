@@ -76,6 +76,10 @@ impl CorpusEntry {
     pub fn raw(&self) -> &RawEntry {
         &self.raw
     }
+
+    pub fn meta(&self) -> &Meta {
+        &self.meta
+    }
 }
 
 impl Deref for CorpusEntry {
