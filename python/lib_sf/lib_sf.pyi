@@ -2,25 +2,35 @@
 # Original author: Will Eaton — MIT License
 
 from typing import Any, Generic, Literal, TypeAlias, TypedDict, TypeVar
+from . import engine as engine
+from . import visitor as visitor
 
 # TODO add our dialect if needed
 
 Dialect: TypeAlias = Literal["generic", "ansi", "sqlite", "postgresql"]
 
+
 def parse_sql(sql: str, dialect: Dialect) -> list[Statement]: ...
 
+
 def restore_ast(ast: list[Statement]) -> str: ...
+
 
 class ID:
     def __init__(self) -> None: ...
 
+
 class CorpusEntry:
     def id(self) -> ID: ...
     def as_ast(self) -> list[Statement]: ...
+    def to_sql_string(self) -> str: ...
+
 
 class RawEntry:
     def id(self) -> ID: ...
     def as_ast(self) -> list[Statement]: ...
+    def to_sql_string(self) -> str: ...
+
 
 T = TypeVar("T")
 
@@ -69,40 +79,50 @@ See https://docs.rs/sqlparser/0.51.0/sqlparser/ast/enum.TableFactor.html
 JoinOperator: TypeAlias = dict[str, Any]
 """See https://docs.rs/sqlparser/0.51.0/sqlparser/ast/enum.JoinOperator.html"""
 
+
 class One(TypedDict, Generic[T]):
     One: T
+
 
 class Many(TypedDict, Generic[T]):
     Many: list[T]
 
+
 class AstSelect(TypedDict):
     Select: Select
+
 
 class AstSetVariable(TypedDict):
     SetVariable: SetVariable
 
+
 class AstInsert(TypedDict):
     Insert: Insert
+
 
 class AstIdentifier(TypedDict):
     """An identifier (e.g. table name or column name)"""
 
     Identifier: Ident
 
+
 class AstCompoundIdentifier(TypedDict):
     """A multi-part identifier (e.g. table_alias.column or schema.table.col)"""
 
     CompoundIdentifier: list[Ident]
+
 
 class AstValue(TypedDict):
     """A literal value, such as string, number, date or NULL."""
 
     Value: Value
 
+
 class AstValues(TypedDict):
     """An insert VALUES clause."""
 
     Values: Values
+
 
 class AstQuery(TypedDict):
     """
@@ -111,6 +131,7 @@ class AstQuery(TypedDict):
     """
 
     Query: Query
+
 
 class AstSubquery(TypedDict):
     """
@@ -122,14 +143,17 @@ class AstSubquery(TypedDict):
 
     Query: Query
 
+
 class AstTable(TypedDict):
     Table: Table
+
 
 class Ident(TypedDict):
     """An identifier, decomposed into its value or character data and the quote style."""
 
     value: str
     quote_style: Any | None
+
 
 class SetVariable(TypedDict):
     """
@@ -141,6 +165,7 @@ class SetVariable(TypedDict):
     hivevar: bool
     variables: One[ObjectName] | Many[ObjectName]
     value: list[Expr]
+
 
 class Select(TypedDict("Select", {"from": list[TableWithJoins]})):
     select_token: Any  # AttachedToken
@@ -162,6 +187,7 @@ class Select(TypedDict("Select", {"from": list[TableWithJoins]})):
     window_before_qualify: bool
     value_table_mode: Any | None  # Option<ValueTableMode>
     connect_by: Any | None  # Option<ConnectBy>
+
 
 class Insert(TypedDict("Insert", {"or": Any | None})):
     """
@@ -188,6 +214,7 @@ class Insert(TypedDict("Insert", {"or": Any | None})):
     priority: Any | None
     insert_alias: Any | None
 
+
 class Query(TypedDict("Query", {"with": Any | None})):
     """
     The most complete variant of a SELECT query expression,
@@ -205,17 +232,21 @@ class Query(TypedDict("Query", {"with": Any | None})):
     settings: Any | None
     format_clause: Any | None
 
+
 class Values(TypedDict):
     explicit_row: bool
     rows: list[list[Expr]]
+
 
 class TableWithJoins(TypedDict):
     relation: TableFactor
     joins: list[Join]
 
+
 class Join(TypedDict("Join", {"global": bool})):
     relation: TableFactor
     join_operator: JoinOperator
+
 
 class Table(TypedDict):
     name: ObjectName

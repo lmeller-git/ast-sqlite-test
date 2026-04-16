@@ -13,5 +13,6 @@ thiserror = { workspace = true }
 anyhow = { workspace = true }
 lsf-core = { workspace = true }
 lsf-mutate = { workspace = true }
+lsf-cov = { workspace = true }
 rand = { workspace = true }
 indexmap = "2.13.0"

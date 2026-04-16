@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use lsf_cov::ipc::{IPCToken, SharedMemHandle};
 use lsf_engine::{
     Engine as RawEngine,
     FIFOScheduler as RawFIFOScheduler,
@@ -6,7 +9,6 @@ use lsf_engine::{
     ObtainSeed,
     Schedule,
     SeedDirReader,
-    SelectedGeneration as RawSelectedGeneration,
 };
 use lsf_mutate::{
     Merger,
@@ -28,15 +30,17 @@ pub struct Engine(RawEngine);
 #[pymethods]
 impl Engine {
     #[new]
-    #[pyo3(signature = (scheduler, strategies, rng_seed = 42))]
+    #[pyo3(signature = (scheduler, strategies, shmem_queue, rng_seed = 42))]
     pub fn new(
         mut scheduler: PyRefMut<SchedulerBuilder>,
         mut strategies: Vec<PyRefMut<StrategyBuilder>>,
+        shmem_queue: PyRef<IPCTokenQueue>,
         rng_seed: u64,
     ) -> Self {
         Self(RawEngine::new(
             scheduler.0.take().unwrap(),
             strategies.iter_mut().map(|s| s.0.take().unwrap()).collect(),
+            shmem_queue.0.clone(),
             rng_seed,
         ))
     }
@@ -50,8 +54,21 @@ impl Engine {
         Generation(self.0.mutate_batch(batch_size))
     }
 
-    pub fn commit_generation(&mut self, generation: SelectedGeneration) {
-        self.0.commit_generation(generation.0);
+    pub fn commit_test_result(
+        &mut self,
+        mut raw: PyRefMut<RawEntry>,
+        mut data: PyRefMut<TestResult>,
+    ) {
+        self.0.commit_test_result(
+            raw.0.take().unwrap(),
+            lsf_core::entry::Meta {
+                triggers_bug: data.triggers_bug,
+                is_valid_syntax: data.is_valid_syntax,
+                new_cov_nodes: 0,
+                exec_time: data.exec_time,
+            },
+            data.token.take().unwrap(),
+        );
     }
 
     pub fn snapshot(&self) -> Vec<CorpusEntry> {
@@ -81,19 +98,33 @@ impl Generation {
     }
 }
 
-#[pyclass(from_py_object)]
-#[derive(Clone)]
-pub struct SelectedGeneration(RawSelectedGeneration);
+#[pyclass]
+pub struct TestResult {
+    #[pyo3(get, set)]
+    pub triggers_bug: bool,
+    #[pyo3(get, set)]
+    pub is_valid_syntax: bool,
+    #[pyo3(get, set)]
+    pub exec_time: u32,
+    token: Option<Box<IPCToken>>,
+}
 
 #[pymethods]
-impl SelectedGeneration {
+impl TestResult {
     #[new]
-    pub fn new(members: Vec<CorpusEntry>) -> Self {
-        Self(members.into_iter().map(|py_corpus| py_corpus.0).collect())
-    }
-
-    pub fn push(&mut self, member: CorpusEntry) {
-        self.0.push(member.0);
+    #[pyo3(signature = (exec_time, token, is_valid_syntax = false, triggers_bug = false))]
+    pub fn new(
+        exec_time: u32,
+        mut token: PyRefMut<IPCTokenHandle>,
+        is_valid_syntax: bool,
+        triggers_bug: bool,
+    ) -> Self {
+        Self {
+            triggers_bug,
+            is_valid_syntax,
+            exec_time,
+            token: token.0.take(),
+        }
     }
 }
 
@@ -176,5 +207,36 @@ impl SeedGeneratorBuilder {
     #[staticmethod]
     pub fn dir_reader(dir: &str) -> Self {
         Self(Some(Box::new(SeedDirReader::new(dir.into()))))
+    }
+}
+
+#[pyclass]
+pub struct IPCTokenHandle(Option<Box<IPCToken>>);
+
+#[pymethods]
+impl IPCTokenHandle {
+    pub fn as_env(&self) -> String {
+        self.0.as_ref().map(|t| t.get_path().to_string()).unwrap()
+    }
+}
+
+#[pyclass]
+pub struct IPCTokenQueue(Arc<SharedMemHandle>);
+
+#[pymethods]
+impl IPCTokenQueue {
+    #[new]
+    pub fn new(n_workers: usize, max_edges: usize) -> Self {
+        Self(Arc::new(SharedMemHandle::new(n_workers, max_edges)))
+    }
+
+    pub fn pop(&self) -> Option<IPCTokenHandle> {
+        self.0.pop().map(|token| IPCTokenHandle(Some(token)))
+    }
+
+    pub fn push(&self, mut token: PyRefMut<IPCTokenHandle>) -> Option<IPCTokenHandle> {
+        self.0
+            .push(token.0.take().unwrap())
+            .map_or_else(|tok| Some(IPCTokenHandle(Some(tok))), |_| None)
     }
 }

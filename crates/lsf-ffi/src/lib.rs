@@ -17,7 +17,7 @@ use visitor::{
     pythonize_query_output,
 };
 
-use crate::engine::{SeedGeneratorBuilder, SelectedGeneration};
+use crate::engine::{IPCTokenHandle, IPCTokenQueue, SeedGeneratorBuilder, TestResult};
 
 mod engine;
 mod visitor;
@@ -48,17 +48,19 @@ fn parse_sql(py: Python, sql: String, dialect: String) -> PyResult<Py<PyAny>> {
     Ok(output)
 }
 
-/// This utility function allows reconstituing a modified AST back into list of SQL queries.
+/// This utility function allows reconstituing a modified AST back into a SQL query.
 #[pyfunction]
 #[pyo3(text_signature = "(ast)")]
-fn restore_ast(_py: Python, ast: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
+fn restore_ast(_py: Python, ast: &Bound<'_, PyAny>) -> PyResult<String> {
     let parse_result = depythonize_query(ast)?;
 
     Ok(parse_result
         .iter()
         .map(std::string::ToString::to_string)
-        .collect::<Vec<String>>())
+        .collect::<Vec<String>>()
+        .join(";"))
 }
+
 #[pyclass(from_py_object)]
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct ID(RawID);
@@ -91,6 +93,17 @@ impl CorpusEntry {
     pub fn as_ast(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         pythonize_query_output(py, self.0.ast().clone())
     }
+
+    // TODO optimize to_sql_string methods to redeuce allocs
+    pub fn to_sql_string(&self) -> String {
+        self.0
+            .as_ref()
+            .ast()
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect::<Vec<String>>()
+            .join(";")
+    }
 }
 
 #[pyclass]
@@ -108,13 +121,18 @@ impl RawEntry {
         pythonize_query_output(py, self.0.as_ref().unwrap().ast().clone())
     }
 
-    pub fn into_corpus_entry(&mut self) -> CorpusEntry {
-        CorpusEntry(
-            self.0
-                .take()
-                .unwrap()
-                .into_corpus_entry(lsf_core::entry::Meta {}),
-        )
+    // TODO optimize to_sql_string methods to redeuce allocs
+    pub fn to_sql_string(&self) -> String {
+        self.0
+            .as_ref()
+            .map(|e| {
+                e.ast()
+                    .iter()
+                    .map(std::string::ToString::to_string)
+                    .collect::<Vec<String>>()
+                    .join(";")
+            })
+            .unwrap()
     }
 }
 
@@ -132,7 +150,9 @@ fn lib_sf(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     engine.add_class::<StrategyBuilder>()?;
     engine.add_class::<SchedulerBuilder>()?;
     engine.add_class::<SeedGeneratorBuilder>()?;
-    engine.add_class::<SelectedGeneration>()?;
+    engine.add_class::<IPCTokenHandle>()?;
+    engine.add_class::<IPCTokenQueue>()?;
+    engine.add_class::<TestResult>()?;
     m.add_submodule(&engine)?;
 
     let visitor = PyModule::new(py, "visitor")?;
@@ -173,9 +193,9 @@ pub(crate) mod tests {
 
             let sql = parse.call1((query, "SQLite")).unwrap();
 
-            let restored: Vec<String> = restore.call1((sql,)).unwrap().extract().unwrap();
+            let restored: String = restore.call1((sql,)).unwrap().extract().unwrap();
 
-            assert_eq!(restored[0], query);
+            assert_eq!(restored, query);
 
             Ok(())
         })

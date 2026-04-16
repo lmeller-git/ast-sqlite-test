@@ -1,0 +1,14 @@
+[package]
+name = "lsf-hooks"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+shared_memory = "0.12.4"
+lsf-cov = { workspace = true }
+
+[lib]
+crate-type = ["cdylib", "staticlib"]

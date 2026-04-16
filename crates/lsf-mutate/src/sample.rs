@@ -120,7 +120,9 @@ mod tests {
             &[entry.id()],
             &([(
                 entry.id(),
-                entry.clone().into_corpus_entry(lsf_core::entry::Meta {}),
+                entry
+                    .clone()
+                    .into_corpus_entry(lsf_core::entry::Meta::default()),
             )]
             .into()),
             &mut SmallRng::seed_from_u64(42),

@@ -1,21 +1,27 @@
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::BTreeSet,
     fmt::Debug,
     fs,
     io::{self, Read},
     ops::RangeBounds,
     path::PathBuf,
+    sync::Arc,
 };
 
-use lsf_core::entry::{CorpusEntry, ID, RawEntry};
+use lsf_core::entry::{CorpusEntry, ID, Meta, RawEntry};
+use lsf_cov::ipc::{IPCToken, SharedMemHandle};
 use lsf_mutate::{MutationState, MutationStrategy};
 use rand::{SeedableRng, rngs::SmallRng};
 use sqlparser::{dialect::SQLiteDialect, parser::Parser};
 
-use crate::schedule::{Queue, Schedule};
+use crate::{
+    Corpus,
+    schedule::{Queue, Schedule},
+};
 
 pub struct Engine {
-    corpus: HashMap<ID, CorpusEntry>,
+    corpus: Corpus,
+    shmem_queue: Arc<SharedMemHandle>,
     scheduler: Box<dyn Schedule>,
     active: Queue<ID>,
     strategies: Vec<Box<dyn MutationStrategy>>,
@@ -36,12 +42,14 @@ impl Engine {
     pub fn new(
         scheduler: Box<dyn Schedule>,
         strategies: Vec<Box<dyn MutationStrategy>>,
+        shmem_queue: Arc<SharedMemHandle>,
         rng_seed: u64,
     ) -> Self {
         Self {
             scheduler,
             strategies,
-            corpus: Default::default(),
+            corpus: Corpus::new(shmem_queue.shmem_size),
+            shmem_queue,
             active: Default::default(),
             rng: SmallRng::seed_from_u64(rng_seed),
         }
@@ -61,20 +69,26 @@ impl Engine {
     }
 
     pub fn mutate_batch(&mut self, batch_size: usize) -> Generation {
+        if self.active.is_empty() {
+            println!("queue is empty!!!");
+        }
         let next_batch = self
             .scheduler
             .next_batch(&mut self.active, batch_size, &mut self.rng);
         next_batch
             .iter()
             .filter_map(|entry| {
-                if let Some(parent_entry) = self.corpus.get(entry) {
+                if let Some(parent_entry) = self.corpus.entries.get(entry) {
                     let mut state = MutationState::Unchanged;
                     let mut current_parent = parent_entry.raw();
 
                     for strategy in &self.strategies {
-                        if let Ok(MutationState::Mutated(next)) =
-                            strategy.breed(current_parent, &next_batch, &self.corpus, &mut self.rng)
-                        {
+                        if let Ok(MutationState::Mutated(next)) = strategy.breed(
+                            current_parent,
+                            &next_batch,
+                            &self.corpus.entries,
+                            &mut self.rng,
+                        ) {
                             state = MutationState::Mutated(next);
                             current_parent = if let MutationState::Mutated(next_parent) = &state {
                                 next_parent
@@ -92,13 +106,35 @@ impl Engine {
             .collect()
     }
 
+    pub fn commit_test_result(
+        &mut self,
+        raw_entry: RawEntry,
+        mut meta: Meta,
+        shmem: Box<IPCToken>,
+    ) {
+        let new_edges = self.corpus.edge_map.update(shmem.as_edge_map());
+        self.shmem_queue.push(shmem).expect("token was duplicated");
+
+        if new_edges == 0 {
+            return;
+        }
+
+        println!("added new entry with {} new edges", new_edges);
+
+        meta.new_cov_nodes = new_edges;
+        let entry = raw_entry.into_corpus_entry(meta);
+        self.commit_generation(SelectedGeneration {
+            members: vec![entry],
+        });
+    }
+
     pub fn commit_generation(&mut self, generation: SelectedGeneration) {
         let ids = generation
             .members()
             .iter()
             .map(|entry| entry.id())
             .collect::<Vec<_>>();
-        self.corpus.extend(
+        self.corpus.entries.extend(
             generation
                 .members
                 .into_iter()
@@ -112,17 +148,22 @@ impl Engine {
             let seeds = generator.obtain();
             let ids = seeds.iter().map(|seed| seed.id()).collect::<Vec<_>>();
             self.corpus
+                .entries
                 .extend(seeds.into_iter().map(|seed| (seed.id(), seed)));
             self.active.extend(ids);
         }
     }
 
     pub fn snapshot(&self) -> Vec<CorpusEntry> {
-        let mut snapshot: Vec<CorpusEntry> = self.corpus.values().cloned().collect();
+        let mut snapshot: Vec<CorpusEntry> = self.corpus.entries.values().cloned().collect();
         // sort snapshot, to ensure same output across runs/snapshots, as this is created from std::collections::HashMap.
         // This may actually be necessary if a snapshot could at some point be fed back into the engine
         snapshot.sort_by_key(|item| item.id());
         snapshot
+    }
+
+    pub fn gc(&mut self) {
+        todo!()
     }
 }
 
@@ -231,7 +272,8 @@ impl SeedDirReader {
                     )
                 }) {
                     contents.push(
-                        RawEntry::new(ast, [].into()).into_corpus_entry(lsf_core::entry::Meta {}),
+                        RawEntry::new(ast, [].into())
+                            .into_corpus_entry(lsf_core::entry::Meta::default()),
                     );
                 }
                 buffer.clear();
@@ -271,7 +313,10 @@ impl ObtainSeed for LiteralSeeder {
         if let Ok(ast) = Parser::parse_sql(&SQLiteDialect {}, &self.lit)
             .inspect_err(|e| eprintln!("could not parse sql \n{}\n due to {:?}\n", self.lit, e))
         {
-            v.push(RawEntry::new(ast, BTreeSet::new()).into_corpus_entry(lsf_core::entry::Meta {}));
+            v.push(
+                RawEntry::new(ast, BTreeSet::new())
+                    .into_corpus_entry(lsf_core::entry::Meta::default()),
+            );
         }
         v
     }
@@ -286,7 +331,12 @@ mod tests {
 
     #[test]
     fn engine_functionality() {
-        let mut engine = Engine::new(Box::new(FIFOScheduler {}), vec![Box::new(SpliceIn {})], 42);
+        let mut engine = Engine::new(
+            Box::new(FIFOScheduler {}),
+            vec![Box::new(SpliceIn {})],
+            Arc::new(SharedMemHandle::new(0, 0)),
+            42,
+        );
         engine.clear_strategies();
         assert!(engine.strategies.is_empty());
         engine.add_strategy(Box::new(RandomUpperCase::new()));
@@ -305,7 +355,7 @@ mod tests {
         engine.commit_generation(
             children
                 .drain(..)
-                .map(|raw| raw.into_corpus_entry(lsf_core::entry::Meta {}))
+                .map(|raw| raw.into_corpus_entry(lsf_core::entry::Meta::default()))
                 .collect(),
         );
         engine.clear_strategies();
