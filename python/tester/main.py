@@ -59,10 +59,9 @@ async def main(args: Namespace):
         mutation_engine.add_strategy(strat)
         for strat in [
             engine.StrategyBuilder.randomize(engine.StrategyBuilder.splice_in(), 0.5),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_scrambler(), 0.3),
             engine.StrategyBuilder.random_sampler(
-                1,
-                5,
+                3,
+                7,
                 [
                     engine.StrategyBuilder.op_flip(),
                     engine.StrategyBuilder.num_bounds(),
@@ -70,8 +69,12 @@ async def main(args: Namespace):
                     engine.StrategyBuilder.type_cast(),
                     engine.StrategyBuilder.set_ops(),
                     engine.StrategyBuilder.sub_query(),
+                    engine.StrategyBuilder.splice_in(),
+                    engine.StrategyBuilder.randomize(engine.StrategyBuilder.merger(), 0.2)
                 ],
             ),
+            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_scrambler(), 0.3),
+            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.1)
         ]
     ]
 
