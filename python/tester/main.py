@@ -21,9 +21,7 @@ async def main(args: Namespace):
 
     mutation_engine.populate(
         [
-            engine.SeedGeneratorBuilder.dir_reader(args.seeds)
-            if args.seeds is not None
-            else engine.SeedGeneratorBuilder.literal("CREATE TABLE B; SELECT a FROM B"),
+            engine.SeedGeneratorBuilder.dir_reader(args.seeds),
             engine.SeedGeneratorBuilder.literal(
                 "\
                 CREATE TABLE t0(c0 REAL UNIQUE);\
@@ -68,7 +66,7 @@ async def main(args: Namespace):
         print(entry.to_sql_string())
 
     tasks = [
-        run_single_mutation(entry.clone_raw(), ipc_queue, mutation_engine, oracle_queue)
+        run_single_mutation(entry.clone_raw(), ipc_queue, mutation_engine, oracle_queue, None)
         for entry in snapshot
     ]
 
@@ -80,9 +78,12 @@ async def main(args: Namespace):
 
     print("\n===========\ninit done, entering loop\n==================\n")
 
-    _ = await asyncio.gather(fuzzing_loop(mutation_engine, ipc_queue, oracle_queue), oracle_task)
+    _ = await asyncio.gather(
+        fuzzing_loop(mutation_engine, ipc_queue, oracle_queue, args.stop_at, args.stats),
+        oracle_task,
+    )
 
-    print("Saving 10000 queries to ./queries/\n", flush=True)
+    print(f"Saving {args.stop_at} queries to ./queries/\n", flush=True)
 
     snapshot = mutation_engine.snapshot()
 
@@ -98,6 +99,8 @@ def add(n1: int, n2: int) -> int:
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    _ = parser.add_argument("--seeds", default=None, type=str)
+    _ = parser.add_argument("--seeds", default="/home/test/seeds", type=str)
+    _ = parser.add_argument("--stop_at", default=10000, type=int)
+    _ = parser.add_argument("--stats", default=False, type=bool)
     args = parser.parse_args()
     asyncio.run(main(args))

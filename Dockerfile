@@ -87,7 +87,7 @@ RUN mkdir -p /app/crashes /app/queries
 
 # python deps
 
-COPY pyproject.toml uv.lock justfile README.md LICENSE ./
+COPY pyproject.toml uv.lock README.md LICENSE ./
 RUN uv sync --no-install-project
 
 # remainder + build
@@ -98,5 +98,5 @@ RUN just build
 
 ENV UV_NO_SYNC=1
 
-VOLUME ["/app/crashes", "/app/queries"]
+VOLUME ["/app/crashes", "/app/queries", "/app/perf_out"]
 ENTRYPOINT []

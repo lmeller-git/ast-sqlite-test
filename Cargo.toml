@@ -29,3 +29,6 @@ lsf-cov = { path = "crates/lsf-cov" }
 sqlparser = { path = "extern/sqlparser-rs" }
 
 [profile.release]
+debug = true
+lto = "fat"
+codegen-units = 1

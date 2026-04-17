@@ -3,6 +3,7 @@ import asyncio
 import re
 import os
 import time
+from typing import Any
 
 from lib_sf.lib_sf import RawEntry
 from lib_sf import engine
@@ -26,30 +27,49 @@ async def run_single_mutation(
     ipc_queue: engine.IPCTokenQueue,
     mutation_engine: engine.Engine,
     oracle_queue: asyncio.PriorityQueue[tuple[int, TestCapture | None]],
+    stats: dict[Any, Any] | None,
 ):
-    # TODO add exponential backoff
     token = ipc_queue.pop()
     while token is None:
         await asyncio.sleep(0.01)
         token = ipc_queue.pop()
+    if stats is not None:
+        stats["tokens_in_use"] += 1
 
-    result = await execute_query(
-        "/home/test/sqlite3-src/build/sqlite3",
-        entry.to_sql_string(),
-        {"FUZZER_SHMEM_PATH": token.as_env(), "ASAN_OPTIONS": "detect_leaks=0"},
-    )
+    try:
+        result = await execute_query(
+            "/home/test/sqlite3-src/build/sqlite3",
+            entry.to_sql_string(),
+            {"FUZZER_SHMEM_PATH": token.as_env(), "ASAN_OPTIONS": "detect_leaks=0"},
+        )
 
-    is_hang = result.exit_code is not None and result.exit_code == 42
-    is_crash = (
-        (not is_hang and result.exit_code is not None and result.exit_code != 0)
-        or b"AddressSanitizer" in result.stderr
-        or b"Assertion" in result.stderr
-    )
+        # Update total execution time
+        if stats is not None:
+            if result.exec_time:
+                stats['exec_s'] += result.exec_time / 1_000_000_000
+            stats["mutations"] += 1
 
-    if not is_crash and not is_hang:
-        mutation_engine.commit_test_result(entry, engine.TestResult(result.exec_time, token))
-    else:
-        mutation_engine.return_token(token)
+        is_hang = result.exit_code is not None and result.exit_code == 42
+        is_crash = (
+            (not is_hang and result.exit_code is not None and result.exit_code != 0)
+            or b"AddressSanitizer" in result.stderr
+            or b"Assertion" in result.stderr
+        )
+
+        if not is_crash and not is_hang:
+            if stats is not None:
+                t_commit = time.perf_counter()
+
+            mutation_engine.commit_test_result(entry, engine.TestResult(result.exec_time, token))
+            if stats is not None:
+                stats["rust_s"] += time.perf_counter() - t_commit
+                # non-crash or hang. This may be rejected by engine anyways
+                stats["commits"] += 1
+        else:
+            mutation_engine.return_token(token)
+    finally:
+        if stats is not None:
+            stats["tokens_in_use"] -= 1
 
     if is_crash:
         result.is_hang_or_crash = "CRASH"
