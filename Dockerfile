@@ -87,7 +87,7 @@ RUN mkdir -p /app/crashes /app/queries
 
 # python deps
 
-COPY pyproject.toml uv.lock justfile README.md LICENSE ./
+COPY pyproject.toml uv.lock README.md LICENSE ./
 RUN uv sync --no-install-project
 
 # remainder + build
