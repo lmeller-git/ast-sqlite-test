@@ -12,7 +12,7 @@ run-debug *args: build-debug
     uv run python python/tester/main.py {{args}}
 
 run-docker_ *args:
-        uv run python python/tester/main.py {{args}}
+    uv run python python/tester/main.py {{args}}
 
 tarball:
     uv build
