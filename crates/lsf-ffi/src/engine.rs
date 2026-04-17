@@ -100,6 +100,10 @@ impl Engine {
     pub fn corpus_size(&self) -> usize {
         self.0.corpus_size()
     }
+
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
 }
 
 #[pyclass]

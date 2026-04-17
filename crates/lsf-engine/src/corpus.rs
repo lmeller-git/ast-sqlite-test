@@ -26,6 +26,16 @@ impl Corpus {
             diversity: DiversityEnsurance::new(),
         }
     }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.entry_rating
+            .best_entries
+            .iter_mut()
+            .for_each(|item| *item = None);
+        self.diversity.entries.clear();
+        self.diversity.hashes.clear();
+    }
 }
 
 const MIN_DIST: u32 = 15;

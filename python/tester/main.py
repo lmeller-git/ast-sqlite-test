@@ -12,6 +12,8 @@ async def main(args: Namespace):
     max_edges = await init()
     print("found ", max_edges, " max_edges")
     ipc_queue = engine.IPCTokenQueue(8, max_edges)
+    oracle_queue = asyncio.PriorityQueue(1024)
+
     mutation_engine = engine.Engine(
         engine.SchedulerBuilder.weighted_random(),
         [engine.StrategyBuilder.table_guard()],
@@ -19,23 +21,34 @@ async def main(args: Namespace):
         42,
     )
 
+    # populate coverage map with "basic edges"
+
+    mutation_engine.populate(
+        [
+            engine.SeedGeneratorBuilder.literal(
+                "CREATE TABLE A(x); INSERT INTO A VALUES(1); SELECT x FROM A;"
+            )
+        ]
+    )
+
+    snapshot = mutation_engine.snapshot()
+
+    for entry in snapshot:
+        _ = await run_single_mutation(entry.clone_raw(), ipc_queue, mutation_engine, oracle_queue)
+
+    mutation_engine.clear()
+
+    # Run seeds
+
+    print(f"Populating engine with seeds from {args.seeds}\n", flush=True)
+
     mutation_engine.populate(
         [
             engine.SeedGeneratorBuilder.dir_reader(args.seeds)
             if args.seeds is not None
-            else engine.SeedGeneratorBuilder.literal("CREATE TABLE B; SELECT a FROM B"),
-            engine.SeedGeneratorBuilder.literal(
-                "\
-                CREATE TABLE t0(c0 REAL UNIQUE);\
-                INSERT INTO t0(c0) VALUES (3175546974276630385);\
-                SELECT 3175546974276630385 < c0 FROM t0;\
-                SELECT 1 FROM t0 WHERE 3175546974276630385 < c0;\
-                "
-            ),
+            else engine.SeedGeneratorBuilder.literal("CREATE TABLE B; SELECT a FROM B")
         ]
     )
-
-    oracle_queue = asyncio.PriorityQueue(1024)
 
     oracle_task = asyncio.create_task(oracle(oracle_queue))
 
@@ -82,7 +95,7 @@ async def main(args: Namespace):
 
     _ = await asyncio.gather(fuzzing_loop(mutation_engine, ipc_queue, oracle_queue), oracle_task)
 
-    print("Saving 10000 queries to ./queries/\n", flush=True)
+    print(f"Saving {mutation_engine.corpus_size()} queries to ./queries/\n", flush=True)
 
     snapshot = mutation_engine.snapshot()
 

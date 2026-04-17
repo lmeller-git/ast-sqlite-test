@@ -37,5 +37,6 @@ async def fuzzing_loop(
 
         if mutation_engine.corpus_size() >= 10_000:
             print("Hit 10000 queries")
+            _ = await asyncio.gather(*active_tasks)
             _ = await oracle_queue.put((sys.maxsize, None))
             return
