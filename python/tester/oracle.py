@@ -1,7 +1,7 @@
 import asyncio
 import os
 
-from tester.exec import TestCapture, execute_query
+from tester.persistent_worker import SQLiteWorker, TestCapture
 
 
 # list of interesting patterns llm generated
@@ -81,7 +81,9 @@ def is_interesting_unilateral(capture: TestCapture) -> bool:
 async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]):
     crash_counter = 0
     seen_signatures: set[bytes] = set()
-    os.makedirs("crashes", exist_ok=True)
+    # Could in theory also spawn multiple workers here, but 1 should be enough, especially since it should never crash
+    oracle_worker = SQLiteWorker("/usr/bin/sqlite3-3.39.4")
+    os.makedirs("docker_out/crashes", exist_ok=True)
 
     while True:
         _, item = await incoming.get()
@@ -100,13 +102,13 @@ async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]
             bug_type = "HANG"
 
         elif is_interesting_unilateral(item):
-            ref = await execute_query("/usr/bin/sqlite3-3.39.4", item.query)
+            ref = await oracle_worker.execute(item.query)
             if not is_interesting_unilateral(ref):
                 bug_type = "INTERNAL_ERROR"
                 notes = "Reference did not produce an internal/corrupt error."
 
         elif item.exit_code != 0:
-            ref = await execute_query("/usr/bin/sqlite3-3.39.4", item.query)
+            ref = await oracle_worker.execute(item.query)
 
             if ref.exit_code == 0:
                 bug_type = "CRASH_OR_ERROR"
@@ -119,7 +121,7 @@ async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]
                     notes = "Both errored, but with different messages."
 
         elif item.exit_code == 0:
-            ref = await execute_query("/usr/bin/sqlite3-3.39.4", item.query)
+            ref = await oracle_worker.execute(item.query)
 
             if ref.exit_code != 0:
                 bug_type = "DIVERGENCE"
@@ -134,7 +136,7 @@ async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]
                 continue
             seen_signatures.add(item.stderr)
 
-            filename = f"crashes/bug_{crash_counter:04d}_{bug_type}.txt"
+            filename = f"docker_out/crashes/bug_{crash_counter:04d}_{bug_type}.txt"
             print(f"[!] {bug_type} — saving to {filename}", flush=True)
 
             ref_block = ""
@@ -148,83 +150,6 @@ async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]
                     Query:\n{item.query}\n\
                     {ref_block}\n\
                     --- Found (sqlite3_guarded) ---\n{item}"
-                )
-
-            crash_counter += 1
-
-        incoming.task_done()
-
-
-async def oracle__(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]):
-    crash_counter = 0
-    os.makedirs("crashes", exist_ok=True)
-
-    while True:
-        _, next_item = await incoming.get()
-        if next_item is None:
-            return
-
-        if next_item.is_hang_or_crash is not None and next_item.is_hang_or_crash == "CRASH":
-            if b"Parse error" in next_item.stderr:
-                continue
-            filename = f"crashes/bug_{crash_counter}.txt"
-            print(f"CRASH FOUND! Saving report to {filename}", flush=True)
-
-            with open(filename, "w", encoding="utf-8") as f:
-                _ = f.write(
-                    f"CRASH REPORT\n\
-                \nQuery: \n{next_item.query}\n\
-                \n--- Found (sqlite3_guarded) ---\n\
-                {next_item}"
-                )
-
-            crash_counter += 1
-            incoming.task_done()
-            continue
-
-        expected = await execute_query("/usr/bin/sqlite3-3.39.4", next_item.query)
-
-        bug_type = None
-
-        if next_item.exit_code == 42:
-            bug_type = "HANG"
-
-        elif (
-            (next_item.exit_code is not None and next_item.exit_code < 0)
-            or b"AddressSanitizer" in next_item.stderr
-            or b"Assertion" in next_item.stderr
-        ):
-            bug_type = "CRASH"
-
-        elif (
-            expected.exit_code != 0
-            and next_item.exit_code != 0
-            and expected.exit_code == next_item.exit_code
-        ):
-            pass
-
-        elif expected.exit_code == 0 and next_item.exit_code == 0:
-            if expected.stdout != next_item.stdout:
-                bug_type = "LOGIC_BUG"
-
-        else:
-            if b"no such module" in expected.stderr or b"no such module" in next_item.stderr:
-                pass
-            else:
-                bug_type = "DIVERGENCE"
-
-        if bug_type is not None:
-            filename = f"crashes/bug_{crash_counter}.txt"
-            print(f"{bug_type} FOUND! Saving report to {filename}", flush=True)
-
-            with open(filename, "w", encoding="utf-8") as f:
-                _ = f.write(
-                    f"{bug_type} REPORT\n\
-                \nQuery: \n{next_item.query}\n\
-                \n--- Expected (/usr/bin/sqlite3-3.39.4) ---\n\
-                {expected}\
-                \n--- Found (sqlite3_guarded) ---\n\
-                {next_item}"
                 )
 
             crash_counter += 1

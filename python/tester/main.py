@@ -6,6 +6,7 @@ import os
 from tester.event_loop import fuzzing_loop
 from tester.exec import init, run_single_mutation
 from tester.oracle import oracle
+from tester.persistent_worker import SQLiteWorker
 
 
 async def main(args: Namespace):
@@ -33,8 +34,15 @@ async def main(args: Namespace):
 
     snapshot = mutation_engine.snapshot()
 
+    # currently the inital queries are run outside of event loop, as we do not want to run them through the mutation logic.
+    # The reason for this is that the scheduler would heavily prioritize the first run seeds, leading to the others only getting run much later
+
+    init_workers: dict[int, SQLiteWorker] = {}
+
     for entry in snapshot:
-        _ = await run_single_mutation(entry.clone_raw(), ipc_queue, mutation_engine, oracle_queue)
+        _ = await run_single_mutation(
+            entry.clone_raw(), ipc_queue, mutation_engine, oracle_queue, init_workers
+        )
 
     mutation_engine.clear()
 
@@ -70,11 +78,11 @@ async def main(args: Namespace):
                     engine.StrategyBuilder.set_ops(),
                     engine.StrategyBuilder.sub_query(),
                     engine.StrategyBuilder.splice_in(),
-                    engine.StrategyBuilder.randomize(engine.StrategyBuilder.merger(), 0.2)
+                    engine.StrategyBuilder.randomize(engine.StrategyBuilder.merger(), 0.2),
                 ],
             ),
             engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_scrambler(), 0.3),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.1)
+            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.1),
         ]
     ]
 
@@ -84,11 +92,16 @@ async def main(args: Namespace):
         print(entry.to_sql_string())
 
     tasks = [
-        run_single_mutation(entry.clone_raw(), ipc_queue, mutation_engine, oracle_queue)
+        run_single_mutation(
+            entry.clone_raw(), ipc_queue, mutation_engine, oracle_queue, init_workers
+        )
         for entry in snapshot
     ]
 
     r = await asyncio.gather(*tasks)
+
+    for worker in init_workers.values():
+        await worker.close()
 
     print(f"Done executing {r.__len__()} setup queries", flush=True)
 
@@ -98,13 +111,13 @@ async def main(args: Namespace):
 
     _ = await asyncio.gather(fuzzing_loop(mutation_engine, ipc_queue, oracle_queue), oracle_task)
 
-    print(f"Saving {mutation_engine.corpus_size()} queries to ./queries/\n", flush=True)
+    print(f"Saving {mutation_engine.corpus_size()} queries to ./docker_out/queries/\n", flush=True)
 
     snapshot = mutation_engine.snapshot()
 
-    os.makedirs("queries", exist_ok=True)
+    os.makedirs("docker_out/queries", exist_ok=True)
     for i, query in enumerate(snapshot):
-        with open(f"queries/query_{i}.sql", "w", encoding="utf-8") as f:
+        with open(f"docker_out/queries/query_{i}.sql", "w", encoding="utf-8") as f:
             _ = f.write(query.to_sql_string())
 
 

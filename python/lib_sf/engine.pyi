@@ -76,6 +76,7 @@ class IPCTokenQueue:
 
 class IPCTokenHandle:
     def as_env(self) -> str: ...
+    def id(self) -> int: ...
 
 
 class TestResult:

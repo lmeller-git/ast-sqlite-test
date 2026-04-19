@@ -275,6 +275,10 @@ impl IPCTokenHandle {
     pub fn as_env(&self) -> String {
         self.0.as_ref().map(|t| t.get_path().to_string()).unwrap()
     }
+
+    pub fn id(&self) -> usize {
+        self.0.as_ref().map(|t| t.id()).unwrap()
+    }
 }
 
 #[pyclass]

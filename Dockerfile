@@ -99,7 +99,7 @@ COPY test-db.sh /usr/bin/test-db
 RUN chmod +x /usr/bin/test-db
 
 
-RUN mkdir -p /app/crashes /app/queries
+RUN mkdir -p /app/docker_out/crashes /app/docker_out/queries
 
 # python deps
 
@@ -114,5 +114,5 @@ RUN just build
 
 ENV UV_NO_SYNC=1
 
-VOLUME ["/app/crashes", "/app/queries"]
+VOLUME ["/app/docker_out"]
 ENTRYPOINT []

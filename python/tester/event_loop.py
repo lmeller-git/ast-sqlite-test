@@ -2,7 +2,8 @@ from lib_sf import engine
 import asyncio
 import sys
 
-from tester.exec import TestCapture, run_single_mutation
+from tester.exec import run_single_mutation
+from tester.persistent_worker import SQLiteWorker, TestCapture
 
 
 async def fuzzing_loop(
@@ -10,6 +11,7 @@ async def fuzzing_loop(
     ipc_queue: engine.IPCTokenQueue,
     oracle_queue: asyncio.PriorityQueue[tuple[int, TestCapture | None]],
 ):
+    workers: dict[int, SQLiteWorker] = {}
     active_tasks: set[asyncio.Task[None]] = set()
     CONCURRENCY_LIMIT = 8
     TASK_QUEUE_LIMIT = CONCURRENCY_LIMIT * 3
@@ -20,7 +22,7 @@ async def fuzzing_loop(
             batch = mutation_engine.mutate_batch(TASK_QUEUE_LIMIT - len(active_tasks))
             for entry in batch.into_members():
                 task = asyncio.create_task(
-                    run_single_mutation(entry, ipc_queue, mutation_engine, oracle_queue)
+                    run_single_mutation(entry, ipc_queue, mutation_engine, oracle_queue, workers)
                 )
                 active_tasks.add(task)
             epoch += 1
@@ -31,12 +33,12 @@ async def fuzzing_loop(
         if not active_tasks:
             continue
 
-
-
         _done, active_tasks = await asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED)
 
         if mutation_engine.corpus_size() >= 10_000:
             print("Hit 10000 queries")
-            _ = await asyncio.gather(*active_tasks)
+            _ = await asyncio.gather(*active_tasks, return_exceptions=True)
+            for worker in workers.values():
+                await worker.close()
             _ = await oracle_queue.put((sys.maxsize, None))
             return
