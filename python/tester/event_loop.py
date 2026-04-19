@@ -4,8 +4,9 @@ import sys
 from torch.utils.tensorboard import SummaryWriter
 import time
 
-from tester.exec import TestCapture, run_single_mutation
 from tester.tb_logger import metrics_logger
+from tester.exec import run_single_mutation
+from tester.persistent_worker import SQLiteWorker, TestCapture
 
 
 async def fuzzing_loop(
@@ -20,6 +21,7 @@ async def fuzzing_loop(
         # Shared state for the background metrics task
         stats = {"mutations": 0, "commits": 0, "exec_s": 0.0, "rust_s": 0.0, "tokens_in_use": 0}
 
+    workers: dict[int, SQLiteWorker] = {}
     active_tasks: set[asyncio.Task[None]] = set()
     CONCURRENCY_LIMIT = 8
     TASK_QUEUE_LIMIT = CONCURRENCY_LIMIT * 3
@@ -42,6 +44,7 @@ async def fuzzing_loop(
                         ipc_queue,
                         mutation_engine,
                         oracle_queue,
+                        workers,
                         stats if track_stats else None,
                     )
                 )
@@ -63,9 +66,12 @@ async def fuzzing_loop(
 
         if mutation_engine.corpus_size() >= stop_at:
             print(f"Hit {stop_at} queries")
-            _ = await asyncio.gather(*active_tasks)
+            _ = await asyncio.gather(*active_tasks, return_exceptions=True)
+            for worker in workers.values():
+                await worker.close()
+
             _ = await oracle_queue.put((sys.maxsize, None))
             if track_stats:
-                metrics_task.cancel()  # Stop the reporter
+                metrics_task.cancel()
                 writer.close()
             return

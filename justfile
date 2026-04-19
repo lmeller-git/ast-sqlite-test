@@ -33,11 +33,15 @@ lint:
 
 run-docker:
     docker build -t ast-sqlite-fuzzer .
-    docker run -v $(pwd)/crashes:/app/crashes -v $(pwd)/queries:/app/queries --init -it --rm ast-sqlite-fuzzer /usr/bin/test-db
+    docker run -v $(pwd)/docker_out:/app/docker_out --init -it --rm ast-sqlite-fuzzer /usr/bin/test-db
+
+run-docker-it:
+    docker build -t ast-sqlite-fuzzer .
+    docker run -v $(pwd)/docker_out:/app/docker_out --init -it --rm ast-sqlite-fuzzer /bin/bash
 
 run-docker-perf-it:
     docker build -t ast-sqlite-fuzzer .
-    docker run -p 6006:6006 --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --privileged -v $(pwd)/crashes:/app/crashes -v $(pwd)/queries:/app/queries -v $(pwd)/perf_out:/app/perf_out --init -it --rm ast-sqlite-fuzzer /bin/bash
+    docker run -p 6006:6006 --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --privileged -v $(pwd)/docker_out:/app/docker_out --init -it --rm ast-sqlite-fuzzer /bin/bash
 
 
 run-flamegraoph:

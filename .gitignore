@@ -7,6 +7,4 @@
 # other
 **/.coverage
 **.so
-crashes/
-queries/
-perf_out/
+docker_out/

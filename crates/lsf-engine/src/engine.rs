@@ -183,6 +183,10 @@ impl Engine {
     pub fn corpus_size(&self) -> usize {
         self.corpus.entries.len()
     }
+
+    pub fn clear(&mut self) {
+        self.corpus.clear();
+    }
 }
 
 /// A batch of newly mutated entries, which are yet to be judged

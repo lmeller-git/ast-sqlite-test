@@ -6,12 +6,15 @@ import os
 from tester.event_loop import fuzzing_loop
 from tester.exec import init, run_single_mutation
 from tester.oracle import oracle
+from tester.persistent_worker import SQLiteWorker
 
 
 async def main(args: Namespace):
     max_edges = await init()
     print("found ", max_edges, " max_edges")
     ipc_queue = engine.IPCTokenQueue(8, max_edges)
+    oracle_queue = asyncio.PriorityQueue(1024)
+
     mutation_engine = engine.Engine(
         engine.SchedulerBuilder.weighted_random(),
         [engine.StrategyBuilder.table_guard()],
@@ -19,21 +22,35 @@ async def main(args: Namespace):
         42,
     )
 
+    # populate coverage map with "basic edges"
+
     mutation_engine.populate(
         [
-            engine.SeedGeneratorBuilder.dir_reader(args.seeds),
             engine.SeedGeneratorBuilder.literal(
-                "\
-                CREATE TABLE t0(c0 REAL UNIQUE);\
-                INSERT INTO t0(c0) VALUES (3175546974276630385);\
-                SELECT 3175546974276630385 < c0 FROM t0;\
-                SELECT 1 FROM t0 WHERE 3175546974276630385 < c0;\
-                "
-            ),
+                "CREATE TABLE A(x); INSERT INTO A VALUES(1); SELECT x FROM A;"
+            )
         ]
     )
 
-    oracle_queue = asyncio.PriorityQueue(1024)
+    snapshot = mutation_engine.snapshot()
+
+    # currently the inital queries are run outside of event loop, as we do not want to run them through the mutation logic.
+    # The reason for this is that the scheduler would heavily prioritize the first run seeds, leading to the others only getting run much later
+
+    init_workers: dict[int, SQLiteWorker] = {}
+
+    for entry in snapshot:
+        _ = await run_single_mutation(
+            entry.clone_raw(), ipc_queue, mutation_engine, oracle_queue, init_workers, None
+        )
+
+    mutation_engine.clear()
+
+    # Run seeds
+
+    print(f"Populating engine with seeds from {args.seeds}\n", flush=True)
+
+    mutation_engine.populate([engine.SeedGeneratorBuilder.dir_reader(args.seeds)])
 
     oracle_task = asyncio.create_task(oracle(oracle_queue))
 
@@ -44,10 +61,9 @@ async def main(args: Namespace):
         mutation_engine.add_strategy(strat)
         for strat in [
             engine.StrategyBuilder.randomize(engine.StrategyBuilder.splice_in(), 0.5),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_scrambler(), 0.3),
             engine.StrategyBuilder.random_sampler(
-                1,
-                5,
+                3,
+                7,
                 [
                     engine.StrategyBuilder.op_flip(),
                     engine.StrategyBuilder.num_bounds(),
@@ -55,8 +71,12 @@ async def main(args: Namespace):
                     engine.StrategyBuilder.type_cast(),
                     engine.StrategyBuilder.set_ops(),
                     engine.StrategyBuilder.sub_query(),
+                    engine.StrategyBuilder.splice_in(),
+                    engine.StrategyBuilder.randomize(engine.StrategyBuilder.merger(), 0.2),
                 ],
             ),
+            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_scrambler(), 0.3),
+            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.1),
         ]
     ]
 
@@ -66,11 +86,16 @@ async def main(args: Namespace):
         print(entry.to_sql_string())
 
     tasks = [
-        run_single_mutation(entry.clone_raw(), ipc_queue, mutation_engine, oracle_queue, None)
+        run_single_mutation(
+            entry.clone_raw(), ipc_queue, mutation_engine, oracle_queue, init_workers, None
+        )
         for entry in snapshot
     ]
 
     r = await asyncio.gather(*tasks)
+
+    for worker in init_workers.values():
+        await worker.close()
 
     print(f"Done executing {r.__len__()} setup queries", flush=True)
 
@@ -83,13 +108,13 @@ async def main(args: Namespace):
         oracle_task,
     )
 
-    print(f"Saving {args.stop_at} queries to ./queries/\n", flush=True)
+    print(f"Saving {mutation_engine.corpus_size()} queries to ./docker_out/queries/\n", flush=True)
 
     snapshot = mutation_engine.snapshot()
 
-    os.makedirs("queries", exist_ok=True)
+    os.makedirs("docker_out/queries", exist_ok=True)
     for i, query in enumerate(snapshot):
-        with open(f"queries/query_{i}.sql", "w", encoding="utf-8") as f:
+        with open(f"docker_out/queries/query_{i}.sql", "w", encoding="utf-8") as f:
             _ = f.write(query.to_sql_string())
 
 
@@ -99,7 +124,7 @@ def add(n1: int, n2: int) -> int:
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    _ = parser.add_argument("--seeds", default="/home/test/seeds", type=str)
+    _ = parser.add_argument("--seeds", default="/app/seeds", type=str)
     _ = parser.add_argument("--stop_at", default=10000, type=int)
     _ = parser.add_argument("--stats", default=False, type=bool)
     args = parser.parse_args()

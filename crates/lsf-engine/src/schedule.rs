@@ -25,7 +25,15 @@ impl WeightedRandomScheduler {
     fn calculate_weight(meta: &Meta) -> f64 {
         let mut weight = 1.;
         weight += (meta.new_cov_nodes as f64) * 20.;
-        weight *= 10000. / (meta.exec_time as f64 + 1.);
+        let exec_time_us = meta.exec_time / 1000;
+        let mul = if exec_time_us < 10 {
+            2.
+        } else if exec_time_us < 1000 {
+            1.
+        } else {
+            0.5
+        };
+        weight *= mul;
         weight
     }
 }

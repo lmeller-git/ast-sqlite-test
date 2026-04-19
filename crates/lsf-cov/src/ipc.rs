@@ -50,6 +50,7 @@ impl Debug for SharedMemHandle {
 pub struct IPCToken {
     path: String,
     shmem: Shmem,
+    id: usize,
 }
 
 impl IPCToken {
@@ -61,7 +62,7 @@ impl IPCToken {
             .create()
             .expect("could not create shmem");
 
-        Self { path, shmem }
+        Self { path, shmem, id }
     }
 
     #[allow(dead_code)]
@@ -81,6 +82,10 @@ impl IPCToken {
 
     pub fn get_path(&self) -> &str {
         &self.path
+    }
+
+    pub fn id(&self) -> usize {
+        self.id
     }
 }
 
