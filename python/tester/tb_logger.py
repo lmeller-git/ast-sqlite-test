@@ -1,7 +1,7 @@
 import time
 import asyncio
 from typing import Any
-from torch.utils.tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 
 
 async def metrics_logger(writer: SummaryWriter, stats: dict[Any, Any], concurrency_limit: int):

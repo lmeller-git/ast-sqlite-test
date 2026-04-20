@@ -1,7 +1,7 @@
 from lib_sf import engine
 import asyncio
 import sys
-from torch.utils.tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 import time
 
 from tester.tb_logger import metrics_logger
@@ -17,7 +17,7 @@ async def fuzzing_loop(
     track_stats: bool,
 ):
     if track_stats:
-        writer = SummaryWriter(log_dir="runs/fuzzer_stats")
+        writer = SummaryWriter(log_dir="docker_out/perf_out/runs/fuzzer_stats")
         # Shared state for the background metrics task
         stats = {"mutations": 0, "commits": 0, "exec_s": 0.0, "rust_s": 0.0, "tokens_in_use": 0}
 
