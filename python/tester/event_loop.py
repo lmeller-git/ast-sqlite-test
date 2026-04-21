@@ -10,6 +10,7 @@ async def fuzzing_loop(
     mutation_engine: engine.Engine,
     ipc_queue: engine.IPCTokenQueue,
     oracle_queue: asyncio.PriorityQueue[tuple[int, TestCapture | None]],
+    stop_at: int,
 ):
     workers: dict[int, SQLiteWorker] = {}
     active_tasks: set[asyncio.Task[None]] = set()
@@ -35,8 +36,8 @@ async def fuzzing_loop(
 
         _done, active_tasks = await asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED)
 
-        if mutation_engine.corpus_size() >= 10_000:
-            print("Hit 10000 queries")
+        if mutation_engine.corpus_size() >= stop_at:
+            print(f"Hit {stop_at} queries")
             _ = await asyncio.gather(*active_tasks, return_exceptions=True)
             for worker in workers.values():
                 await worker.close()

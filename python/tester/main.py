@@ -109,16 +109,19 @@ async def main(args: Namespace):
 
     print("\n===========\ninit done, entering loop\n==================\n")
 
-    _ = await asyncio.gather(fuzzing_loop(mutation_engine, ipc_queue, oracle_queue), oracle_task)
+    _ = await asyncio.gather(
+        fuzzing_loop(mutation_engine, ipc_queue, oracle_queue, args.stop_at), oracle_task
+    )
 
-    print(f"Saving {mutation_engine.corpus_size()} queries to ./docker_out/queries/\n", flush=True)
+    if args.save_to is not None:
+        print(f"Saving {mutation_engine.corpus_size()} queries to {args.save_to}\n", flush=True)
 
-    snapshot = mutation_engine.snapshot()
+        snapshot = mutation_engine.snapshot()
 
-    os.makedirs("docker_out/queries", exist_ok=True)
-    for i, query in enumerate(snapshot):
-        with open(f"docker_out/queries/query_{i}.sql", "w", encoding="utf-8") as f:
-            _ = f.write(query.to_sql_string())
+        os.makedirs(args.save_to, exist_ok=True)
+        for i, query in enumerate(snapshot):
+            with open(f"{args.save_to}/query_{i}.sql", "w", encoding="utf-8") as f:
+                _ = f.write(query.to_sql_string())
 
 
 def add(n1: int, n2: int) -> int:
@@ -128,5 +131,7 @@ def add(n1: int, n2: int) -> int:
 if __name__ == "__main__":
     parser = ArgumentParser()
     _ = parser.add_argument("--seeds", default=None, type=str)
+    _ = parser.add_argument("--stop_at", default=10000, type=int)
+    _ = parser.add_argument("--save_to", default=None, type=str)
     args = parser.parse_args()
     asyncio.run(main(args))
