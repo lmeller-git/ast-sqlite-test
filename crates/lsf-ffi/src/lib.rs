@@ -142,31 +142,31 @@ impl RawEntry {
 
 #[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
-pub struct TestOutcome(lsf_mutate::TestOutcome);
+pub struct TestOutcome(lsf_feedback::TestOutcome);
 
 #[pymethods]
 impl TestOutcome {
     #[staticmethod]
     pub fn rejected(because: RejectionReason) -> Self {
-        Self(lsf_mutate::TestOutcome::Rejected(because.0))
+        Self(lsf_feedback::TestOutcome::Rejected(because.0))
     }
 }
 
 #[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
-pub struct RejectionReason(lsf_mutate::RejectionReason);
+pub struct RejectionReason(lsf_feedback::RejectionReason);
 
 #[pymethods]
 impl RejectionReason {
     #[staticmethod]
     pub fn invalid_syntax() -> Self {
-        Self(lsf_mutate::RejectionReason::SyntaxError)
+        Self(lsf_feedback::RejectionReason::SyntaxError)
     }
 }
 
 #[pyclass]
 #[derive(Debug, PartialEq, Eq)]
-pub struct TestableEntry(Option<lsf_mutate::TestableEntry>);
+pub struct TestableEntry(Option<lsf_feedback::TestableEntry<RawestEntry>>);
 
 #[pymethods]
 impl TestableEntry {
@@ -198,7 +198,9 @@ impl TestableEntry {
 
     #[staticmethod]
     pub fn from_raw(mut raw: PyRefMut<RawEntry>) -> Self {
-        Self(Some(lsf_mutate::TestableEntry::new(raw.0.take().unwrap())))
+        Self(Some(lsf_feedback::TestableEntry::new(
+            raw.0.take().unwrap(),
+        )))
     }
 }
 

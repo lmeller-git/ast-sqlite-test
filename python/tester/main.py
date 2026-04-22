@@ -17,7 +17,7 @@ async def main(args: Namespace):
     oracle_queue = asyncio.PriorityQueue(1024)
 
     mutation_engine = engine.Engine(
-        engine.SchedulerBuilder.weighted_random(),
+        engine.SchedulerBuilder.adaptive_weighted_random(),
         [engine.StrategyBuilder.table_guard()],
         ipc_queue,
         42,

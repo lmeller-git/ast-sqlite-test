@@ -4,6 +4,7 @@ use std::{
 };
 
 use lsf_core::entry::RawEntry;
+use lsf_feedback::TestableEntry;
 use rand::RngExt;
 use sqlparser::ast::{
     Expr,
@@ -23,9 +24,8 @@ pub struct ExprShuffle {
 impl MutationStrategy for ExprShuffle {
     fn breed(
         &self,
-        parent: &lsf_core::entry::RawEntry,
-        _parent_gen: &[lsf_core::entry::ID],
-        _mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        parent: &TestableEntry<RawEntry>,
+        _parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut parent_exprs: HashMap<std::mem::Discriminant<Expr>, Vec<Expr>> = HashMap::new();
@@ -75,9 +75,8 @@ pub struct RelShuffle {
 impl MutationStrategy for RelShuffle {
     fn breed(
         &self,
-        parent: &lsf_core::entry::RawEntry,
-        _parent_gen: &[lsf_core::entry::ID],
-        _mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        parent: &TestableEntry<RawEntry>,
+        _parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut parent_rels: HashSet<ObjectName> = HashSet::new();

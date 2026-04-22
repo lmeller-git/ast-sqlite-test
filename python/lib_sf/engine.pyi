@@ -1,4 +1,4 @@
-from .lib_sf import CorpusEntry, RawEntry, TestableEntry
+from .lib_sf import CorpusEntry, TestableEntry
 
 
 class Generation:
@@ -8,13 +8,11 @@ class Generation:
 class SchedulerBuilder:
     @staticmethod
     def weighted_random() -> SchedulerBuilder: ...
+    @staticmethod
+    def adaptive_weighted_random() -> SchedulerBuilder: ...
 
 
 class StrategyBuilder:
-    @staticmethod
-    def uppercase() -> StrategyBuilder: ...
-    @staticmethod
-    def merger() -> StrategyBuilder: ...
     @staticmethod
     def random_sampler(
         min_choices: int, max_choixes: int, choices: list[StrategyBuilder]
@@ -23,8 +21,6 @@ class StrategyBuilder:
     def randomize(strategy: StrategyBuilder, probability: float) -> StrategyBuilder: ...
     @staticmethod
     def splice_in() -> StrategyBuilder: ...
-    @staticmethod
-    def table_scrambler() -> StrategyBuilder: ...
     @staticmethod
     def table_guard() -> StrategyBuilder: ...
     @staticmethod

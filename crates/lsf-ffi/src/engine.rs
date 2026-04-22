@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use lsf_cov::ipc::{IPCToken, SharedMemHandle};
 use lsf_engine::{
+    AdaptiveWeightedRandomScheduler,
     Engine as RawEngine,
     Generation as RawGeneration,
     LiteralSeeder,
@@ -13,20 +14,17 @@ use lsf_engine::{
 use lsf_mutate::{
     AdaptiveStrategyScheduler,
     ExprShuffle,
-    Merger,
     MutationStrategy,
     NullInject,
     NumericBounds,
     OperatorFlip,
     RandomMutationSampler,
-    RandomUpperCase,
     Randomly,
     RelShuffle,
     SetOps,
     SpliceIn,
     SubQuery,
     TableGuard,
-    TableNameScramble,
     TypeCast,
 };
 use pyo3::prelude::*;
@@ -162,6 +160,11 @@ impl SchedulerBuilder {
     pub fn weighted_random() -> Self {
         Self(Some(Box::new(WeightedRandomScheduler {})))
     }
+
+    #[staticmethod]
+    pub fn adaptive_weighted_random() -> Self {
+        Self(Some(Box::new(AdaptiveWeightedRandomScheduler::default())))
+    }
 }
 
 #[pyclass]
@@ -169,16 +172,6 @@ pub struct StrategyBuilder(Option<Box<dyn MutationStrategy>>);
 
 #[pymethods]
 impl StrategyBuilder {
-    #[staticmethod]
-    pub fn uppercase() -> Self {
-        Self(Some(Box::new(RandomUpperCase::new())))
-    }
-
-    #[staticmethod]
-    pub fn merger() -> Self {
-        Self(Some(Box::new(Merger)))
-    }
-
     #[staticmethod]
     pub fn random_sampler(
         min_choices: usize,
@@ -206,11 +199,6 @@ impl StrategyBuilder {
     #[staticmethod]
     pub fn splice_in() -> Self {
         Self(Some(Box::new(SpliceIn {})))
-    }
-
-    #[staticmethod]
-    pub fn table_scrambler() -> Self {
-        Self(Some(Box::new(TableNameScramble {})))
     }
 
     #[staticmethod]
