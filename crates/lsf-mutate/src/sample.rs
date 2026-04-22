@@ -1,4 +1,5 @@
 use lsf_core::entry::RawEntry;
+use lsf_feedback::TestableEntry;
 use rand::{Rng, RngExt};
 
 use crate::{MutationState, MutationStrategy};
@@ -28,9 +29,8 @@ impl RandomMutationSampler {
 impl MutationStrategy for RandomMutationSampler {
     fn breed(
         &self,
-        parent: &lsf_core::entry::RawEntry,
-        parent_gen: &[lsf_core::entry::ID],
-        mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        parent: &TestableEntry<RawEntry>,
+        parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<MutationState, crate::MutationError> {
         let n_chosen = rng.random_range(self.choose_min..=self.choose_max);
@@ -39,12 +39,12 @@ impl MutationStrategy for RandomMutationSampler {
         }
 
         let mut status = MutationState::Unchanged;
-        let mut current_parent: &RawEntry = parent;
+        let mut current_parent: &TestableEntry<RawEntry> = parent;
 
         for i in 0..n_chosen {
             let chosen_strategy = rng.random_range(..self.choices.len());
             if let Ok(MutationState::Mutated(mut next)) =
-                self.choices[chosen_strategy].breed(current_parent, parent_gen, mapping, rng)
+                self.choices[chosen_strategy].breed(current_parent, parent_gen, rng)
             {
                 if i > 0 && status != MutationState::Unchanged {
                     next.parents_mut().extend(current_parent.parents());
@@ -80,13 +80,12 @@ impl Randomly {
 impl MutationStrategy for Randomly {
     fn breed(
         &self,
-        parent: &RawEntry,
-        parent_gen: &[lsf_core::entry::ID],
-        mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        parent: &TestableEntry<RawEntry>,
+        parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<MutationState, crate::MutationError> {
         if rng.random_bool(self.prob) {
-            self.over.breed(parent, parent_gen, mapping, rng)
+            self.over.breed(parent, parent_gen, rng)
         } else {
             Ok(MutationState::Unchanged)
         }
@@ -95,53 +94,23 @@ impl MutationStrategy for Randomly {
 
 #[cfg(test)]
 mod tests {
-    use rand::{SeedableRng, rngs::SmallRng};
-    use sqlparser::{dialect::SQLiteDialect, parser::Parser};
-
     use super::*;
-    use crate::{RandomUpperCase, SpliceIn, test_single_mutation};
+    use crate::{SpliceIn, test_single_mutation};
 
     #[test]
     fn random_sampler() {
         let sql = "SELECT a FROM b";
-        let expected1 = "SELECT a FROM B";
         let expected2 = "SELECT a FROM b; SELECT a FROM b";
 
-        let parsed = Parser::parse_sql(&SQLiteDialect {}, sql).unwrap();
-        let entry = RawEntry::new(parsed, Default::default());
-
-        let res = RandomMutationSampler::new(
-            1,
-            1,
-            vec![Box::new(RandomUpperCase::new()), Box::new(SpliceIn {})],
-        )
-        .breed(
-            &entry,
-            &[entry.id()],
-            &([(
-                entry.id(),
-                entry
-                    .clone()
-                    .into_corpus_entry(lsf_core::entry::Meta::default()),
-            )]
-            .into()),
-            &mut SmallRng::seed_from_u64(42),
-        )
-        .unwrap();
-        let MutationState::Mutated(child) = res else {
-            panic!()
-        };
-
-        let res = child
-            .ast()
-            .iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>()
-            .join("; ");
-
-        if res != expected1 && res != expected2 {
-            panic!()
-        }
+        test_single_mutation(
+            sql,
+            expected2,
+            Box::new(RandomMutationSampler::new(
+                1,
+                1,
+                vec![Box::new(SpliceIn {})],
+            )),
+        );
 
         let expected3 = "SELECT a FROM b; SELECT a FROM b; SELECT a FROM b";
         test_single_mutation(
@@ -159,8 +128,8 @@ mod tests {
     fn randomly() {
         test_single_mutation(
             "SELECT a FROM b",
-            "SELECT a FROM B",
-            Box::new(Randomly::new(Box::new(RandomUpperCase::new()), 1.)),
+            "SELECT a FROM b",
+            Box::new(Randomly::new(Box::new(SpliceIn {}), 0.)),
         );
     }
 }

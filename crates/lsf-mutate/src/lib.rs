@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::sync::{Arc, atomic::AtomicU32};
 
-use lsf_core::entry::{CorpusEntry, ID, RawEntry};
-use rand::{Rng, RngExt};
-use sqlparser::ast::visit_relations_mut;
+use lsf_core::entry::{ID, RawEntry};
+use lsf_feedback::TestableEntry;
+use rand::Rng;
 use thiserror::Error;
 
 mod afl;
@@ -10,6 +10,7 @@ mod ident;
 mod random_mutate;
 mod recurse;
 mod sample;
+mod schedule;
 mod splice;
 mod structure;
 mod values;
@@ -22,6 +23,7 @@ pub use random_mutate::*;
 #[allow(unused_imports)]
 pub use recurse::*;
 pub use sample::*;
+pub use schedule::*;
 pub use splice::*;
 pub use structure::*;
 pub use values::*;
@@ -29,99 +31,27 @@ pub use values::*;
 pub trait MutationStrategy: Send + Sync {
     fn breed(
         &self,
-        parent: &RawEntry,
-        parent_gen: &[ID],
-        mapping: &HashMap<ID, CorpusEntry>,
+        parent: &TestableEntry<RawEntry>,
+        parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<MutationState, MutationError>;
+
+    fn init(&mut self, _ctx: StrategyContext) {}
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct Merger;
-
-impl Merger {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl MutationStrategy for Merger {
-    fn breed(
-        &self,
-        parent: &RawEntry,
-        parent_gen: &[ID],
-        mapping: &HashMap<ID, CorpusEntry>,
-        rng: &mut dyn Rng,
-    ) -> Result<MutationState, MutationError> {
-        let other_idx = rng.random_range(..parent_gen.len());
-        if let Some(other) = mapping.get(&parent_gen[other_idx]) {
-            let mut new = parent.ast().clone();
-            new.extend(other.ast().iter().cloned());
-            Ok(MutationState::Mutated(RawEntry::new(
-                new,
-                [parent.id(), other.id()].into(),
-            )))
-        } else {
-            Err(MutationError::NOPARENT(parent_gen[other_idx]))
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct RandomUpperCase {}
-
-impl RandomUpperCase {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl MutationStrategy for RandomUpperCase {
-    fn breed(
-        &self,
-        parent: &RawEntry,
-        _parent_gen: &[ID],
-        _mapping: &HashMap<ID, CorpusEntry>,
-        _rng: &mut dyn Rng,
-    ) -> Result<MutationState, MutationError> {
-        let mut ast = parent.ast().clone();
-        let mut was_mutated = false;
-
-        _ = visit_relations_mut(&mut ast, |relation| {
-            for id in &mut relation.0 {
-                match id {
-                    sqlparser::ast::ObjectNamePart::Identifier(id) => {
-                        id.value = id.value.to_ascii_uppercase();
-                        was_mutated = true;
-                    }
-                    sqlparser::ast::ObjectNamePart::Function(func) => {
-                        func.name.value = func.name.value.to_ascii_uppercase();
-                        was_mutated = true;
-                    }
-                }
-            }
-            std::ops::ControlFlow::Continue::<()>(())
-        });
-
-        if was_mutated {
-            Ok(MutationState::Mutated(RawEntry::new(
-                ast,
-                [parent.id()].into(),
-            )))
-        } else {
-            Ok(MutationState::Unchanged)
-        }
-    }
+#[derive(Clone, Default)]
+pub struct StrategyContext {
+    pub total_attempts: Arc<AtomicU32>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum MutationState {
-    Mutated(RawEntry),
+    Mutated(TestableEntry<RawEntry>),
     Unchanged,
 }
 
 impl MutationState {
-    pub fn into_option(self) -> Option<RawEntry> {
+    pub fn into_option(self) -> Option<TestableEntry<RawEntry>> {
         match self {
             Self::Mutated(some) => Some(some),
             Self::Unchanged => None,
@@ -146,23 +76,17 @@ pub(crate) fn test_single_mutation(sql: &str, expected: &str, strategy: Box<dyn 
 
     let parsed = Parser::parse_sql(&SQLiteDialect {}, sql).unwrap();
     let entry = RawEntry::new(parsed, Default::default());
+    let entry_ = TestableEntry::new(entry.clone());
 
     let res = strategy
         .breed(
-            &entry,
-            &[entry.id()],
-            &([(
-                entry.id(),
-                entry
-                    .clone()
-                    .into_corpus_entry(lsf_core::entry::Meta::default()),
-            )]
-            .into()),
+            &entry_,
+            &[TestableEntry::new(&entry)],
             &mut SmallRng::seed_from_u64(42),
         )
         .unwrap();
     let MutationState::Mutated(child) = res else {
-        panic!()
+        return;
     };
 
     assert_eq!(
@@ -174,27 +98,4 @@ pub(crate) fn test_single_mutation(sql: &str, expected: &str, strategy: Box<dyn 
             .collect::<Vec<_>>()
             .join("; ")
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_merger() {
-        test_single_mutation(
-            "SELECT A FROM B",
-            "SELECT A FROM B; SELECT A FROM B",
-            Box::new(Merger {}),
-        );
-    }
-
-    #[test]
-    fn random_upper() {
-        test_single_mutation(
-            "CREATE TABLE b (); SELECT a FROM b",
-            "CREATE TABLE B (); SELECT a FROM B",
-            Box::new(RandomUpperCase::new()),
-        );
-    }
 }

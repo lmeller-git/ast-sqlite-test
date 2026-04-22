@@ -276,6 +276,7 @@ dependencies = [
  "lsf-core",
  "lsf-cov",
  "lsf-engine",
+ "lsf-feedback",
  "lsf-mutate",
  "pyo3",
  "pythonize",
@@ -342,12 +343,20 @@ dependencies = [
  "indexmap",
  "lsf-core",
  "lsf-cov",
+ "lsf-feedback",
  "lsf-mutate",
  "rand 0.10.1",
  "serde",
  "siphasher",
  "sqlparser",
  "thiserror",
+]
+
+[[package]]
+name = "lsf-feedback"
+version = "0.1.0"
+dependencies = [
+ "lsf-core",
 ]
 
 [[package]]
@@ -364,6 +373,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "lsf-core",
+ "lsf-feedback",
  "rand 0.10.1",
  "serde",
  "sqlparser",

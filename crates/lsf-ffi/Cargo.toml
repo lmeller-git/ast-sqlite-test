@@ -23,3 +23,4 @@ lsf-core = { workspace = true }
 lsf-engine = { workspace = true }
 lsf-mutate = { workspace = true }
 lsf-cov = { workspace = true }
+lsf-feedback = { workspace = true  }

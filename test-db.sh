@@ -2,4 +2,4 @@
 
 cd /app
 
-just run-docker_ --seeds /app/seeds
+just run-docker_ --seeds /app/seeds --save_to docker_out/queries

@@ -1,4 +1,5 @@
 use lsf_core::entry::RawEntry;
+use lsf_feedback::TestableEntry;
 use rand::{Rng, RngExt};
 use sqlparser::{
     ast::{
@@ -33,9 +34,8 @@ pub struct NumericBounds {
 impl MutationStrategy for NumericBounds {
     fn breed(
         &self,
-        parent: &lsf_core::entry::RawEntry,
-        _parent_gen: &[lsf_core::entry::ID],
-        _mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        parent: &TestableEntry<RawEntry>,
+        _parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut child_ast = parent.ast().clone();
@@ -59,10 +59,9 @@ impl MutationStrategy for NumericBounds {
         }
 
         if child_is_mutated {
-            Ok(crate::MutationState::Mutated(RawEntry::new(
-                child_ast,
-                [parent.id()].into(),
-            )))
+            Ok(crate::MutationState::Mutated(
+                RawEntry::new(child_ast, [parent.id()].into()).into(),
+            ))
         } else {
             Ok(crate::MutationState::Unchanged)
         }
@@ -76,9 +75,8 @@ pub struct OperatorFlip {
 impl MutationStrategy for OperatorFlip {
     fn breed(
         &self,
-        parent: &lsf_core::entry::RawEntry,
-        _parent_gen: &[lsf_core::entry::ID],
-        _mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        parent: &TestableEntry<RawEntry>,
+        _parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut child_ast = parent.ast().clone();
@@ -113,10 +111,9 @@ impl MutationStrategy for OperatorFlip {
         }
 
         if child_is_mutated {
-            Ok(crate::MutationState::Mutated(RawEntry::new(
-                child_ast,
-                [parent.id()].into(),
-            )))
+            Ok(crate::MutationState::Mutated(
+                RawEntry::new(child_ast, [parent.id()].into()).into(),
+            ))
         } else {
             Ok(crate::MutationState::Unchanged)
         }
@@ -130,9 +127,8 @@ pub struct NullInject {
 impl MutationStrategy for NullInject {
     fn breed(
         &self,
-        parent: &RawEntry,
-        _parent_gen: &[lsf_core::entry::ID],
-        _mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        parent: &TestableEntry<RawEntry>,
+        _parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut child_ast = parent.ast().clone();
@@ -152,10 +148,9 @@ impl MutationStrategy for NullInject {
         });
 
         if child_is_mutated {
-            Ok(crate::MutationState::Mutated(RawEntry::new(
-                child_ast,
-                [parent.id()].into(),
-            )))
+            Ok(crate::MutationState::Mutated(
+                RawEntry::new(child_ast, [parent.id()].into()).into(),
+            ))
         } else {
             Ok(crate::MutationState::Unchanged)
         }
@@ -169,9 +164,8 @@ pub struct TypeCast {
 impl MutationStrategy for TypeCast {
     fn breed(
         &self,
-        parent: &RawEntry,
-        _parent_gen: &[lsf_core::entry::ID],
-        _mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        parent: &TestableEntry<RawEntry>,
+        _parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         const TYPES: &[&str] = &["INTEGER", "TEXT", "REAL", "BLOB", "NUMERIC", "BOOLEAN"];
@@ -201,10 +195,9 @@ impl MutationStrategy for TypeCast {
         });
 
         if child_is_mutated {
-            Ok(crate::MutationState::Mutated(RawEntry::new(
-                child_ast,
-                [parent.id()].into(),
-            )))
+            Ok(crate::MutationState::Mutated(
+                RawEntry::new(child_ast, [parent.id()].into()).into(),
+            ))
         } else {
             Ok(crate::MutationState::Unchanged)
         }
