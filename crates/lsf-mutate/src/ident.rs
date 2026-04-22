@@ -65,10 +65,9 @@ impl MutationStrategy for TableNameScramble {
         }
 
         if child_is_mutated {
-            Ok(crate::MutationState::Mutated(RawEntry::new(
-                child_ast,
-                [parent.id()].into(),
-            )))
+            Ok(crate::MutationState::Mutated(
+                RawEntry::new(child_ast, [parent.id()].into()).into(),
+            ))
         } else {
             Ok(crate::MutationState::Unchanged)
         }
@@ -99,10 +98,9 @@ impl MutationStrategy for TableGuard {
         });
 
         if mutation_occured {
-            Ok(crate::MutationState::Mutated(RawEntry::new(
-                child_ast,
-                [parent.id()].into(),
-            )))
+            Ok(crate::MutationState::Mutated(
+                RawEntry::new(child_ast, [parent.id()].into()).into(),
+            ))
         } else {
             Ok(crate::MutationState::Unchanged)
         }

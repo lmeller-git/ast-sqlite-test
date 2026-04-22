@@ -3,6 +3,7 @@ from argparse import ArgumentParser, Namespace
 import asyncio
 import os
 
+from lib_sf.lib_sf import TestableEntry
 from tester.event_loop import fuzzing_loop
 from tester.exec import init, run_single_mutation
 from tester.oracle import oracle
@@ -41,7 +42,11 @@ async def main(args: Namespace):
 
     for entry in snapshot:
         _ = await run_single_mutation(
-            entry.clone_raw(), ipc_queue, mutation_engine, oracle_queue, init_workers
+            TestableEntry.from_raw(entry.clone_raw()),
+            ipc_queue,
+            mutation_engine,
+            oracle_queue,
+            init_workers,
         )
 
     mutation_engine.clear()
@@ -63,28 +68,46 @@ async def main(args: Namespace):
     # TODO: force add guarded queries back to engine or skip this entirely
 
     mutation_engine.clear_strategies()
+    # [
+    #     mutation_engine.add_strategy(strat)
+    #     for strat in [
+    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.splice_in()),
+    #         engine.StrategyBuilder.random_sampler(
+    #             3,
+    #             7,
+    #             [
+    #                 engine.StrategyBuilder.op_flip(),
+    #                 engine.StrategyBuilder.num_bounds(),
+    #                 engine.StrategyBuilder.null_inject(),
+    #                 engine.StrategyBuilder.type_cast(),
+    #                 engine.StrategyBuilder.set_ops(),
+    #                 engine.StrategyBuilder.sub_query(),
+    #                 engine.StrategyBuilder.splice_in(),
+    #                 engine.StrategyBuilder.randomize(engine.StrategyBuilder.merger(), 0.2),
+    #             ],
+    #         ),
+    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.table_scrambler()),
+    #         engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.1),
+    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.expr_shuffle()),
+    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.relation_shuffle()),
+    #     ]
+    # ]
+
     [
-        mutation_engine.add_strategy(strat)
-        for strat in [
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.splice_in(), 0.5),
-            engine.StrategyBuilder.random_sampler(
-                3,
-                7,
-                [
-                    engine.StrategyBuilder.op_flip(),
-                    engine.StrategyBuilder.num_bounds(),
-                    engine.StrategyBuilder.null_inject(),
-                    engine.StrategyBuilder.type_cast(),
-                    engine.StrategyBuilder.set_ops(),
-                    engine.StrategyBuilder.sub_query(),
-                    engine.StrategyBuilder.splice_in(),
-                    engine.StrategyBuilder.randomize(engine.StrategyBuilder.merger(), 0.2),
-                ],
-            ),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_scrambler(), 0.3),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.1),
+        mutation_engine.add_strategy(strat) for strat in [
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.splice_in()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.num_bounds()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.op_flip()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.null_inject()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.type_cast()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.set_ops()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.sub_query()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.relation_shuffle()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.splice_in()),
+            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.3)
         ]
     ]
+
 
     snapshot = mutation_engine.snapshot()
 
@@ -93,7 +116,11 @@ async def main(args: Namespace):
 
     tasks = [
         run_single_mutation(
-            entry.clone_raw(), ipc_queue, mutation_engine, oracle_queue, init_workers
+            TestableEntry.from_raw(entry.clone_raw()),
+            ipc_queue,
+            mutation_engine,
+            oracle_queue,
+            init_workers,
         )
         for entry in snapshot
     ]

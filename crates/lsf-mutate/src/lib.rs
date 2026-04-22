@@ -1,4 +1,8 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    ops::{Deref, DerefMut},
+    sync::{Arc, atomic::AtomicU32},
+};
 
 use lsf_core::entry::{CorpusEntry, ID, RawEntry};
 use rand::{Rng, RngExt};
@@ -10,6 +14,7 @@ mod ident;
 mod random_mutate;
 mod recurse;
 mod sample;
+mod schedule;
 mod splice;
 mod structure;
 mod values;
@@ -22,6 +27,7 @@ pub use random_mutate::*;
 #[allow(unused_imports)]
 pub use recurse::*;
 pub use sample::*;
+pub use schedule::*;
 pub use splice::*;
 pub use structure::*;
 pub use values::*;
@@ -34,6 +40,84 @@ pub trait MutationStrategy: Send + Sync {
         mapping: &HashMap<ID, CorpusEntry>,
         rng: &mut dyn Rng,
     ) -> Result<MutationState, MutationError>;
+
+    fn init(&mut self, _ctx: StrategyContext) {}
+}
+
+#[derive(Clone, Default)]
+pub struct StrategyContext {
+    pub total_attempts: Arc<AtomicU32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestableEntry {
+    entry: RawEntry,
+    hooks: Vec<MutationHook>,
+}
+
+impl TestableEntry {
+    pub fn new(entry: RawEntry) -> Self {
+        Self {
+            entry,
+            hooks: Vec::new(),
+        }
+    }
+
+    pub fn attach_hook(&mut self, hook: MutationHook) {
+        self.hooks.push(hook);
+    }
+
+    pub fn with_hook(mut self, hook: MutationHook) -> Self {
+        self.attach_hook(hook);
+        self
+    }
+
+    pub fn fire_hooks(&self, outcome: TestOutcome) {
+        for hook in &self.hooks {
+            hook.fire(outcome);
+        }
+    }
+}
+
+impl AsRef<RawEntry> for TestableEntry {
+    fn as_ref(&self) -> &RawEntry {
+        self
+    }
+}
+
+impl AsMut<RawEntry> for TestableEntry {
+    fn as_mut(&mut self) -> &mut RawEntry {
+        self
+    }
+}
+
+impl Deref for TestableEntry {
+    type Target = RawEntry;
+
+    fn deref(&self) -> &Self::Target {
+        &self.entry
+    }
+}
+
+impl DerefMut for TestableEntry {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.entry
+    }
+}
+
+impl From<RawEntry> for TestableEntry {
+    fn from(entry: RawEntry) -> TestableEntry {
+        TestableEntry {
+            entry,
+            hooks: Vec::new(),
+        }
+    }
+}
+
+impl From<TestableEntry> for RawEntry {
+    fn from(testable: TestableEntry) -> RawEntry {
+        testable.entry
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
@@ -57,10 +141,9 @@ impl MutationStrategy for Merger {
         if let Some(other) = mapping.get(&parent_gen[other_idx]) {
             let mut new = parent.ast().clone();
             new.extend(other.ast().iter().cloned());
-            Ok(MutationState::Mutated(RawEntry::new(
-                new,
-                [parent.id(), other.id()].into(),
-            )))
+            Ok(MutationState::Mutated(
+                RawEntry::new(new, [parent.id(), other.id()].into()).into(),
+            ))
         } else {
             Err(MutationError::NOPARENT(parent_gen[other_idx]))
         }
@@ -104,10 +187,9 @@ impl MutationStrategy for RandomUpperCase {
         });
 
         if was_mutated {
-            Ok(MutationState::Mutated(RawEntry::new(
-                ast,
-                [parent.id()].into(),
-            )))
+            Ok(MutationState::Mutated(
+                RawEntry::new(ast, [parent.id()].into()).into(),
+            ))
         } else {
             Ok(MutationState::Unchanged)
         }
@@ -116,12 +198,12 @@ impl MutationStrategy for RandomUpperCase {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum MutationState {
-    Mutated(RawEntry),
+    Mutated(TestableEntry),
     Unchanged,
 }
 
 impl MutationState {
-    pub fn into_option(self) -> Option<RawEntry> {
+    pub fn into_option(self) -> Option<TestableEntry> {
         match self {
             Self::Mutated(some) => Some(some),
             Self::Unchanged => None,

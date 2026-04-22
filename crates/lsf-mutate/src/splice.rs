@@ -36,10 +36,9 @@ impl MutationStrategy for SpliceIn {
                 random_insert..random_insert,
                 other.ast()[random_start..random_end].iter().cloned(),
             );
-            Ok(crate::MutationState::Mutated(RawEntry::new(
-                child_ast,
-                [parent.id(), other.id()].into(),
-            )))
+            Ok(crate::MutationState::Mutated(
+                RawEntry::new(child_ast, [parent.id(), other.id()].into()).into(),
+            ))
         } else {
             Err(crate::MutationError::NOPARENT(parent_gen[other_idx]))
         }
@@ -81,10 +80,9 @@ impl MutationStrategy for SubQuery {
         });
 
         if child_is_mutated {
-            Ok(crate::MutationState::Mutated(RawEntry::new(
-                child_ast,
-                [parent.id()].into(),
-            )))
+            Ok(crate::MutationState::Mutated(
+                RawEntry::new(child_ast, [parent.id()].into()).into(),
+            ))
         } else {
             Ok(crate::MutationState::Unchanged)
         }
@@ -183,10 +181,9 @@ impl MutationStrategy for SetOps {
             pipe_operators: vec![],
         }));
 
-        Ok(crate::MutationState::Mutated(RawEntry::new(
-            vec![combined],
-            [parent.id(), other.id()].into(),
-        )))
+        Ok(crate::MutationState::Mutated(
+            RawEntry::new(vec![combined], [parent.id(), other.id()].into()).into(),
+        ))
     }
 }
 

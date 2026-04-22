@@ -11,6 +11,8 @@ use lsf_engine::{
     WeightedRandomScheduler,
 };
 use lsf_mutate::{
+    AdaptiveStrategyScheduler,
+    ExprShuffle,
     Merger,
     MutationStrategy,
     NullInject,
@@ -19,6 +21,7 @@ use lsf_mutate::{
     RandomMutationSampler,
     RandomUpperCase,
     Randomly,
+    RelShuffle,
     SetOps,
     SpliceIn,
     SubQuery,
@@ -28,7 +31,7 @@ use lsf_mutate::{
 };
 use pyo3::prelude::*;
 
-use crate::{CorpusEntry, RawEntry};
+use crate::{CorpusEntry, TestableEntry};
 
 #[pyclass]
 pub struct Engine(RawEngine);
@@ -62,7 +65,7 @@ impl Engine {
 
     pub fn commit_test_result(
         &mut self,
-        mut raw: PyRefMut<RawEntry>,
+        mut raw: PyRefMut<TestableEntry>,
         mut data: PyRefMut<TestResult>,
     ) {
         self.0.commit_test_result(
@@ -112,10 +115,10 @@ pub struct Generation(RawGeneration);
 #[pymethods]
 impl Generation {
     #[allow(clippy::wrong_self_convention)]
-    pub fn into_members(&mut self) -> Vec<RawEntry> {
+    pub fn into_members(&mut self) -> Vec<TestableEntry> {
         self.0
             .drain(..)
-            .map(|rawest| RawEntry(Some(rawest)))
+            .map(|rawest| TestableEntry(Some(rawest)))
             .collect()
     }
 }
@@ -248,6 +251,29 @@ impl StrategyBuilder {
     #[pyo3(signature = (mutation_chance = 0.3))]
     pub fn sub_query(mutation_chance: f64) -> Self {
         Self(Some(Box::new(SubQuery { mutation_chance })))
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (mutation_chance = 0.3))]
+    pub fn expr_shuffle(mutation_chance: f64) -> Self {
+        Self(Some(Box::new(ExprShuffle {
+            chance_per_node: mutation_chance,
+        })))
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (mutation_chance = 0.3))]
+    pub fn relation_shuffle(mutation_chance: f64) -> Self {
+        Self(Some(Box::new(RelShuffle {
+            chance_per_node: mutation_chance,
+        })))
+    }
+
+    #[staticmethod]
+    pub fn scheduled(mut strategy: PyRefMut<StrategyBuilder>) -> Self {
+        Self(Some(Box::new(AdaptiveStrategyScheduler::new(
+            strategy.0.take().unwrap(),
+        ))))
     }
 }
 

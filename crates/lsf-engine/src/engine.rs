@@ -5,12 +5,19 @@ use std::{
     io::{self, Read},
     ops::RangeBounds,
     path::PathBuf,
-    sync::Arc,
+    sync::{Arc, atomic::AtomicU32},
 };
 
 use lsf_core::entry::{CorpusEntry, Meta, RawEntry};
 use lsf_cov::ipc::{IPCToken, SharedMemHandle};
-use lsf_mutate::{MutationState, MutationStrategy};
+use lsf_mutate::{
+    AcceptanceReason,
+    MutationState,
+    MutationStrategy,
+    RejectionReason,
+    TestOutcome,
+    TestableEntry,
+};
 use rand::{SeedableRng, rngs::SmallRng};
 use sqlparser::{dialect::SQLiteDialect, parser::Parser};
 
@@ -22,6 +29,7 @@ pub struct Engine {
     scheduler: Box<dyn Schedule>,
     strategies: Vec<Box<dyn MutationStrategy>>,
     rng: SmallRng,
+    total_mutations: Arc<AtomicU32>,
 }
 
 impl Debug for Engine {
@@ -46,6 +54,7 @@ impl Engine {
             corpus: Corpus::new(shmem_queue.shmem_size),
             shmem_queue,
             rng: SmallRng::seed_from_u64(rng_seed),
+            total_mutations: Arc::default(),
         }
     }
 
@@ -58,7 +67,10 @@ impl Engine {
         self.strategies.clear();
     }
 
-    pub fn add_strategy(&mut self, strategy: Box<dyn MutationStrategy>) {
+    pub fn add_strategy(&mut self, mut strategy: Box<dyn MutationStrategy>) {
+        strategy.init(lsf_mutate::StrategyContext {
+            total_attempts: self.total_mutations.clone(),
+        });
         self.strategies.push(strategy);
     }
 
@@ -69,7 +81,8 @@ impl Engine {
         let next_batch = self
             .scheduler
             .next_batch(&self.corpus, batch_size, &mut self.rng);
-        next_batch
+
+        let generation: Generation = next_batch
             .iter()
             .filter_map(|entry| {
                 if let Some(parent_entry) = self.corpus.entries.get(entry) {
@@ -97,12 +110,19 @@ impl Engine {
                     None
                 }
             })
-            .collect()
+            .collect();
+
+        self.total_mutations.fetch_add(
+            generation.members.len() as u32,
+            std::sync::atomic::Ordering::Relaxed,
+        );
+
+        generation
     }
 
     pub fn commit_test_result(
         &mut self,
-        raw_entry: RawEntry,
+        raw_entry: TestableEntry,
         mut meta: Meta,
         shmem: Box<IPCToken>,
     ) {
@@ -115,25 +135,30 @@ impl Engine {
             .try_insert(raw_entry.id(), raw_entry.ast());
 
         if !is_diverse && new_edges.is_empty() {
+            raw_entry.fire_hooks(TestOutcome::Rejected(RejectionReason::Bad));
             return;
         }
 
         meta.new_cov_nodes = new_edges.len();
-        let entry = raw_entry.into_corpus_entry(meta);
 
         if !new_edges.is_empty() {
             let is_best = self.corpus.entry_rating.update_if_best(
-                entry.id(),
-                entry.ast().len(),
-                entry.meta().exec_time,
+                raw_entry.id(),
+                raw_entry.ast().len(),
+                meta.exec_time,
                 new_edges.into_iter(),
             );
 
             if !is_best && !is_diverse {
+                raw_entry.fire_hooks(TestOutcome::Rejected(RejectionReason::Bad));
                 return;
             }
+            raw_entry.fire_hooks(TestOutcome::Accepted(AcceptanceReason::CovIncrease));
+        } else {
+            raw_entry.fire_hooks(TestOutcome::Accepted(AcceptanceReason::IsDiverse));
         }
 
+        let entry = Into::<RawEntry>::into(raw_entry).into_corpus_entry(meta);
         self.commit_generation(SelectedGeneration {
             members: vec![entry],
         });
@@ -192,7 +217,7 @@ impl Engine {
 /// A batch of newly mutated entries, which are yet to be judged
 #[derive(Debug, Clone)]
 pub struct Generation {
-    members: Vec<RawEntry>,
+    members: Vec<TestableEntry>,
 }
 
 impl Generation {
@@ -208,11 +233,11 @@ impl Generation {
         }
     }
 
-    pub fn members(&self) -> &[RawEntry] {
+    pub fn members(&self) -> &[TestableEntry] {
         &self.members
     }
 
-    pub fn drain<R>(&mut self, range: R) -> impl Iterator<Item = RawEntry>
+    pub fn drain<R>(&mut self, range: R) -> impl Iterator<Item = TestableEntry>
     where
         R: RangeBounds<usize>,
     {
@@ -220,8 +245,8 @@ impl Generation {
     }
 }
 
-impl FromIterator<RawEntry> for Generation {
-    fn from_iter<T: IntoIterator<Item = RawEntry>>(iter: T) -> Self {
+impl FromIterator<TestableEntry> for Generation {
+    fn from_iter<T: IntoIterator<Item = TestableEntry>>(iter: T) -> Self {
         Self {
             members: iter.into_iter().collect(),
         }
@@ -376,7 +401,9 @@ mod tests {
         engine.commit_generation(
             children
                 .drain(..)
-                .map(|raw| raw.into_corpus_entry(lsf_core::entry::Meta::default()))
+                .map(|raw| {
+                    Into::<RawEntry>::into(raw).into_corpus_entry(lsf_core::entry::Meta::default())
+                })
                 .collect(),
         );
         engine.clear_strategies();

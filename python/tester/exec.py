@@ -1,13 +1,13 @@
 import asyncio
 import re
 
-from lib_sf.lib_sf import RawEntry
+from lib_sf.lib_sf import RejectionReason, TestOutcome, TestableEntry
 from lib_sf import engine
 from tester.persistent_worker import SQLiteWorker, TestCapture
 
 
 async def run_single_mutation(
-    entry: RawEntry,
+    entry: TestableEntry,
     ipc_queue: engine.IPCTokenQueue,
     mutation_engine: engine.Engine,
     oracle_queue: asyncio.PriorityQueue[tuple[int, TestCapture | None]],
@@ -39,6 +39,7 @@ async def run_single_mutation(
         if not is_crash and not is_hang:
             mutation_engine.commit_test_result(entry, engine.TestResult(capture.exec_time, token))
         else:
+            entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()))
             mutation_engine.return_token(token)
 
         if is_crash:
@@ -53,6 +54,7 @@ async def run_single_mutation(
         await oracle_queue.put((-priority, capture))
 
     except Exception:
+        entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()))
         mutation_engine.return_token(token)
 
 
