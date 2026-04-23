@@ -2,8 +2,4 @@
 
 cd /app
 
-<<<<<<< HEAD
-just run-docker_ --seeds "$@"
-=======
-just run-docker_ --seeds /app/seeds
->>>>>>> main
+just run-docker_ --seeds /app/seeds --save_to docker_out/queries

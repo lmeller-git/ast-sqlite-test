@@ -17,7 +17,13 @@ use visitor::{
     pythonize_query_output,
 };
 
-use crate::engine::{IPCTokenHandle, IPCTokenQueue, SeedGeneratorBuilder, TestResult};
+use crate::engine::{
+    IPCTokenHandle,
+    IPCTokenQueue,
+    SeedGeneratorBuilder,
+    TestResult,
+    TreeMutatorOperation,
+};
 
 mod engine;
 mod visitor;
@@ -140,6 +146,70 @@ impl RawEntry {
     }
 }
 
+#[pyclass(from_py_object)]
+#[derive(Clone, Debug)]
+pub struct TestOutcome(lsf_feedback::TestOutcome);
+
+#[pymethods]
+impl TestOutcome {
+    #[staticmethod]
+    pub fn rejected(because: RejectionReason) -> Self {
+        Self(lsf_feedback::TestOutcome::Rejected(because.0))
+    }
+}
+
+#[pyclass(from_py_object)]
+#[derive(Clone, Debug)]
+pub struct RejectionReason(lsf_feedback::RejectionReason);
+
+#[pymethods]
+impl RejectionReason {
+    #[staticmethod]
+    pub fn invalid_syntax() -> Self {
+        Self(lsf_feedback::RejectionReason::SyntaxError)
+    }
+}
+
+#[pyclass]
+#[derive(Debug, PartialEq, Eq)]
+pub struct TestableEntry(Option<lsf_feedback::TestableEntry<RawestEntry>>);
+
+#[pymethods]
+impl TestableEntry {
+    pub fn id(&self) -> ID {
+        self.0.as_ref().unwrap().id().into()
+    }
+
+    pub fn as_ast(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        pythonize_query_output(py, self.0.as_ref().unwrap().ast().clone())
+    }
+
+    // TODO optimize to_sql_string methods to redeuce allocs
+    pub fn to_sql_string(&self) -> String {
+        self.0
+            .as_ref()
+            .map(|e| {
+                e.ast()
+                    .iter()
+                    .map(std::string::ToString::to_string)
+                    .collect::<Vec<String>>()
+                    .join(";")
+            })
+            .unwrap()
+    }
+
+    pub fn fire_hooks(&self, outcome: TestOutcome) {
+        self.0.as_ref().unwrap().fire_hooks(outcome.0);
+    }
+
+    #[staticmethod]
+    pub fn from_raw(mut raw: PyRefMut<RawEntry>) -> Self {
+        Self(Some(lsf_feedback::TestableEntry::new(
+            raw.0.take().unwrap(),
+        )))
+    }
+}
+
 #[pymodule]
 fn lib_sf(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_sql, m)?)?;
@@ -148,6 +218,9 @@ fn lib_sf(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ID>()?;
     m.add_class::<RawEntry>()?;
     m.add_class::<CorpusEntry>()?;
+    m.add_class::<TestableEntry>()?;
+    m.add_class::<TestOutcome>()?;
+    m.add_class::<RejectionReason>()?;
 
     let engine = PyModule::new(py, "engine")?;
     engine.add_class::<Engine>()?;
@@ -157,6 +230,7 @@ fn lib_sf(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     engine.add_class::<IPCTokenHandle>()?;
     engine.add_class::<IPCTokenQueue>()?;
     engine.add_class::<TestResult>()?;
+    engine.add_class::<TreeMutatorOperation>()?;
     m.add_submodule(&engine)?;
 
     let visitor = PyModule::new(py, "visitor")?;

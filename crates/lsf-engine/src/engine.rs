@@ -5,11 +5,12 @@ use std::{
     io::{self, Read},
     ops::RangeBounds,
     path::PathBuf,
-    sync::Arc,
+    sync::{Arc, atomic::AtomicU32},
 };
 
 use lsf_core::entry::{CorpusEntry, Meta, RawEntry};
 use lsf_cov::ipc::{IPCToken, SharedMemHandle};
+use lsf_feedback::{AcceptanceReason, RejectionReason, TestOutcome, TestableEntry};
 use lsf_mutate::{MutationState, MutationStrategy};
 use rand::{SeedableRng, rngs::SmallRng};
 use sqlparser::{dialect::SQLiteDialect, parser::Parser};
@@ -22,6 +23,7 @@ pub struct Engine {
     scheduler: Box<dyn Schedule>,
     strategies: Vec<Box<dyn MutationStrategy>>,
     rng: SmallRng,
+    total_mutations: Arc<AtomicU32>,
 }
 
 impl Debug for Engine {
@@ -35,21 +37,29 @@ impl Debug for Engine {
 
 impl Engine {
     pub fn new(
-        scheduler: Box<dyn Schedule>,
+        mut scheduler: Box<dyn Schedule>,
         strategies: Vec<Box<dyn MutationStrategy>>,
         shmem_queue: Arc<SharedMemHandle>,
         rng_seed: u64,
     ) -> Self {
+        let total_mutations: Arc<std::sync::atomic::AtomicU32> = Arc::default();
+        scheduler.init(crate::SchedulerContext {
+            total_attempts: total_mutations.clone(),
+        });
         Self {
             scheduler,
             strategies,
             corpus: Corpus::new(shmem_queue.shmem_size),
             shmem_queue,
             rng: SmallRng::seed_from_u64(rng_seed),
+            total_mutations,
         }
     }
 
-    pub fn with_scheduler(mut self, scheduler: Box<dyn Schedule>) -> Self {
+    pub fn with_scheduler(mut self, mut scheduler: Box<dyn Schedule>) -> Self {
+        scheduler.init(crate::SchedulerContext {
+            total_attempts: self.total_mutations.clone(),
+        });
         self.scheduler = scheduler;
         self
     }
@@ -58,7 +68,10 @@ impl Engine {
         self.strategies.clear();
     }
 
-    pub fn add_strategy(&mut self, strategy: Box<dyn MutationStrategy>) {
+    pub fn add_strategy(&mut self, mut strategy: Box<dyn MutationStrategy>) {
+        strategy.init(lsf_mutate::StrategyContext {
+            total_attempts: self.total_mutations.clone(),
+        });
         self.strategies.push(strategy);
     }
 
@@ -69,40 +82,48 @@ impl Engine {
         let next_batch = self
             .scheduler
             .next_batch(&self.corpus, batch_size, &mut self.rng);
-        next_batch
+
+        let generation: Generation = next_batch
             .iter()
             .filter_map(|entry| {
-                if let Some(parent_entry) = self.corpus.entries.get(entry) {
-                    let mut state = MutationState::Unchanged;
-                    let mut current_parent = parent_entry.raw();
+                let mut state = MutationState::Unchanged;
+                let mut hooks = entry.hooks.clone();
+                let mut current_parent: &TestableEntry<RawEntry> =
+                    &TestableEntry::new((*entry.as_ref()).clone());
 
-                    for strategy in &self.strategies {
-                        if let Ok(MutationState::Mutated(next)) = strategy.breed(
-                            current_parent,
-                            &next_batch,
-                            &self.corpus.entries,
-                            &mut self.rng,
-                        ) {
-                            state = MutationState::Mutated(next);
-                            current_parent = if let MutationState::Mutated(next_parent) = &state {
-                                next_parent
-                            } else {
-                                unreachable!()
-                            }
+                for strategy in &self.strategies {
+                    if let Ok(MutationState::Mutated(next)) =
+                        strategy.breed(current_parent, &next_batch, &mut self.rng)
+                    {
+                        state = MutationState::Mutated(next);
+                        current_parent = if let MutationState::Mutated(next_parent) = &mut state {
+                            hooks.append(&mut next_parent.hooks);
+                            next_parent
+                        } else {
+                            unreachable!()
                         }
                     }
-
-                    state.into_option()
-                } else {
-                    None
                 }
+
+                if let MutationState::Mutated(state) = &mut state {
+                    state.hooks.append(&mut hooks);
+                }
+
+                state.into_option()
             })
-            .collect()
+            .collect();
+
+        self.total_mutations.fetch_add(
+            generation.members.len() as u32,
+            std::sync::atomic::Ordering::Relaxed,
+        );
+
+        generation
     }
 
     pub fn commit_test_result(
         &mut self,
-        raw_entry: RawEntry,
+        raw_entry: TestableEntry<RawEntry>,
         mut meta: Meta,
         shmem: Box<IPCToken>,
     ) {
@@ -115,25 +136,30 @@ impl Engine {
             .try_insert(raw_entry.id(), raw_entry.ast());
 
         if !is_diverse && new_edges.is_empty() {
+            raw_entry.fire_hooks(TestOutcome::Rejected(RejectionReason::Bad));
             return;
         }
 
         meta.new_cov_nodes = new_edges.len();
-        let entry = raw_entry.into_corpus_entry(meta);
 
         if !new_edges.is_empty() {
             let is_best = self.corpus.entry_rating.update_if_best(
-                entry.id(),
-                entry.ast().len(),
-                entry.meta().exec_time,
+                raw_entry.id(),
+                raw_entry.ast().len(),
+                meta.exec_time,
                 new_edges.into_iter(),
             );
 
             if !is_best && !is_diverse {
+                raw_entry.fire_hooks(TestOutcome::Rejected(RejectionReason::Bad));
                 return;
             }
+            raw_entry.fire_hooks(TestOutcome::Accepted(AcceptanceReason::CovIncrease));
+        } else {
+            raw_entry.fire_hooks(TestOutcome::Accepted(AcceptanceReason::IsDiverse));
         }
 
+        let entry = Into::<RawEntry>::into(raw_entry).into_corpus_entry(meta);
         self.commit_generation(SelectedGeneration {
             members: vec![entry],
         });
@@ -192,7 +218,7 @@ impl Engine {
 /// A batch of newly mutated entries, which are yet to be judged
 #[derive(Debug, Clone)]
 pub struct Generation {
-    members: Vec<RawEntry>,
+    members: Vec<TestableEntry<RawEntry>>,
 }
 
 impl Generation {
@@ -208,11 +234,11 @@ impl Generation {
         }
     }
 
-    pub fn members(&self) -> &[RawEntry] {
+    pub fn members(&self) -> &[TestableEntry<RawEntry>] {
         &self.members
     }
 
-    pub fn drain<R>(&mut self, range: R) -> impl Iterator<Item = RawEntry>
+    pub fn drain<R>(&mut self, range: R) -> impl Iterator<Item = TestableEntry<RawEntry>>
     where
         R: RangeBounds<usize>,
     {
@@ -220,8 +246,8 @@ impl Generation {
     }
 }
 
-impl FromIterator<RawEntry> for Generation {
-    fn from_iter<T: IntoIterator<Item = RawEntry>>(iter: T) -> Self {
+impl FromIterator<TestableEntry<RawEntry>> for Generation {
+    fn from_iter<T: IntoIterator<Item = TestableEntry<RawEntry>>>(iter: T) -> Self {
         Self {
             members: iter.into_iter().collect(),
         }
@@ -346,7 +372,7 @@ impl ObtainSeed for LiteralSeeder {
 
 #[cfg(test)]
 mod tests {
-    use lsf_mutate::{RandomUpperCase, SpliceIn};
+    use lsf_mutate::SpliceIn;
 
     use super::*;
     use crate::WeightedRandomScheduler;
@@ -361,7 +387,7 @@ mod tests {
         );
         engine.clear_strategies();
         assert!(engine.strategies.is_empty());
-        engine.add_strategy(Box::new(RandomUpperCase::new()));
+        engine.add_strategy(Box::new(SpliceIn {}));
 
         assert!(engine.mutate_batch(16).members().is_empty());
 
@@ -376,7 +402,9 @@ mod tests {
         engine.commit_generation(
             children
                 .drain(..)
-                .map(|raw| raw.into_corpus_entry(lsf_core::entry::Meta::default()))
+                .map(|raw| {
+                    Into::<RawEntry>::into(raw).into_corpus_entry(lsf_core::entry::Meta::default())
+                })
                 .collect(),
         );
         engine.clear_strategies();

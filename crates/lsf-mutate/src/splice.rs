@@ -1,4 +1,5 @@
 use lsf_core::entry::RawEntry;
+use lsf_feedback::TestableEntry;
 use rand::{Rng, RngExt};
 use sqlparser::ast::{
     Expr,
@@ -20,29 +21,24 @@ impl SpliceIn {}
 impl MutationStrategy for SpliceIn {
     fn breed(
         &self,
-        parent: &lsf_core::entry::RawEntry,
-        parent_gen: &[lsf_core::entry::ID],
-        mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        parent: &TestableEntry<RawEntry>,
+        parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let other_idx = rng.random_range(..parent_gen.len());
-        if let Some(other) = mapping.get(&parent_gen[other_idx]) {
-            let random_start = rng.random_range(..other.ast().len());
-            let random_end = rng.random_range(random_start + 1..=other.ast().len());
-            let random_insert = rng.random_range(..parent.ast().len());
+        let other = &parent_gen[other_idx];
+        let random_start = rng.random_range(..other.ast().len());
+        let random_end = rng.random_range(random_start + 1..=other.ast().len());
+        let random_insert = rng.random_range(..parent.ast().len());
 
-            let mut child_ast = parent.ast().clone();
-            _ = child_ast.splice(
-                random_insert..random_insert,
-                other.ast()[random_start..random_end].iter().cloned(),
-            );
-            Ok(crate::MutationState::Mutated(RawEntry::new(
-                child_ast,
-                [parent.id(), other.id()].into(),
-            )))
-        } else {
-            Err(crate::MutationError::NOPARENT(parent_gen[other_idx]))
-        }
+        let mut child_ast = parent.ast().clone();
+        _ = child_ast.splice(
+            random_insert..random_insert,
+            other.ast()[random_start..random_end].iter().cloned(),
+        );
+        Ok(crate::MutationState::Mutated(
+            RawEntry::new(child_ast, [parent.id(), other.id()].into()).into(),
+        ))
     }
 }
 
@@ -53,9 +49,8 @@ pub struct SubQuery {
 impl MutationStrategy for SubQuery {
     fn breed(
         &self,
-        parent: &RawEntry,
-        parent_gen: &[lsf_core::entry::ID],
-        mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        parent: &TestableEntry<RawEntry>,
+        parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut child_ast = parent.ast().clone();
@@ -67,24 +62,22 @@ impl MutationStrategy for SubQuery {
                 && rng.random_bool(self.mutation_chance)
             {
                 let other_idx = rng.random_range(..parent_gen.len());
-                if let Some(other) = mapping.get(&parent_gen[other_idx]) {
-                    _ = visit_expressions(other.ast(), |expr| {
-                        if let Expr::Subquery(query) = expr {
-                            **right = Expr::Subquery(query.clone());
-                            child_is_mutated = true;
-                        }
-                        std::ops::ControlFlow::<()>::Break(())
-                    });
-                }
+                let other = &parent_gen[other_idx];
+                _ = visit_expressions(other.ast(), |expr| {
+                    if let Expr::Subquery(query) = expr {
+                        **right = Expr::Subquery(query.clone());
+                        child_is_mutated = true;
+                    }
+                    std::ops::ControlFlow::<()>::Break(())
+                });
             }
             std::ops::ControlFlow::Continue::<()>(())
         });
 
         if child_is_mutated {
-            Ok(crate::MutationState::Mutated(RawEntry::new(
-                child_ast,
-                [parent.id()].into(),
-            )))
+            Ok(crate::MutationState::Mutated(
+                RawEntry::new(child_ast, [parent.id()].into()).into(),
+            ))
         } else {
             Ok(crate::MutationState::Unchanged)
         }
@@ -96,15 +89,12 @@ pub struct SetOps {}
 impl MutationStrategy for SetOps {
     fn breed(
         &self,
-        parent: &RawEntry,
-        parent_gen: &[lsf_core::entry::ID],
-        mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        parent: &TestableEntry<RawEntry>,
+        parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let other_idx = rng.random_range(..parent_gen.len());
-        let Some(other) = mapping.get(&parent_gen[other_idx]) else {
-            return Err(crate::MutationError::NOPARENT(parent_gen[other_idx]));
-        };
+        let other = &parent_gen[other_idx];
 
         let left = parent
             .ast()
@@ -183,10 +173,9 @@ impl MutationStrategy for SetOps {
             pipe_operators: vec![],
         }));
 
-        Ok(crate::MutationState::Mutated(RawEntry::new(
-            vec![combined],
-            [parent.id(), other.id()].into(),
-        )))
+        Ok(crate::MutationState::Mutated(
+            RawEntry::new(vec![combined], [parent.id(), other.id()].into()).into(),
+        ))
     }
 }
 

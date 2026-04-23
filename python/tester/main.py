@@ -3,6 +3,7 @@ from argparse import ArgumentParser, Namespace
 import asyncio
 import os
 
+from lib_sf.lib_sf import TestableEntry
 from tester.event_loop import fuzzing_loop
 from tester.exec import init, run_single_mutation
 from tester.oracle import oracle
@@ -16,7 +17,7 @@ async def main(args: Namespace):
     oracle_queue = asyncio.PriorityQueue(1024)
 
     mutation_engine = engine.Engine(
-        engine.SchedulerBuilder.weighted_random(),
+        engine.SchedulerBuilder.adaptive_weighted_random(),
         [engine.StrategyBuilder.table_guard()],
         ipc_queue,
         42,
@@ -41,7 +42,12 @@ async def main(args: Namespace):
 
     for entry in snapshot:
         _ = await run_single_mutation(
-            entry.clone_raw(), ipc_queue, mutation_engine, oracle_queue, init_workers, None
+            TestableEntry.from_raw(entry.clone_raw()),
+            ipc_queue,
+            mutation_engine,
+            oracle_queue,
+            init_workers,
+            None
         )
 
     mutation_engine.clear()
@@ -57,26 +63,81 @@ async def main(args: Namespace):
     # TODO: force add guarded queries back to engine or skip this entirely
 
     mutation_engine.clear_strategies()
+    # [
+    #     mutation_engine.add_strategy(strat)
+    #     for strat in [
+    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.splice_in()),
+    #         engine.StrategyBuilder.random_sampler(
+    #             3,
+    #             7,
+    #             [
+    #                 engine.StrategyBuilder.op_flip(),
+    #                 engine.StrategyBuilder.num_bounds(),
+    #                 engine.StrategyBuilder.null_inject(),
+    #                 engine.StrategyBuilder.type_cast(),
+    #                 engine.StrategyBuilder.set_ops(),
+    #                 engine.StrategyBuilder.sub_query(),
+    #                 engine.StrategyBuilder.splice_in(),
+    #                 engine.StrategyBuilder.randomize(engine.StrategyBuilder.merger(), 0.2),
+    #             ],
+    #         ),
+    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.table_scrambler()),
+    #         engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.1),
+    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.expr_shuffle()),
+    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.relation_shuffle()),
+    #     ]
+    # ]
+
     [
         mutation_engine.add_strategy(strat)
         for strat in [
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.splice_in(), 0.5),
-            engine.StrategyBuilder.random_sampler(
-                3,
-                7,
-                [
-                    engine.StrategyBuilder.op_flip(),
-                    engine.StrategyBuilder.num_bounds(),
-                    engine.StrategyBuilder.null_inject(),
-                    engine.StrategyBuilder.type_cast(),
-                    engine.StrategyBuilder.set_ops(),
-                    engine.StrategyBuilder.sub_query(),
-                    engine.StrategyBuilder.splice_in(),
-                    engine.StrategyBuilder.randomize(engine.StrategyBuilder.merger(), 0.2),
-                ],
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.splice_in()),
+            engine.StrategyBuilder.scheduled(
+                engine.StrategyBuilder.random_sampler(
+                    1,
+                    1,
+                    [
+                        engine.StrategyBuilder.scheduled(
+                            engine.StrategyBuilder.tree_mutate_stmt(
+                                engine.TreeMutatorOperation.null_random()
+                            )
+                        ),
+                        engine.StrategyBuilder.scheduled(
+                            engine.StrategyBuilder.tree_mutate_stmt(
+                                engine.TreeMutatorOperation.shuffle_two()
+                            )
+                        ),
+                    ],
+                )
             ),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_scrambler(), 0.3),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.1),
+            engine.StrategyBuilder.scheduled(
+                engine.StrategyBuilder.random_sampler(
+                    1,
+                    1,
+                    [
+                        engine.StrategyBuilder.scheduled(
+                            engine.StrategyBuilder.tree_mutate_stmt(
+                                engine.TreeMutatorOperation.null_random()
+                            )
+                        ),
+                        engine.StrategyBuilder.scheduled(
+                            engine.StrategyBuilder.tree_mutate_stmt(
+                                engine.TreeMutatorOperation.shuffle_two()
+                            )
+                        ),
+                    ],
+                )
+            ),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.recursive_expand_expr()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.num_bounds()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.op_flip()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.null_inject()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.type_cast()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.set_ops()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.sub_query()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.relation_shuffle()),
+            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.6),
+            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_name_guard(), 0.6),
         ]
     ]
 
@@ -87,7 +148,12 @@ async def main(args: Namespace):
 
     tasks = [
         run_single_mutation(
-            entry.clone_raw(), ipc_queue, mutation_engine, oracle_queue, init_workers, None
+            TestableEntry.from_raw(entry.clone_raw()),
+            ipc_queue,
+            mutation_engine,
+            oracle_queue,
+            init_workers,
+            None
         )
         for entry in snapshot
     ]
@@ -108,14 +174,15 @@ async def main(args: Namespace):
         oracle_task,
     )
 
-    print(f"Saving {mutation_engine.corpus_size()} queries to ./docker_out/queries/\n", flush=True)
+    if args.save_to is not None:
+        print(f"Saving {mutation_engine.corpus_size()} queries to {args.save_to}\n", flush=True)
 
-    snapshot = mutation_engine.snapshot()
+        snapshot = mutation_engine.snapshot()
 
-    os.makedirs("docker_out/queries", exist_ok=True)
-    for i, query in enumerate(snapshot):
-        with open(f"docker_out/queries/query_{i}.sql", "w", encoding="utf-8") as f:
-            _ = f.write(query.to_sql_string())
+        os.makedirs(args.save_to, exist_ok=True)
+        for i, query in enumerate(snapshot):
+            with open(f"{args.save_to}/query_{i}.sql", "w", encoding="utf-8") as f:
+                _ = f.write(query.to_sql_string())
 
 
 def add(n1: int, n2: int) -> int:
@@ -127,5 +194,6 @@ if __name__ == "__main__":
     _ = parser.add_argument("--seeds", default="/app/seeds", type=str)
     _ = parser.add_argument("--stop_at", default=10000, type=int)
     _ = parser.add_argument("--stats", default=False, type=bool)
+    _ = parser.add_argument("--save_to", default=None, type=str)
     args = parser.parse_args()
     asyncio.run(main(args))

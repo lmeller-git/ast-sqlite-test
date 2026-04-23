@@ -1,4 +1,5 @@
 use lsf_core::entry::RawEntry;
+use lsf_feedback::TestableEntry;
 use rand::{Rng, RngExt};
 use sqlparser::ast::{
     CreateTable,
@@ -19,9 +20,8 @@ impl TableNameScramble {}
 impl MutationStrategy for TableNameScramble {
     fn breed(
         &self,
-        parent: &lsf_core::entry::RawEntry,
-        _parent_gen: &[lsf_core::entry::ID],
-        _mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        parent: &TestableEntry<RawEntry>,
+        _parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut tables = Vec::new();
@@ -65,10 +65,9 @@ impl MutationStrategy for TableNameScramble {
         }
 
         if child_is_mutated {
-            Ok(crate::MutationState::Mutated(RawEntry::new(
-                child_ast,
-                [parent.id()].into(),
-            )))
+            Ok(crate::MutationState::Mutated(
+                RawEntry::new(child_ast, [parent.id()].into()).into(),
+            ))
         } else {
             Ok(crate::MutationState::Unchanged)
         }
@@ -80,9 +79,8 @@ pub struct TableGuard {}
 impl MutationStrategy for TableGuard {
     fn breed(
         &self,
-        parent: &RawEntry,
-        _parent_gen: &[lsf_core::entry::ID],
-        _mapping: &std::collections::HashMap<lsf_core::entry::ID, lsf_core::entry::CorpusEntry>,
+        parent: &TestableEntry<RawEntry>,
+        _parent_gen: &[TestableEntry<&RawEntry>],
         _rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut child_ast = parent.ast().clone();
@@ -99,10 +97,9 @@ impl MutationStrategy for TableGuard {
         });
 
         if mutation_occured {
-            Ok(crate::MutationState::Mutated(RawEntry::new(
-                child_ast,
-                [parent.id()].into(),
-            )))
+            Ok(crate::MutationState::Mutated(
+                RawEntry::new(child_ast, [parent.id()].into()).into(),
+            ))
         } else {
             Ok(crate::MutationState::Unchanged)
         }
@@ -113,6 +110,7 @@ impl MutationStrategy for TableGuard {
 mod tests {
     use super::*;
     use crate::test_single_mutation;
+
     #[test]
     fn table_name_scrambler() {
         test_single_mutation(

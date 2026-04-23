@@ -35,13 +35,9 @@ FROM chef AS builder
 
 WORKDIR /home/test/sqlite3-src/build
 
-RUN make clean && \
-    CC="clang" \
-    CFLAGS="-O3 -fsanitize=address -fsanitize-coverage=trace-pc-guard" \
-    LDFLAGS="-fsanitize=address" \
-    ../configure
+RUN make clean && ../configure --enable-all
 
-RUN ASAN_OPTIONS="detect_leaks=0" make sqlite3.c
+RUN make sqlite3.c
 
 # prebuild dependencies
 
@@ -62,30 +58,34 @@ COPY ./crates /app/crates
 RUN cargo build --release -p lsf-hooks
 
 WORKDIR /home/test/sqlite3-src/build
-# RUN rm -f sqlite3 && \
-#     ASAN_OPTIONS="detect_leaks=0" make LDFLAGS="-fsanitize=address -Wl,--whole-archive /app/target/release/liblsf_hooks.a -Wl,--no-whole-archive -lpthread -ldl -lm"
+
 RUN clang -O3 \
-    -DSQLITE_ENABLE_RTREE=1 \
-    -DSQLITE_ENABLE_FTS3=1 \
-    -DSQLITE_ENABLE_FTS3_PARENTHESIS=1 \
+    -DSQLITE_ENABLE_MATH_FUNCTIONS=1 \
     -DSQLITE_ENABLE_FTS4=1 \
     -DSQLITE_ENABLE_FTS5=1 \
     -DSQLITE_ENABLE_GEOPOLY=1 \
+    -DSQLITE_ENABLE_RTREE=1 \
+    -DSQLITE_ENABLE_SESSION=1 \
+    -DSQLITE_ENABLE_PREUPDATE_HOOK=1 \
+    -DSQLITE_ENABLE_FTS3=1 \
+    -DSQLITE_ENABLE_FTS3_PARENTHESIS=1 \
     -DSQLITE_ENABLE_JSON1=1 \
-    -DSQLITE_ENABLE_MATH_FUNCTIONS=1 \
     -DSQLITE_ENABLE_STAT4=1 \
     -DSQLITE_ENABLE_UPDATE_DELETE_LIMIT=1 \
     -DSQLITE_ENABLE_COLUMN_METADATA=1 \
     -DSQLITE_ENABLE_DBSTAT_VTAB=1 \
-    -DSQLITE_ENABLE_SESSION=1 \
-    -DSQLITE_ENABLE_PREUPDATE_HOOK=1 \
+    -DSQLITE_ENABLE_EXPLAIN_COMMENTS=1 \
+    -DSQLITE_ENABLE_UNKNOWN_SQL_FUNCTION=1 \
+    -DSQLITE_ENABLE_STMTVTAB=1 \
+    -DSQLITE_ENABLE_DBPAGE_VTAB=1 \
+    -DSQLITE_ENABLE_BYTECODE_VTAB=1 \
+    -DSQLITE_ENABLE_OFFSET_SQL_FUNC=1 \
     -fsanitize=address \
     -fsanitize-coverage=trace-pc-guard \
     -o ./sqlite3 \
     /home/test/sqlite3-src/build/sqlite3.c \
     /home/test/sqlite3-src/build/shell.c \
-    -Wl,--whole-archive /app/target/release/liblsf_hooks.a -Wl,--no-whole-archive \
-    -lpthread -ldl -lm
+    -Wl,--whole-archive /app/target/release/liblsf_hooks.a -Wl,--no-whole-archive
 
 # build lsf
 WORKDIR /app

@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 import asyncio
 import time
 import os
+import tempfile
+import shutil
 
 
 @dataclass(order=True)
@@ -25,6 +27,7 @@ class SQLiteWorker:
         self.env: dict[str, str] | None = env
         self.STDOUT_SENTINEL: bytes = b"__STDOUT_EOQ__"
         self.STDERR_SENTINEL: bytes = b"__STDERR_EOQ__"
+        self.workdir: str = tempfile.mkdtemp(prefix="sqlite_worker_")
 
     async def _start(self) -> None:
         if self.proc is not None:
@@ -44,6 +47,7 @@ class SQLiteWorker:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=full_env,
+            cwd=self.workdir
         )
 
     async def _read_until_sentinel(
@@ -51,6 +55,7 @@ class SQLiteWorker:
     ) -> tuple[bytes, bool]:
         chunks: list[bytes] = []
         while True:
+            # TODO: handle StreamOverrunError
             line = await stream.readline()
             if not line:
                 return b"".join(chunks), False
@@ -113,10 +118,15 @@ class SQLiteWorker:
 
             # process is alive, query ran
             # need to restore a clean state via kill, since ATTACHED dbs dont get wiped on .open :memory:
-            if "ATTACH" in query.upper():
+            if "ATTACH" in query:
                 self.proc.kill()
                 _ = await self.proc.wait()
                 self.proc = None
+                for f in os.scandir(self.workdir):
+                    try:
+                        os.remove(f.path) if f.is_file() else shutil.rmtree(f.path)
+                    except OSError:
+                        pass
 
             return TestCapture(
                 stdout=stdout_bytes,
@@ -179,3 +189,4 @@ class SQLiteWorker:
                 self.proc.kill()
                 _ = await self.proc.wait()
         self.proc = None
+        shutil.rmtree(self.workdir, ignore_errors=True)
