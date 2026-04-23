@@ -7,6 +7,7 @@ use thiserror::Error;
 
 mod afl;
 mod ident;
+mod json_tree;
 mod random_mutate;
 mod recurse;
 mod sample;
@@ -18,6 +19,7 @@ mod values;
 #[allow(unused_imports)]
 pub use afl::*;
 pub use ident::*;
+pub use json_tree::*;
 #[allow(unused_imports)]
 pub use random_mutate::*;
 #[allow(unused_imports)]

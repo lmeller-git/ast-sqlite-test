@@ -14,20 +14,25 @@ use lsf_engine::{
 use lsf_mutate::{
     AdaptiveStrategyScheduler,
     ExprShuffle,
+    FieldOperation,
     MutationStrategy,
     NullInject,
     NumericBounds,
     OperatorFlip,
     RandomMutationSampler,
     Randomly,
+    RecursiveExpandExpr,
     RelShuffle,
     SetOps,
     SpliceIn,
     SubQuery,
     TableGuard,
+    TableNameScramble,
+    TreeMutator,
     TypeCast,
 };
 use pyo3::prelude::*;
+use sqlparser::ast::{Expr, Statement};
 
 use crate::{CorpusEntry, TestableEntry};
 
@@ -262,6 +267,77 @@ impl StrategyBuilder {
         Self(Some(Box::new(AdaptiveStrategyScheduler::new(
             strategy.0.take().unwrap(),
         ))))
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (operator, chance_per_node = 0.3, chance_per_field = 0.1))]
+    pub fn tree_mutate_stmt(
+        operator: TreeMutatorOperation,
+        chance_per_node: f64,
+        chance_per_field: f64,
+    ) -> Self {
+        Self(Some(Box::new(TreeMutator {
+            chance_per_node,
+            chance_per_field,
+            operation: operator.0,
+            _phantom: std::marker::PhantomData::<Statement>,
+        })))
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (operator, chance_per_node = 0.3, chance_per_field = 0.1))]
+    pub fn tree_mutate_expr(
+        operator: TreeMutatorOperation,
+        chance_per_node: f64,
+        chance_per_field: f64,
+    ) -> Self {
+        Self(Some(Box::new(TreeMutator {
+            chance_per_node,
+            chance_per_field,
+            operation: operator.0,
+            _phantom: std::marker::PhantomData::<Expr>,
+        })))
+    }
+
+    #[staticmethod]
+    pub fn table_name_guard() -> Self {
+        Self(Some(Box::new(TableNameScramble {})))
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (max_depth = 3, chance_per_node = 0.1, chance_per_level = 0.5))]
+    pub fn recursive_expand_expr(
+        max_depth: usize,
+        chance_per_node: f64,
+        chance_per_level: f64,
+    ) -> Self {
+        Self(Some(Box::new(RecursiveExpandExpr {
+            max_depth,
+            chance_per_node,
+            chance_per_level,
+        })))
+    }
+}
+
+#[pyclass(from_py_object)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TreeMutatorOperation(FieldOperation);
+
+#[pymethods]
+impl TreeMutatorOperation {
+    #[staticmethod]
+    pub fn shuffle_two() -> Self {
+        Self(FieldOperation::ShuffleTwo)
+    }
+
+    #[staticmethod]
+    pub fn shuffle_self() -> Self {
+        Self(FieldOperation::ShuffleSelf)
+    }
+
+    #[staticmethod]
+    pub fn null_random() -> Self {
+        Self(FieldOperation::NullRandom)
     }
 }
 

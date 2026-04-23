@@ -60,6 +60,12 @@ impl MutationStrategy for RandomMutationSampler {
 
         Ok(status)
     }
+
+    fn init(&mut self, ctx: crate::StrategyContext) {
+        for s in &mut self.choices {
+            s.init(ctx.clone());
+        }
+    }
 }
 
 /// applies the strategy over with probability prob
@@ -89,6 +95,10 @@ impl MutationStrategy for Randomly {
         } else {
             Ok(MutationState::Unchanged)
         }
+    }
+
+    fn init(&mut self, ctx: crate::StrategyContext) {
+        self.over.init(ctx);
     }
 }
 

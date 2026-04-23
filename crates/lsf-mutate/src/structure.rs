@@ -25,10 +25,20 @@ impl MutationStrategy for ExprShuffle {
     fn breed(
         &self,
         parent: &TestableEntry<RawEntry>,
-        _parent_gen: &[TestableEntry<&RawEntry>],
+        parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut parent_exprs: HashMap<std::mem::Discriminant<Expr>, Vec<Expr>> = HashMap::new();
+
+        let rd_donor = &parent_gen[rng.random_range(..parent_gen.len())];
+
+        _ = visit_expressions(rd_donor.ast(), |expr| {
+            parent_exprs
+                .entry(std::mem::discriminant(expr))
+                .and_modify(|entry| entry.push(expr.clone()))
+                .or_insert(vec![expr.clone()]);
+            ControlFlow::Continue::<()>(())
+        });
 
         _ = visit_expressions(parent.ast(), |expr| {
             parent_exprs
@@ -60,7 +70,7 @@ impl MutationStrategy for ExprShuffle {
 
         if is_mutated {
             Ok(crate::MutationState::Mutated(
-                RawEntry::new(child_ast, [parent.id()].into()).into(),
+                RawEntry::new(child_ast, [parent.id(), rd_donor.id()].into()).into(),
             ))
         } else {
             Ok(crate::MutationState::Unchanged)

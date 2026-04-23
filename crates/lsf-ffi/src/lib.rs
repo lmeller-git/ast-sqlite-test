@@ -17,7 +17,13 @@ use visitor::{
     pythonize_query_output,
 };
 
-use crate::engine::{IPCTokenHandle, IPCTokenQueue, SeedGeneratorBuilder, TestResult};
+use crate::engine::{
+    IPCTokenHandle,
+    IPCTokenQueue,
+    SeedGeneratorBuilder,
+    TestResult,
+    TreeMutatorOperation,
+};
 
 mod engine;
 mod visitor;
@@ -224,6 +230,7 @@ fn lib_sf(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     engine.add_class::<IPCTokenHandle>()?;
     engine.add_class::<IPCTokenQueue>()?;
     engine.add_class::<TestResult>()?;
+    engine.add_class::<TreeMutatorOperation>()?;
     m.add_submodule(&engine)?;
 
     let visitor = PyModule::new(py, "visitor")?;

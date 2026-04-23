@@ -41,6 +41,29 @@ class StrategyBuilder:
     def relation_shuffle(mutation_chance: float = 0.3) -> StrategyBuilder: ...
     @staticmethod
     def scheduled(strategy: StrategyBuilder) -> StrategyBuilder: ...
+    @staticmethod
+    def tree_mutate_stmt(
+        operator: TreeMutatorOperation, chance_per_node: float = 0.3, chance_per_field: float = 0.1
+    ) -> StrategyBuilder: ...
+    @staticmethod
+    def tree_mutate_expr(
+        operator: TreeMutatorOperation, chance_per_node: float = 0.3, chance_per_field: float = 0.1
+    ) -> StrategyBuilder: ...
+    @staticmethod
+    def table_name_guard() -> StrategyBuilder: ...
+    @staticmethod
+    def recursive_expand_expr(
+        max_depth: int = 3, chance_per_node: float = 0.1, chance_per_level: float = 0.5
+    ) -> StrategyBuilder: ...
+
+
+class TreeMutatorOperation:
+    @staticmethod
+    def shuffle_two() -> TreeMutatorOperation: ...
+    @staticmethod
+    def shuffle_self() -> TreeMutatorOperation: ...
+    @staticmethod
+    def null_random() -> TreeMutatorOperation: ...
 
 
 class SeedGeneratorBuilder:
