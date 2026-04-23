@@ -225,8 +225,9 @@ impl Schedule for AdaptiveWeightedRandomScheduler {
             .map(|idx| ids[idx])
             .filter_map(|id| {
                 from.entries.get(&id).map(|entry| {
-                    TestableEntry::new(entry.raw())
-                        .with_hook(self.stat_mapping.get(&id).unwrap().clone())
+                    let stats = self.stat_mapping.get(&id).unwrap();
+                    stats.attempts.fetch_add(1, Ordering::Relaxed);
+                    TestableEntry::new(entry.raw()).with_hook(stats.clone())
                 })
             })
             .collect()
