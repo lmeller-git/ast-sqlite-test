@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, atomic::AtomicBool};
 
 use lsf_cov::ipc::{IPCToken, SharedMemHandle};
 use lsf_engine::{
@@ -11,6 +11,7 @@ use lsf_engine::{
     SeedDirReader,
     WeightedRandomScheduler,
 };
+use lsf_feedback::{GenericHook, Hookable, SchedulerStatisticsSnapshot};
 use lsf_mutate::{
     AdaptiveStrategyScheduler,
     ExprShuffle,
@@ -31,7 +32,7 @@ use lsf_mutate::{
     TreeMutator,
     TypeCast,
 };
-use pyo3::prelude::*;
+use pyo3::{prelude::*, sync::MutexExt};
 use sqlparser::ast::{Expr, Statement};
 
 use crate::{CorpusEntry, TestableEntry};
@@ -156,6 +157,94 @@ impl TestResult {
     }
 }
 
+pub struct SchedulerHook__ {
+    stats: Mutex<Vec<SchedulerStatisticsSnapshot>>,
+    dirty: AtomicBool,
+}
+
+impl GenericHook for SchedulerHook__ {
+    fn on_snapshot(&self, snapshot: SchedulerStatisticsSnapshot) {
+        self.stats.lock().unwrap().push(snapshot);
+        self.dirty.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+#[pyclass(skip_from_py_object)]
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct SchedulerSnapshot {
+    #[pyo3(get)]
+    pub global_attempts: Option<u32>,
+    #[pyo3(get)]
+    pub name: String,
+    #[pyo3(get)]
+    pub meta: Vec<String>,
+    #[pyo3(get)]
+    pub self_attempts: Vec<u32>,
+    #[pyo3(get)]
+    pub cov_increases: Vec<u32>,
+    #[pyo3(get)]
+    pub accepted: Vec<u32>,
+    #[pyo3(get)]
+    pub syntax_err: Vec<u32>,
+    #[pyo3(get)]
+    pub crashes: Vec<u32>,
+    #[pyo3(get)]
+    pub rating: Vec<f64>,
+    #[pyo3(get)]
+    pub rating_as_prob: Vec<f64>,
+}
+
+impl From<SchedulerStatisticsSnapshot> for SchedulerSnapshot {
+    fn from(value: SchedulerStatisticsSnapshot) -> Self {
+        Self {
+            global_attempts: value.global_attempts,
+            name: value.name,
+            meta: value.meta,
+            self_attempts: value.self_attmepts,
+            cov_increases: value.cov_increases,
+            accepted: value.accepted,
+            syntax_err: value.synatx_err,
+            crashes: value.crashes,
+            rating: value.rating,
+            rating_as_prob: value.rating_as_prob,
+        }
+    }
+}
+
+#[pyclass]
+pub struct SchedulerHook(Arc<SchedulerHook__>);
+
+#[pymethods]
+impl SchedulerHook {
+    #[new]
+    pub fn new() -> Self {
+        Self(
+            SchedulerHook__ {
+                stats: Mutex::default(),
+                dirty: false.into(),
+            }
+            .into(),
+        )
+    }
+
+    pub fn drain(&self, py: Python<'_>) -> Vec<SchedulerSnapshot> {
+        let drain = self
+            .0
+            .stats
+            .lock_py_attached(py)
+            .map(|mut s| s.drain(..).map(|s| s.into()).collect())
+            .unwrap_or_default();
+        self.0
+            .dirty
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+        drain
+    }
+
+    pub fn dirty(&self) -> bool {
+        self.0.dirty.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
 #[pyclass]
 pub struct SchedulerBuilder(Option<Box<dyn Schedule>>);
 
@@ -169,6 +258,13 @@ impl SchedulerBuilder {
     #[staticmethod]
     pub fn adaptive_weighted_random() -> Self {
         Self(Some(Box::new(AdaptiveWeightedRandomScheduler::default())))
+    }
+
+    #[staticmethod]
+    pub fn hooked_adaptive_weighted_random(hook: PyRef<SchedulerHook>) -> Self {
+        let mut scheduler = AdaptiveWeightedRandomScheduler::default();
+        scheduler.attach_hook(hook.0.clone());
+        Self(Some(Box::new(scheduler)))
     }
 }
 
@@ -267,6 +363,16 @@ impl StrategyBuilder {
         Self(Some(Box::new(AdaptiveStrategyScheduler::new(
             strategy.0.take().unwrap(),
         ))))
+    }
+
+    #[staticmethod]
+    pub fn hooked_scheduled(
+        mut strategy: PyRefMut<StrategyBuilder>,
+        hook: PyRef<SchedulerHook>,
+    ) -> Self {
+        let mut scheduler = AdaptiveStrategyScheduler::new(strategy.0.take().unwrap());
+        scheduler.attach_hook(hook.0.clone());
+        Self(Some(Box::new(scheduler)))
     }
 
     #[staticmethod]

@@ -14,6 +14,7 @@ use sqlparser::ast::{
 
 use crate::MutationStrategy;
 
+#[derive(Debug)]
 pub struct SpliceIn {}
 
 impl SpliceIn {}
@@ -42,6 +43,7 @@ impl MutationStrategy for SpliceIn {
     }
 }
 
+#[derive(Debug)]
 pub struct SubQuery {
     pub mutation_chance: f64,
 }
@@ -84,6 +86,7 @@ impl MutationStrategy for SubQuery {
     }
 }
 
+#[derive(Debug)]
 pub struct SetOps {}
 
 impl MutationStrategy for SetOps {

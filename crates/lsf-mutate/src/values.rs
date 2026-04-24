@@ -27,6 +27,7 @@ const NUM_BOUNDS: &[&str] = &[
     "-9223372036854775808",
 ];
 
+#[derive(Debug)]
 pub struct NumericBounds {
     pub mutate_chance: f64,
 }
@@ -68,6 +69,7 @@ impl MutationStrategy for NumericBounds {
     }
 }
 
+#[derive(Debug)]
 pub struct OperatorFlip {
     pub flip_chance: f64,
 }
@@ -120,6 +122,7 @@ impl MutationStrategy for OperatorFlip {
     }
 }
 
+#[derive(Debug)]
 pub struct NullInject {
     pub mutation_chance: f64,
 }
@@ -157,6 +160,7 @@ impl MutationStrategy for NullInject {
     }
 }
 
+#[derive(Debug)]
 pub struct TypeCast {
     pub mutation_chance: f64,
 }

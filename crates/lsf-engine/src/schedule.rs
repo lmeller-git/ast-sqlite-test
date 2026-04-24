@@ -11,7 +11,10 @@ use lsf_feedback::{
     AcceptanceReason,
     AdaptiveStatistics,
     FeedbackHook,
+    GenericHook,
+    Hookable,
     RejectionReason,
+    SchedulerStatisticsSnapshot,
     TestOutcome,
     TestableEntry,
 };
@@ -112,6 +115,8 @@ const ZERO_WEIGHT: f64 = 100.;
 pub struct AdaptiveWeightedRandomScheduler {
     stat_mapping: HashMap<ID, Arc<AdaptiveCorpusStats>>,
     ctx: SchedulerContext,
+    hook: Option<Arc<dyn GenericHook>>,
+    last_snapshot: AtomicU32,
 }
 
 #[derive(Default)]
@@ -182,6 +187,61 @@ impl AdaptiveStatistics for AdaptiveCorpusStats {
     }
 }
 
+impl Hookable for AdaptiveWeightedRandomScheduler {
+    fn snapshot(&self) -> SchedulerStatisticsSnapshot {
+        if self.stat_mapping.is_empty() {
+            return SchedulerStatisticsSnapshot::default();
+        }
+
+        #[allow(clippy::type_complexity)]
+        let ((((((ids, attempts), accepted), cov_inc), syntax_err), crashes), ratings): (
+            (
+                ((((Vec<ID>, Vec<u32>), Vec<u32>), Vec<u32>), Vec<u32>),
+                Vec<u32>,
+            ),
+            Vec<f64>,
+        ) = self
+            .stat_mapping
+            .iter()
+            .map(|(id, stats)| {
+                (
+                    (
+                        (
+                            (
+                                (
+                                    (*id, stats.attempts.load(Ordering::Relaxed)),
+                                    stats.accepted.load(Ordering::Relaxed),
+                                ),
+                                stats.cov_increases.load(Ordering::Relaxed),
+                            ),
+                            stats.syntax_err.load(Ordering::Relaxed),
+                        ),
+                        stats.crash.load(Ordering::Relaxed),
+                    ),
+                    stats.calculate_score(),
+                )
+            })
+            .unzip();
+
+        SchedulerStatisticsSnapshot {
+            global_attempts: Some(self.ctx.total_attempts.load(Ordering::Relaxed)),
+            name: "AdaptiveWeightedRandomScheduler".into(),
+            meta: ids.into_iter().map(|id| format!("Entry_{}", id)).collect(),
+            self_attmepts: attempts,
+            cov_increases: cov_inc,
+            accepted,
+            synatx_err: syntax_err,
+            crashes,
+            rating: ratings,
+            rating_as_prob: Vec::new(),
+        }
+    }
+
+    fn attach_hook(&mut self, hook: Arc<dyn lsf_feedback::GenericHook>) {
+        self.hook.replace(hook);
+    }
+}
+
 impl FeedbackHook for AdaptiveCorpusStats {
     fn fire(&self, test_outcome: lsf_feedback::TestOutcome) {
         self.update(test_outcome);
@@ -220,16 +280,29 @@ impl Schedule for AdaptiveWeightedRandomScheduler {
             Err(_) => WeightedIndex::new(vec![1.; weights.len()]).unwrap(),
         };
 
-        dist.sample_iter(rng)
+        let batch = dist
+            .sample_iter(rng)
             .take(size)
             .map(|idx| ids[idx])
             .filter_map(|id| {
                 from.entries.get(&id).map(|entry| {
-                    TestableEntry::new(entry.raw())
-                        .with_hook(self.stat_mapping.get(&id).unwrap().clone())
+                    let stats = self.stat_mapping.get(&id).unwrap();
+                    stats.attempts.fetch_add(1, Ordering::Relaxed);
+                    TestableEntry::new(entry.raw()).with_hook(stats.clone())
                 })
             })
-            .collect()
+            .collect();
+
+        let total = self.ctx.total_attempts.load(Ordering::Relaxed);
+        let last = self.last_snapshot.load(Ordering::Relaxed);
+        if let Some(hook) = &self.hook
+            && total.saturating_sub(last) >= 500
+        {
+            self.last_snapshot.store(total, Ordering::Relaxed);
+            hook.on_snapshot(self.snapshot());
+        }
+
+        batch
     }
 
     fn init(&mut self, ctx: SchedulerContext) {

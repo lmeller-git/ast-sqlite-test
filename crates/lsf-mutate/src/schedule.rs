@@ -1,5 +1,6 @@
 use std::{
     f64,
+    fmt::Debug,
     sync::{
         Arc,
         atomic::{AtomicU32, Ordering},
@@ -11,6 +12,8 @@ use lsf_feedback::{
     AcceptanceReason,
     AdaptiveStatistics,
     FeedbackHook,
+    GenericHook,
+    Hookable,
     RejectionReason,
     TestOutcome,
     TestableEntry,
@@ -23,6 +26,16 @@ pub struct AdaptiveStrategyScheduler {
     strategy: Box<dyn MutationStrategy>,
     stats: Arc<StrategySchedulerStats>,
     ctx: StrategyContext,
+    hook: Option<Arc<dyn GenericHook>>,
+    last_snapshot: AtomicU32,
+}
+
+impl Debug for AdaptiveStrategyScheduler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AdaptiveStrategyScheduler")
+            .field("strategy", &self.strategy)
+            .finish()
+    }
 }
 
 impl AdaptiveStrategyScheduler {
@@ -31,6 +44,8 @@ impl AdaptiveStrategyScheduler {
             strategy,
             stats: Arc::new(StrategySchedulerStats::default()),
             ctx: StrategyContext::default(),
+            hook: None,
+            last_snapshot: 0.into(),
         }
     }
 }
@@ -60,6 +75,14 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
             result.attach_hook(self.stats.clone());
         }
 
+        let total = self.ctx.total_attempts.load(Ordering::Relaxed);
+        let last = self.last_snapshot.load(Ordering::Relaxed);
+        if let Some(hook) = &self.hook
+            && total.saturating_sub(last) >= 100
+        {
+            self.last_snapshot.store(total, Ordering::Relaxed);
+            hook.on_snapshot(self.snapshot());
+        }
         r
     }
 
@@ -176,5 +199,34 @@ impl PartialEq for StrategySchedulerStats {
                 .crash
                 .load(Ordering::Relaxed)
                 .eq(&other.crash.load(Ordering::Relaxed))
+    }
+}
+
+impl Hookable for AdaptiveStrategyScheduler {
+    fn snapshot(&self) -> lsf_feedback::SchedulerStatisticsSnapshot {
+        lsf_feedback::SchedulerStatisticsSnapshot {
+            global_attempts: Some(self.stats.total_attempts.load(Ordering::Relaxed)),
+            name: format!("{:?}", self),
+            meta: Vec::new(),
+            self_attmepts: vec![self.stats.attempts.load(Ordering::Relaxed)],
+            cov_increases: vec![self.stats.cov_increases.load(Ordering::Relaxed)],
+            accepted: vec![self.stats.accepted.load(Ordering::Relaxed)],
+            synatx_err: vec![self.stats.syntax_err.load(Ordering::Relaxed)],
+            crashes: vec![self.stats.crash.load(Ordering::Relaxed)],
+            rating: vec![self.stats.calculate_score()],
+            rating_as_prob: vec![{
+                let score = self.stats.calculate_score();
+                if score.is_infinite() {
+                    // initialize with a smaller probability to allow schedulers to diverege immediately
+                    0.3
+                } else {
+                    sigmoid(score)
+                }
+            }],
+        }
+    }
+
+    fn attach_hook(&mut self, hook: Arc<dyn lsf_feedback::GenericHook>) {
+        self.hook.replace(hook);
     }
 }

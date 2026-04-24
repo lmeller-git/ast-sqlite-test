@@ -17,6 +17,7 @@ use sqlparser::ast::{
 
 use crate::MutationStrategy;
 
+#[derive(Debug)]
 pub struct ExprShuffle {
     pub chance_per_node: f64,
 }
@@ -78,6 +79,7 @@ impl MutationStrategy for ExprShuffle {
     }
 }
 
+#[derive(Debug)]
 pub struct RelShuffle {
     pub chance_per_node: f64,
 }

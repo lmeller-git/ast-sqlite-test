@@ -1,5 +1,6 @@
 use std::{
     collections::BTreeSet,
+    fmt::Display,
     ops::{Deref, DerefMut},
     sync::atomic::AtomicU32,
 };
@@ -18,6 +19,12 @@ impl ID {
         Self {
             raw: CURRENT_ID.fetch_add(1, std::sync::atomic::Ordering::AcqRel),
         }
+    }
+}
+
+impl Display for ID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.raw)
     }
 }
 

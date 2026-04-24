@@ -1,4 +1,7 @@
-use std::sync::{Arc, atomic::AtomicU32};
+use std::{
+    fmt::Debug,
+    sync::{Arc, atomic::AtomicU32},
+};
 
 use lsf_core::entry::{ID, RawEntry};
 use lsf_feedback::TestableEntry;
@@ -30,7 +33,7 @@ pub use splice::*;
 pub use structure::*;
 pub use values::*;
 
-pub trait MutationStrategy: Send + Sync {
+pub trait MutationStrategy: Send + Sync + Debug {
     fn breed(
         &self,
         parent: &TestableEntry<RawEntry>,

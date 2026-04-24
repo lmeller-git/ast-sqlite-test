@@ -5,6 +5,7 @@ use rand::{Rng, RngExt};
 use crate::{MutationState, MutationStrategy};
 
 /// applies a random sample with replacement of size choose_max..=choose_min from choices
+#[derive(Debug)]
 pub struct RandomMutationSampler {
     choices: Vec<Box<dyn MutationStrategy>>,
     choose_max: usize,
@@ -69,6 +70,7 @@ impl MutationStrategy for RandomMutationSampler {
 }
 
 /// applies the strategy over with probability prob
+#[derive(Debug)]
 pub struct Randomly {
     over: Box<dyn MutationStrategy>,
     prob: f64,

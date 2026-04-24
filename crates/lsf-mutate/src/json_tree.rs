@@ -1,4 +1,10 @@
-use std::{collections::HashMap, marker::PhantomData, mem::Discriminant, ops::ControlFlow};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    marker::PhantomData,
+    mem::Discriminant,
+    ops::ControlFlow,
+};
 
 use lsf_core::{ast::AST, entry::RawEntry};
 use lsf_feedback::TestableEntry;
@@ -19,6 +25,7 @@ pub trait AstNode: Serialize + DeserializeOwned + 'static {
     fn visit_mut<T>(ast: &mut AST, f: impl FnMut(&mut Self) -> ControlFlow<T>) -> ControlFlow<T>;
     fn visit<T>(ast: &AST, f: impl FnMut(&Self) -> ControlFlow<T>) -> ControlFlow<T>;
     fn discriminant(node: &Self) -> Discriminant<Self>;
+    fn dbg_ty() -> &'static str;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -87,6 +94,18 @@ impl<T: AstNode + Send + Sync + Clone> MutationStrategy for TreeMutator<T> {
     }
 }
 
+impl<T: AstNode> Debug for TreeMutator<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TreeMutator")
+            .field("node_chance", &self.chance_per_node)
+            .field("field_chance", &self.chance_per_field)
+            .field("op", &self.operation)
+            .field("ty", &T::dbg_ty())
+            .finish()
+    }
+}
+
+#[derive(Debug)]
 pub struct RecursiveExpandExpr {
     pub max_depth: usize,
     pub chance_per_node: f64,
@@ -297,6 +316,10 @@ impl AstNode for Statement {
     fn discriminant(node: &Self) -> Discriminant<Self> {
         std::mem::discriminant(node)
     }
+
+    fn dbg_ty() -> &'static str {
+        "Statement"
+    }
 }
 
 impl AstNode for Expr {
@@ -310,5 +333,9 @@ impl AstNode for Expr {
 
     fn discriminant(node: &Self) -> Discriminant<Self> {
         std::mem::discriminant(node)
+    }
+
+    fn dbg_ty() -> &'static str {
+        "Expr"
     }
 }

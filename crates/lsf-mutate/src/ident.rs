@@ -13,6 +13,7 @@ use sqlparser::ast::{
 
 use crate::MutationStrategy;
 
+#[derive(Debug)]
 pub struct TableNameScramble {}
 
 impl TableNameScramble {}
@@ -74,6 +75,7 @@ impl MutationStrategy for TableNameScramble {
     }
 }
 
+#[derive(Debug)]
 pub struct TableGuard {}
 
 impl MutationStrategy for TableGuard {

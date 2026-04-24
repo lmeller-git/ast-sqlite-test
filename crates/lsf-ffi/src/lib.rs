@@ -20,6 +20,8 @@ use visitor::{
 use crate::engine::{
     IPCTokenHandle,
     IPCTokenQueue,
+    SchedulerHook,
+    SchedulerSnapshot,
     SeedGeneratorBuilder,
     TestResult,
     TreeMutatorOperation,
@@ -231,6 +233,8 @@ fn lib_sf(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     engine.add_class::<IPCTokenQueue>()?;
     engine.add_class::<TestResult>()?;
     engine.add_class::<TreeMutatorOperation>()?;
+    engine.add_class::<SchedulerHook>()?;
+    engine.add_class::<SchedulerSnapshot>()?;
     m.add_submodule(&engine)?;
 
     let visitor = PyModule::new(py, "visitor")?;
