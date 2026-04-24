@@ -8,6 +8,7 @@ from tester.event_loop import fuzzing_loop
 from tester.exec import init, run_single_mutation
 from tester.oracle import oracle
 from tester.persistent_worker import SQLiteWorker
+from tester.tb_logger import csv_logger
 
 
 async def main(args: Namespace):
@@ -16,8 +17,17 @@ async def main(args: Namespace):
     ipc_queue = engine.IPCTokenQueue(8, max_edges)
     oracle_queue = asyncio.PriorityQueue(1024)
 
+    if args.scheduler_stats:
+        scheduler_hook = engine.SchedulerHook()
+        strategy_scheduler_hook = engine.SchedulerHook()
+    else:
+        scheduler_hook = None
+        strategy_scheduler_hook = None
+
     mutation_engine = engine.Engine(
-        engine.SchedulerBuilder.adaptive_weighted_random(),
+        engine.SchedulerBuilder.adaptive_weighted_random()
+        if not args.scheduler_stats
+        else engine.SchedulerBuilder.hooked_adaptive_weighted_random(scheduler_hook),
         [engine.StrategyBuilder.table_guard()],
         ipc_queue,
         42,
@@ -47,7 +57,7 @@ async def main(args: Namespace):
             mutation_engine,
             oracle_queue,
             init_workers,
-            None
+            None,
         )
 
     mutation_engine.clear()
@@ -63,83 +73,137 @@ async def main(args: Namespace):
     # TODO: force add guarded queries back to engine or skip this entirely
 
     mutation_engine.clear_strategies()
-    # [
-    #     mutation_engine.add_strategy(strat)
-    #     for strat in [
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.splice_in()),
-    #         engine.StrategyBuilder.random_sampler(
-    #             3,
-    #             7,
-    #             [
-    #                 engine.StrategyBuilder.op_flip(),
-    #                 engine.StrategyBuilder.num_bounds(),
-    #                 engine.StrategyBuilder.null_inject(),
-    #                 engine.StrategyBuilder.type_cast(),
-    #                 engine.StrategyBuilder.set_ops(),
-    #                 engine.StrategyBuilder.sub_query(),
-    #                 engine.StrategyBuilder.splice_in(),
-    #                 engine.StrategyBuilder.randomize(engine.StrategyBuilder.merger(), 0.2),
-    #             ],
-    #         ),
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.table_scrambler()),
-    #         engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.1),
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.expr_shuffle()),
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.relation_shuffle()),
-    #     ]
-    # ]
 
-    [
-        mutation_engine.add_strategy(strat)
-        for strat in [
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.splice_in()),
-            engine.StrategyBuilder.scheduled(
-                engine.StrategyBuilder.random_sampler(
-                    1,
-                    1,
-                    [
-                        engine.StrategyBuilder.scheduled(
-                            engine.StrategyBuilder.tree_mutate_stmt(
-                                engine.TreeMutatorOperation.null_random()
-                            )
-                        ),
-                        engine.StrategyBuilder.scheduled(
-                            engine.StrategyBuilder.tree_mutate_stmt(
-                                engine.TreeMutatorOperation.shuffle_two()
-                            )
-                        ),
-                    ],
-                )
-            ),
-            engine.StrategyBuilder.scheduled(
-                engine.StrategyBuilder.random_sampler(
-                    1,
-                    1,
-                    [
-                        engine.StrategyBuilder.scheduled(
-                            engine.StrategyBuilder.tree_mutate_stmt(
-                                engine.TreeMutatorOperation.null_random()
-                            )
-                        ),
-                        engine.StrategyBuilder.scheduled(
-                            engine.StrategyBuilder.tree_mutate_stmt(
-                                engine.TreeMutatorOperation.shuffle_two()
-                            )
-                        ),
-                    ],
-                )
-            ),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.recursive_expand_expr()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.num_bounds()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.op_flip()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.null_inject()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.type_cast()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.set_ops()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.sub_query()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.relation_shuffle()),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.6),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_name_guard(), 0.6),
+    if not args.scheduler_stats:
+        [
+            mutation_engine.add_strategy(strat)
+            for strat in [
+                engine.StrategyBuilder.scheduled(engine.StrategyBuilder.splice_in()),
+                engine.StrategyBuilder.scheduled(
+                    engine.StrategyBuilder.random_sampler(
+                        1,
+                        1,
+                        [
+                            engine.StrategyBuilder.scheduled(
+                                engine.StrategyBuilder.tree_mutate_stmt(
+                                    engine.TreeMutatorOperation.null_random()
+                                )
+                            ),
+                            engine.StrategyBuilder.scheduled(
+                                engine.StrategyBuilder.tree_mutate_stmt(
+                                    engine.TreeMutatorOperation.shuffle_two()
+                                )
+                            ),
+                        ],
+                    )
+                ),
+                engine.StrategyBuilder.scheduled(
+                    engine.StrategyBuilder.random_sampler(
+                        1,
+                        1,
+                        [
+                            engine.StrategyBuilder.scheduled(
+                                engine.StrategyBuilder.tree_mutate_stmt(
+                                    engine.TreeMutatorOperation.null_random()
+                                )
+                            ),
+                            engine.StrategyBuilder.scheduled(
+                                engine.StrategyBuilder.tree_mutate_stmt(
+                                    engine.TreeMutatorOperation.shuffle_two()
+                                )
+                            ),
+                        ],
+                    )
+                ),
+                engine.StrategyBuilder.scheduled(engine.StrategyBuilder.recursive_expand_expr()),
+                engine.StrategyBuilder.scheduled(engine.StrategyBuilder.num_bounds()),
+                engine.StrategyBuilder.scheduled(engine.StrategyBuilder.op_flip()),
+                engine.StrategyBuilder.scheduled(engine.StrategyBuilder.null_inject()),
+                engine.StrategyBuilder.scheduled(engine.StrategyBuilder.type_cast()),
+                engine.StrategyBuilder.scheduled(engine.StrategyBuilder.set_ops()),
+                engine.StrategyBuilder.scheduled(engine.StrategyBuilder.sub_query()),
+                engine.StrategyBuilder.scheduled(engine.StrategyBuilder.relation_shuffle()),
+                engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.6),
+                engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_name_guard(), 0.6),
+            ]
         ]
-    ]
+    else:
+        [
+            mutation_engine.add_strategy(strat)
+            for strat in [
+                engine.StrategyBuilder.hooked_scheduled(
+                    engine.StrategyBuilder.splice_in(), strategy_scheduler_hook
+                ),
+                engine.StrategyBuilder.hooked_scheduled(
+                    engine.StrategyBuilder.random_sampler(
+                        1,
+                        1,
+                        [
+                            engine.StrategyBuilder.hooked_scheduled(
+                                engine.StrategyBuilder.tree_mutate_stmt(
+                                    engine.TreeMutatorOperation.null_random()
+                                ),
+                                strategy_scheduler_hook,
+                            ),
+                            engine.StrategyBuilder.hooked_scheduled(
+                                engine.StrategyBuilder.tree_mutate_stmt(
+                                    engine.TreeMutatorOperation.shuffle_two()
+                                ),
+                                strategy_scheduler_hook,
+                            ),
+                        ],
+                    ),
+                    strategy_scheduler_hook,
+                ),
+                engine.StrategyBuilder.hooked_scheduled(
+                    engine.StrategyBuilder.random_sampler(
+                        1,
+                        1,
+                        [
+                            engine.StrategyBuilder.hooked_scheduled(
+                                engine.StrategyBuilder.tree_mutate_stmt(
+                                    engine.TreeMutatorOperation.null_random()
+                                ),
+                                strategy_scheduler_hook,
+                            ),
+                            engine.StrategyBuilder.hooked_scheduled(
+                                engine.StrategyBuilder.tree_mutate_stmt(
+                                    engine.TreeMutatorOperation.shuffle_two()
+                                ),
+                                strategy_scheduler_hook,
+                            ),
+                        ],
+                    ),
+                    strategy_scheduler_hook,
+                ),
+                engine.StrategyBuilder.hooked_scheduled(
+                    engine.StrategyBuilder.recursive_expand_expr(), strategy_scheduler_hook
+                ),
+                engine.StrategyBuilder.hooked_scheduled(
+                    engine.StrategyBuilder.num_bounds(), strategy_scheduler_hook
+                ),
+                engine.StrategyBuilder.hooked_scheduled(
+                    engine.StrategyBuilder.op_flip(), strategy_scheduler_hook
+                ),
+                engine.StrategyBuilder.hooked_scheduled(
+                    engine.StrategyBuilder.null_inject(), strategy_scheduler_hook
+                ),
+                engine.StrategyBuilder.hooked_scheduled(
+                    engine.StrategyBuilder.type_cast(), strategy_scheduler_hook
+                ),
+                engine.StrategyBuilder.hooked_scheduled(
+                    engine.StrategyBuilder.set_ops(), strategy_scheduler_hook
+                ),
+                engine.StrategyBuilder.hooked_scheduled(
+                    engine.StrategyBuilder.sub_query(), strategy_scheduler_hook
+                ),
+                engine.StrategyBuilder.hooked_scheduled(
+                    engine.StrategyBuilder.relation_shuffle(), strategy_scheduler_hook
+                ),
+                engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.6),
+                engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_name_guard(), 0.6),
+            ]
+        ]
 
     snapshot = mutation_engine.snapshot()
 
@@ -153,7 +217,7 @@ async def main(args: Namespace):
             mutation_engine,
             oracle_queue,
             init_workers,
-            None
+            None,
         )
         for entry in snapshot
     ]
@@ -172,6 +236,7 @@ async def main(args: Namespace):
     _ = await asyncio.gather(
         fuzzing_loop(mutation_engine, ipc_queue, oracle_queue, args.stop_at, args.stats),
         oracle_task,
+        csv_logger(scheduler_hook, strategy_scheduler_hook),
     )
 
     if args.save_to is not None:
@@ -194,6 +259,7 @@ if __name__ == "__main__":
     _ = parser.add_argument("--seeds", default="/app/seeds", type=str)
     _ = parser.add_argument("--stop_at", default=10000, type=int)
     _ = parser.add_argument("--stats", default=False, type=bool)
+    _ = parser.add_argument("--scheduler-stats", default=False, type=bool)
     _ = parser.add_argument("--save_to", default=None, type=str)
     args = parser.parse_args()
     asyncio.run(main(args))

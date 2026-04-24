@@ -10,6 +10,8 @@ class SchedulerBuilder:
     def weighted_random() -> SchedulerBuilder: ...
     @staticmethod
     def adaptive_weighted_random() -> SchedulerBuilder: ...
+    @staticmethod
+    def hooked_adaptive_weighted_random(hook: SchedulerHook) -> SchedulerBuilder: ...
 
 
 class StrategyBuilder:
@@ -55,7 +57,16 @@ class StrategyBuilder:
     def recursive_expand_expr(
         max_depth: int = 3, chance_per_node: float = 0.1, chance_per_level: float = 0.5
     ) -> StrategyBuilder: ...
+    @staticmethod
+    def hooked_scheduled(strategy: StrategyBuilder, hook: SchedulerHook) -> StrategyBuilder: ...
 
+class SchedulerSnapshot:
+    pass
+
+
+class SchedulerHook:
+    def drain(self) -> list[SchedulerSnapshot]: ...
+    def dirty(self) -> bool: ...
 
 class TreeMutatorOperation:
     @staticmethod

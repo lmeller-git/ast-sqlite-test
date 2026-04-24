@@ -1,7 +1,10 @@
 import time
 import asyncio
+import csv
 from typing import Any
 from tensorboardX import SummaryWriter
+
+from lib_sf import engine
 
 
 async def metrics_logger(writer: SummaryWriter, stats: dict[Any, Any], concurrency_limit: int):
@@ -44,3 +47,77 @@ async def metrics_logger(writer: SummaryWriter, stats: dict[Any, Any], concurren
         last_exec_s = stats["exec_s"]
         last_rust_s = stats["rust_s"]
         step += 1
+
+
+async def csv_logger(
+    scheduler_hook: engine.SchedulerHook | None,
+    strategy_scheduler_hook: engine.SchedulerHook | None,
+):
+    if scheduler_hook is None or strategy_scheduler_hook is None:
+        return
+
+    scheduler_writer = csv.writer(open("docker_out/perf_out/scheduler_stats.csv", "w", buffering=1))
+    strategy_writer = csv.writer(open("docker_out/perf_out/strategy_stats.csv", "w", buffering=1))
+
+    scheduler_writer.writerow(
+        [
+            "tick",
+            "name",
+            "attempts",
+            "accepted",
+            "cov_increase",
+            "syntax_err",
+            "rating",
+            "probability",
+        ]
+    )
+    strategy_writer.writerow(
+        [
+            "tick",
+            "name",
+            "attempts",
+            "accepted",
+            "cov_increase",
+            "syntax_err",
+            "rating",
+            "probability",
+        ]
+    )
+
+    while True:
+        if not scheduler_hook.dirty() and not strategy_scheduler_hook.dirty():
+            await asyncio.sleep(0.1)
+            continue
+
+        strategy_stats = strategy_scheduler_hook.drain()
+        scheduler_stats = scheduler_hook.drain()
+
+        for s in strategy_stats:
+            strategy_writer.writerow(
+                [
+                    s.global_attempts,
+                    s.name,
+                    s.self_attempts[0],
+                    s.accepted[0],
+                    s.cov_increases[0],
+                    s.syntax_err[0],
+                    s.rating[0],
+                    s.rating_as_prob[0],
+                ]
+            )
+        for s in scheduler_stats:
+            for id, attempts, accepted, cov_increase, syntax_err, rating in zip(
+                s.meta, s.self_attempts, s.accepted, s.cov_increases, s.syntax_err, s.rating
+            ):
+                scheduler_writer.writerow(
+                    [
+                        s.global_attempts,
+                        id,
+                        attempts,
+                        accepted,
+                        cov_increase,
+                        syntax_err,
+                        rating,
+                        rating,
+                    ]
+                )
