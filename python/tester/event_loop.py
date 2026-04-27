@@ -15,6 +15,7 @@ async def fuzzing_loop(
     oracle_queue: asyncio.PriorityQueue[tuple[int, TestCapture | None]],
     stop_at: int,
     track_stats: bool,
+    test_path: str,
 ):
     if track_stats:
         writer = SummaryWriter(log_dir="docker_out/perf_out/runs/fuzzer_stats")
@@ -46,6 +47,7 @@ async def fuzzing_loop(
                         oracle_queue,
                         workers,
                         stats if track_stats else None,
+                        test_path,
                     )
                 )
                 active_tasks.add(task)

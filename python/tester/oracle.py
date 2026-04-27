@@ -78,11 +78,11 @@ def is_interesting_unilateral(capture: TestCapture) -> bool:
     return stderr_matches_any(capture.stderr, INTERESTING_UNILATERAL_PATTERNS)
 
 
-async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]):
+async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]], oracle_path: str):
     crash_counter = 0
     seen_signatures: set[bytes] = set()
     # Could in theory also spawn multiple workers here, but 1 should be enough, especially since it should never crash
-    oracle_worker = SQLiteWorker("/usr/bin/sqlite3-3.39.4")
+    oracle_worker = SQLiteWorker(oracle_path)
     os.makedirs("docker_out/crashes", exist_ok=True)
 
     while True:

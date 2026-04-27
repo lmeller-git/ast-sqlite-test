@@ -15,6 +15,7 @@ async def run_single_mutation(
     oracle_queue: asyncio.PriorityQueue[tuple[int, TestCapture | None]],
     workers: dict[int, SQLiteWorker],
     stats: dict[Any, Any] | None,
+    test_path: str
 ):
     backoff = 0.01
     token = ipc_queue.pop()
@@ -29,7 +30,7 @@ async def run_single_mutation(
         token_id = token.id()
         if token_id not in workers:
             workers[token_id] = SQLiteWorker(
-                "/home/test/sqlite3-src/build/sqlite3",
+                test_path,
                 {"FUZZER_SHMEM_PATH": token.as_env(), "ASAN_OPTIONS": "detect_leaks=0"},
             )
         worker = workers[token_id]
@@ -79,8 +80,8 @@ async def run_single_mutation(
             stats["tokens_in_use"] -= 1
 
 
-async def init() -> int:
-    worker = SQLiteWorker("/home/test/sqlite3-src/build/sqlite3", {"FUZZER_INIT": "1"})
+async def init(test_path: str) -> int:
+    worker = SQLiteWorker(test_path, {"FUZZER_INIT": "1"})
 
     res = await worker.execute(".quit")
     await worker.close()

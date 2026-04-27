@@ -7,14 +7,14 @@ pub trait AdaptiveStatistics {
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct SchedulerStatisticsSnapshot {
-    pub global_attempts: Option<u32>,
+    pub global_attempts: Option<f64>,
     pub name: String,
     pub meta: Vec<String>,
-    pub self_attmepts: Vec<u32>,
-    pub cov_increases: Vec<u32>,
-    pub accepted: Vec<u32>,
-    pub synatx_err: Vec<u32>,
-    pub crashes: Vec<u32>,
+    pub self_attmepts: Vec<f64>,
+    pub cov_increases: Vec<f64>,
+    pub accepted: Vec<f64>,
+    pub synatx_err: Vec<f64>,
+    pub crashes: Vec<f64>,
     pub rating: Vec<f64>,
     pub rating_as_prob: Vec<f64>,
 }

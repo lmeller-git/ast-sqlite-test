@@ -12,7 +12,7 @@ from tester.tb_logger import csv_logger
 
 
 async def main(args: Namespace):
-    max_edges = await init()
+    max_edges = await init(args.test_path)
     print("found ", max_edges, " max_edges")
     ipc_queue = engine.IPCTokenQueue(8, max_edges)
     oracle_queue = asyncio.PriorityQueue(1024)
@@ -58,6 +58,7 @@ async def main(args: Namespace):
             oracle_queue,
             init_workers,
             None,
+            args.test_path,
         )
 
     mutation_engine.clear()
@@ -68,7 +69,7 @@ async def main(args: Namespace):
 
     mutation_engine.populate([engine.SeedGeneratorBuilder.dir_reader(args.seeds)])
 
-    oracle_task = asyncio.create_task(oracle(oracle_queue))
+    oracle_task = asyncio.create_task(oracle(oracle_queue, args.oracle_path))
 
     # TODO: force add guarded queries back to engine or skip this entirely
 
@@ -218,6 +219,7 @@ async def main(args: Namespace):
             oracle_queue,
             init_workers,
             None,
+            args.test_path,
         )
         for entry in snapshot
     ]
@@ -234,9 +236,11 @@ async def main(args: Namespace):
     print("\n===========\ninit done, entering loop\n==================\n")
 
     _ = await asyncio.gather(
-        fuzzing_loop(mutation_engine, ipc_queue, oracle_queue, args.stop_at, args.stats),
-        oracle_task,
         csv_logger(scheduler_hook, strategy_scheduler_hook),
+        fuzzing_loop(
+            mutation_engine, ipc_queue, oracle_queue, args.stop_at, args.stats, args.test_path
+        ),
+        oracle_task,
     )
 
     if args.save_to is not None:
@@ -261,5 +265,7 @@ if __name__ == "__main__":
     _ = parser.add_argument("--stats", default=False, type=bool)
     _ = parser.add_argument("--scheduler-stats", default=False, type=bool)
     _ = parser.add_argument("--save_to", default=None, type=str)
+    _ = parser.add_argument("--test_path", default="/home/test/sqlite3-src/build/sqlite3")
+    _ = parser.add_argument("--oracle_path", default="/usr/bin/sqlite3-3.39.4")
     args = parser.parse_args()
     asyncio.run(main(args))

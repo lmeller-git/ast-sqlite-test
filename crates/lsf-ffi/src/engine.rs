@@ -173,21 +173,21 @@ impl GenericHook for SchedulerHook__ {
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct SchedulerSnapshot {
     #[pyo3(get)]
-    pub global_attempts: Option<u32>,
+    pub global_attempts: Option<f64>,
     #[pyo3(get)]
     pub name: String,
     #[pyo3(get)]
     pub meta: Vec<String>,
     #[pyo3(get)]
-    pub self_attempts: Vec<u32>,
+    pub self_attempts: Vec<f64>,
     #[pyo3(get)]
-    pub cov_increases: Vec<u32>,
+    pub cov_increases: Vec<f64>,
     #[pyo3(get)]
-    pub accepted: Vec<u32>,
+    pub accepted: Vec<f64>,
     #[pyo3(get)]
-    pub syntax_err: Vec<u32>,
+    pub syntax_err: Vec<f64>,
     #[pyo3(get)]
-    pub crashes: Vec<u32>,
+    pub crashes: Vec<f64>,
     #[pyo3(get)]
     pub rating: Vec<f64>,
     #[pyo3(get)]

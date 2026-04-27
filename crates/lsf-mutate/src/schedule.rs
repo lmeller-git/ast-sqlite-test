@@ -3,11 +3,11 @@ use std::{
     fmt::Debug,
     sync::{
         Arc,
-        atomic::{AtomicU32, Ordering},
+        atomic::{AtomicU64, Ordering},
     },
 };
 
-use lsf_core::entry::RawEntry;
+use lsf_core::{AtomicF64Ext, entry::RawEntry};
 use lsf_feedback::{
     AcceptanceReason,
     AdaptiveStatistics,
@@ -27,7 +27,6 @@ pub struct AdaptiveStrategyScheduler {
     stats: Arc<StrategySchedulerStats>,
     ctx: StrategyContext,
     hook: Option<Arc<dyn GenericHook>>,
-    last_snapshot: AtomicU32,
 }
 
 impl Debug for AdaptiveStrategyScheduler {
@@ -45,7 +44,6 @@ impl AdaptiveStrategyScheduler {
             stats: Arc::new(StrategySchedulerStats::default()),
             ctx: StrategyContext::default(),
             hook: None,
-            last_snapshot: 0.into(),
         }
     }
 }
@@ -71,16 +69,10 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
         let mut r = self.strategy.breed(parent, parent_gen, rng);
 
         if let Ok(MutationState::Mutated(result)) = &mut r {
-            self.stats.attempts.fetch_add(1, Ordering::Relaxed);
+            self.stats.attempts.add_f64(1., Ordering::Relaxed);
             result.attach_hook(self.stats.clone());
         }
-
-        let total = self.ctx.total_attempts.load(Ordering::Relaxed);
-        let last = self.last_snapshot.load(Ordering::Relaxed);
-        if let Some(hook) = &self.hook
-            && total.saturating_sub(last) >= 100
-        {
-            self.last_snapshot.store(total, Ordering::Relaxed);
+        if let Some(hook) = &self.hook {
             hook.on_snapshot(self.snapshot());
         }
         r
@@ -92,6 +84,16 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
         stat_ref.total_attempts = ctx.total_attempts.clone();
         self.ctx = ctx
     }
+
+    fn decay(&self, rate: f64) {
+        self.stats.attempts.multiply_f64(rate, Ordering::Relaxed);
+        self.stats.accepted.multiply_f64(rate, Ordering::Relaxed);
+        self.stats
+            .cov_increases
+            .multiply_f64(rate, Ordering::Relaxed);
+        self.stats.syntax_err.multiply_f64(rate, Ordering::Relaxed);
+        self.stats.crash.multiply_f64(rate, Ordering::Relaxed);
+    }
 }
 
 fn sigmoid(val: f64) -> f64 {
@@ -100,12 +102,12 @@ fn sigmoid(val: f64) -> f64 {
 
 #[derive(Debug, Default)]
 pub struct StrategySchedulerStats {
-    attempts: AtomicU32,
-    accepted: AtomicU32,
-    cov_increases: AtomicU32,
-    syntax_err: AtomicU32,
-    crash: AtomicU32,
-    total_attempts: Arc<AtomicU32>,
+    attempts: AtomicU64,
+    accepted: AtomicU64,
+    cov_increases: AtomicU64,
+    syntax_err: AtomicU64,
+    crash: AtomicU64,
+    total_attempts: Arc<AtomicU64>,
 }
 
 impl FeedbackHook for StrategySchedulerStats {
@@ -119,20 +121,20 @@ impl AdaptiveStatistics for StrategySchedulerStats {
         match test_result {
             TestOutcome::Rejected(r) => match r {
                 RejectionReason::SyntaxError => {
-                    self.syntax_err.fetch_add(1, Ordering::Relaxed);
+                    self.syntax_err.add_f64(1., Ordering::Relaxed);
                 }
                 RejectionReason::TriggersCrash => {
-                    self.crash.fetch_add(1, Ordering::Relaxed);
+                    self.crash.add_f64(1., Ordering::Relaxed);
                 }
                 RejectionReason::Bad => {}
             },
             TestOutcome::Accepted(s) => match s {
                 AcceptanceReason::CovIncrease => {
-                    self.accepted.fetch_add(1, Ordering::Relaxed);
-                    self.cov_increases.fetch_add(1, Ordering::Relaxed);
+                    self.accepted.add_f64(1., Ordering::Relaxed);
+                    self.cov_increases.add_f64(1., Ordering::Relaxed);
                 }
                 AcceptanceReason::IsDiverse => {
-                    self.accepted.fetch_add(1, Ordering::Relaxed);
+                    self.accepted.add_f64(1., Ordering::Relaxed);
                 }
             },
         }
@@ -141,23 +143,23 @@ impl AdaptiveStatistics for StrategySchedulerStats {
     fn calculate_score(&self) -> f64 {
         // ucb1
         // TODO add more relevant terms
-        let total_attempts = self.total_attempts.load(Ordering::Relaxed);
-        if total_attempts == 0 {
+        let total_attempts = self.total_attempts.load_f64(Ordering::Relaxed);
+        if total_attempts == 0. {
             return f64::INFINITY;
         }
-        let attempts = self.attempts.load(Ordering::Relaxed);
-        if attempts == 0 {
+        let attempts = self.attempts.load_f64(Ordering::Relaxed);
+        if attempts == 0. {
             return f64::INFINITY;
         }
 
         // we want to
         // increase score for accepted ratio, coverage increase and crashes (likely a bug) and reduce it for syntax errors, as they are somewhat uninteresting
-        let cov_inc_rate = (self.cov_increases.load(Ordering::Relaxed) as f64
-            + self.accepted.load(Ordering::Relaxed) as f64 * 0.2
-            + self.crash.load(Ordering::Relaxed) as f64 * 2.
-            - self.syntax_err.load(Ordering::Relaxed) as f64 * 0.5)
-            / attempts as f64;
-        let exploration = (2.0 * (total_attempts as f64).ln() / attempts as f64).sqrt();
+        let cov_inc_rate = (self.cov_increases.load_f64(Ordering::Relaxed)
+            + self.accepted.load_f64(Ordering::Relaxed) * 0.2
+            + self.crash.load_f64(Ordering::Relaxed) * 2.
+            - self.syntax_err.load_f64(Ordering::Relaxed) * 0.5)
+            / attempts;
+        let exploration = (2. * (total_attempts).ln() / attempts).sqrt();
 
         cov_inc_rate + exploration
     }
@@ -205,14 +207,14 @@ impl PartialEq for StrategySchedulerStats {
 impl Hookable for AdaptiveStrategyScheduler {
     fn snapshot(&self) -> lsf_feedback::SchedulerStatisticsSnapshot {
         lsf_feedback::SchedulerStatisticsSnapshot {
-            global_attempts: Some(self.stats.total_attempts.load(Ordering::Relaxed)),
+            global_attempts: Some(self.stats.total_attempts.load_f64(Ordering::Relaxed)),
             name: format!("{:?}", self),
             meta: Vec::new(),
-            self_attmepts: vec![self.stats.attempts.load(Ordering::Relaxed)],
-            cov_increases: vec![self.stats.cov_increases.load(Ordering::Relaxed)],
-            accepted: vec![self.stats.accepted.load(Ordering::Relaxed)],
-            synatx_err: vec![self.stats.syntax_err.load(Ordering::Relaxed)],
-            crashes: vec![self.stats.crash.load(Ordering::Relaxed)],
+            self_attmepts: vec![self.stats.attempts.load_f64(Ordering::Relaxed)],
+            cov_increases: vec![self.stats.cov_increases.load_f64(Ordering::Relaxed)],
+            accepted: vec![self.stats.accepted.load_f64(Ordering::Relaxed)],
+            synatx_err: vec![self.stats.syntax_err.load_f64(Ordering::Relaxed)],
+            crashes: vec![self.stats.crash.load_f64(Ordering::Relaxed)],
             rating: vec![self.stats.calculate_score()],
             rating_as_prob: vec![{
                 let score = self.stats.calculate_score();
