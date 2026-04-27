@@ -108,10 +108,12 @@ impl Engine {
             .filter_map(|entry| {
                 let mut state = MutationState::Unchanged;
                 let mut hooks = entry.hooks.clone();
-                let mut current_parent: &TestableEntry<RawEntry> =
-                    &TestableEntry::new((*entry.as_ref()).clone());
+                let build_hooks = entry.build_hooks.clone();
+                let mut current_parent: &mut TestableEntry<RawEntry> =
+                    &mut TestableEntry::new((*entry.as_ref()).clone());
 
                 for strategy in &self.strategies {
+                    current_parent.build_hooks = build_hooks.clone();
                     if let Ok(MutationState::Mutated(next)) =
                         strategy.breed(current_parent, &next_batch, &mut self.rng)
                     {

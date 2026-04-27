@@ -56,6 +56,15 @@ impl<T> TestableEntry<T> {
         self
     }
 
+    pub fn attach_build_hook(&mut self, hook: Arc<dyn FeedbackHook>) {
+        self.build_hooks.push(hook);
+    }
+
+    pub fn with_build_hook(mut self, hook: Arc<dyn FeedbackHook>) -> Self {
+        self.attach_build_hook(hook);
+        self
+    }
+
     pub fn fire_hooks(&self, outcome: TestOutcome) {
         for hook in &self.hooks {
             hook.fire(outcome);
