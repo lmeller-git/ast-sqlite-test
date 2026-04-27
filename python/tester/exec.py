@@ -12,7 +12,7 @@ async def run_single_mutation(
     mutation_engine: engine.Engine,
     oracle_queue: asyncio.PriorityQueue[tuple[int, TestCapture | None]],
     workers: dict[int, SQLiteWorker],
-    test_path: str
+    test_path: str,
 ):
     backoff = 0.01
     token = ipc_queue.pop()
@@ -25,23 +25,32 @@ async def run_single_mutation(
         token_id = token.id()
         if token_id not in workers:
             workers[token_id] = SQLiteWorker(
-                test_path,
-                {"FUZZER_SHMEM_PATH": token.as_env(), "ASAN_OPTIONS": "detect_leaks=0"},
+                test_path, {"FUZZER_SHMEM_PATH": token.as_env(), "ASAN_OPTIONS": "detect_leaks=0"}
             )
         worker = workers[token_id]
         capture = await worker.execute(entry.to_sql_string())
-        is_hang = capture.exit_code is not None and capture.exit_code == 42
+        is_hang = (
+            capture.exit_code is not None
+            and capture.exit_code == 42
+            or capture.is_hang_or_crash == "HANG"
+        )
         is_crash = (
             (not is_hang and capture.exit_code is not None and capture.exit_code != 0)
             or b"AddressSanitizer" in capture.stderr
             or b"Assertion" in capture.stderr
+            or capture.is_hang_or_crash == "CRASH"
         )
 
-        if not is_crash and not is_hang:
-            mutation_engine.commit_test_result(entry, engine.TestResult(capture.exec_time, token))
-        else:
+        is_syntax_err = b"syntax error" in capture.stderr or b"Parse error" in capture.stderr
+
+        if is_crash or is_hang:
+            entry.fire_hooks(TestOutcome.rejected(RejectionReason.crash()))
+            mutation_engine.return_token(token)
+        elif is_syntax_err:
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()))
             mutation_engine.return_token(token)
+        else:
+            mutation_engine.commit_test_result(entry, engine.TestResult(capture.exec_time, token))
 
         if is_crash:
             capture.is_hang_or_crash = "CRASH"

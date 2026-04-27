@@ -168,6 +168,11 @@ impl RejectionReason {
     pub fn invalid_syntax() -> Self {
         Self(lsf_feedback::RejectionReason::SyntaxError)
     }
+
+    #[staticmethod]
+    pub fn crash() -> Self {
+        Self(lsf_feedback::RejectionReason::TriggersCrash)
+    }
 }
 
 #[pyclass]
