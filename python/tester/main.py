@@ -235,8 +235,9 @@ async def main(args: Namespace):
 
     print("\n===========\ninit done, entering loop\n==================\n")
 
+    csv_logger_task = asyncio.create_task(csv_logger(scheduler_hook, strategy_scheduler_hook))
+
     _ = await asyncio.gather(
-        csv_logger(scheduler_hook, strategy_scheduler_hook),
         fuzzing_loop(
             mutation_engine, ipc_queue, oracle_queue, args.stop_at, args.stats, args.test_path
         ),
@@ -252,6 +253,10 @@ async def main(args: Namespace):
         for i, query in enumerate(snapshot):
             with open(f"{args.save_to}/query_{i}.sql", "w", encoding="utf-8") as f:
                 _ = f.write(query.to_sql_string())
+
+    await asyncio.sleep(0.5)
+
+    _ = csv_logger_task.cancel()
 
 
 def add(n1: int, n2: int) -> int:

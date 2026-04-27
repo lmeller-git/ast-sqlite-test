@@ -119,7 +119,6 @@ impl Engine {
                     &mut TestableEntry::new((*entry.as_ref()).clone());
 
                 for strategy in &self.strategies {
-                    // TODO move
                     current_parent.build_hooks = build_hooks.clone();
                     if let Ok(MutationState::Mutated(next)) =
                         strategy.breed(current_parent, &next_batch, &mut self.rng)
