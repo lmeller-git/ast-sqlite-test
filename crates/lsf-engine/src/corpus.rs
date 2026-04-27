@@ -38,7 +38,7 @@ impl Corpus {
     }
 }
 
-const MIN_DIST: u32 = 20;
+const MIN_DIST: u32 = 15;
 
 #[derive(Debug, Default)]
 pub struct DiversityEnsurance {

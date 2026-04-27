@@ -11,6 +11,7 @@ async def fuzzing_loop(
     ipc_queue: engine.IPCTokenQueue,
     oracle_queue: asyncio.PriorityQueue[tuple[int, TestCapture | None]],
     stop_at: int,
+    test_path: str,
 ):
     workers: dict[int, SQLiteWorker] = {}
     active_tasks: set[asyncio.Task[None]] = set()
@@ -23,7 +24,9 @@ async def fuzzing_loop(
             batch = mutation_engine.mutate_batch(TASK_QUEUE_LIMIT - len(active_tasks))
             for entry in batch.into_members():
                 task = asyncio.create_task(
-                    run_single_mutation(entry, ipc_queue, mutation_engine, oracle_queue, workers)
+                    run_single_mutation(
+                        entry, ipc_queue, mutation_engine, oracle_queue, workers, test_path
+                    )
                 )
                 active_tasks.add(task)
             epoch += 1

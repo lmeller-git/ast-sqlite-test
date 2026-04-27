@@ -5,10 +5,13 @@ use std::{
     io::{self, Read},
     ops::RangeBounds,
     path::PathBuf,
-    sync::{Arc, atomic::AtomicU32},
+    sync::{Arc, atomic::AtomicU64},
 };
 
-use lsf_core::entry::{CorpusEntry, Meta, RawEntry};
+use lsf_core::{
+    AtomicF64Ext,
+    entry::{CorpusEntry, Meta, RawEntry},
+};
 use lsf_cov::ipc::{IPCToken, SharedMemHandle};
 use lsf_feedback::{AcceptanceReason, RejectionReason, TestOutcome, TestableEntry};
 use lsf_mutate::{MutationState, MutationStrategy};
@@ -23,7 +26,7 @@ pub struct Engine {
     scheduler: Box<dyn Schedule>,
     strategies: Vec<Box<dyn MutationStrategy>>,
     rng: SmallRng,
-    total_mutations: Arc<AtomicU32>,
+    total_mutations: Arc<AtomicU64>,
 }
 
 impl Debug for Engine {
@@ -42,7 +45,7 @@ impl Engine {
         shmem_queue: Arc<SharedMemHandle>,
         rng_seed: u64,
     ) -> Self {
-        let total_mutations: Arc<std::sync::atomic::AtomicU32> = Arc::default();
+        let total_mutations: Arc<std::sync::atomic::AtomicU64> = Arc::default();
         scheduler.init(crate::SchedulerContext {
             total_attempts: total_mutations.clone(),
         });
@@ -113,10 +116,12 @@ impl Engine {
             })
             .collect();
 
-        self.total_mutations.fetch_add(
-            generation.members.len() as u32,
+        self.total_mutations.add_f64(
+            generation.members.len() as f64,
             std::sync::atomic::Ordering::Relaxed,
         );
+
+        self.decay();
 
         generation
     }
@@ -172,6 +177,16 @@ impl Engine {
                 .into_iter()
                 .map(|entry| (entry.id(), entry)),
         );
+    }
+
+    pub fn decay(&self) {
+        const DECAY_RATE: f64 = 0.95;
+        self.total_mutations
+            .multiply_f64(DECAY_RATE, std::sync::atomic::Ordering::Relaxed);
+        self.scheduler.decay(DECAY_RATE);
+        for s in &self.strategies {
+            s.decay(DECAY_RATE);
+        }
     }
 
     pub fn return_token(&mut self, token: Box<IPCToken>) {

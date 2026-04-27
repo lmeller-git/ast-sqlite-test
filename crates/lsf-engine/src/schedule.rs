@@ -2,11 +2,14 @@ use std::{
     collections::HashMap,
     sync::{
         Arc,
-        atomic::{AtomicU32, Ordering},
+        atomic::{AtomicU64, Ordering},
     },
 };
 
-use lsf_core::entry::{ID, Meta, RawEntry};
+use lsf_core::{
+    AtomicF64Ext,
+    entry::{ID, Meta, RawEntry},
+};
 use lsf_feedback::{
     AcceptanceReason,
     AdaptiveStatistics,
@@ -39,11 +42,13 @@ pub trait Schedule: Send + Sync {
     }
 
     fn init(&mut self, _ctx: SchedulerContext) {}
+
+    fn decay(&self, _rate: f64) {}
 }
 
 #[derive(Clone, Default)]
 pub struct SchedulerContext {
-    pub total_attempts: Arc<AtomicU32>,
+    pub total_attempts: Arc<AtomicU64>,
 }
 
 #[derive(Default)]
@@ -116,16 +121,16 @@ pub struct AdaptiveWeightedRandomScheduler {
 
 #[derive(Default)]
 pub struct AdaptiveCorpusStats {
-    attempts: AtomicU32,
-    accepted: AtomicU32,
-    cov_increases: AtomicU32,
-    syntax_err: AtomicU32,
-    crash: AtomicU32,
-    total_attempts: Arc<AtomicU32>,
+    attempts: AtomicU64,
+    accepted: AtomicU64,
+    cov_increases: AtomicU64,
+    syntax_err: AtomicU64,
+    crash: AtomicU64,
+    total_attempts: Arc<AtomicU64>,
 }
 
 impl AdaptiveCorpusStats {
-    fn new(total_attempts: Arc<AtomicU32>) -> Self {
+    fn new(total_attempts: Arc<AtomicU64>) -> Self {
         Self {
             total_attempts,
             ..Default::default()
@@ -138,20 +143,20 @@ impl AdaptiveStatistics for AdaptiveCorpusStats {
         match test_result {
             TestOutcome::Rejected(r) => match r {
                 RejectionReason::SyntaxError => {
-                    self.syntax_err.fetch_add(1, Ordering::Relaxed);
+                    self.syntax_err.add_f64(1., Ordering::Relaxed);
                 }
                 RejectionReason::TriggersCrash => {
-                    self.crash.fetch_add(1, Ordering::Relaxed);
+                    self.crash.add_f64(1., Ordering::Relaxed);
                 }
                 RejectionReason::Bad => {}
             },
             TestOutcome::Accepted(s) => match s {
                 AcceptanceReason::CovIncrease => {
-                    self.accepted.fetch_add(1, Ordering::Relaxed);
-                    self.cov_increases.fetch_add(1, Ordering::Relaxed);
+                    self.accepted.add_f64(1., Ordering::Relaxed);
+                    self.cov_increases.add_f64(1., Ordering::Relaxed);
                 }
                 AcceptanceReason::IsDiverse => {
-                    self.accepted.fetch_add(1, Ordering::Relaxed);
+                    self.accepted.add_f64(1., Ordering::Relaxed);
                 }
             },
         }
@@ -160,23 +165,23 @@ impl AdaptiveStatistics for AdaptiveCorpusStats {
     fn calculate_score(&self) -> f64 {
         // ucb1
         // TODO add more relevant terms
-        let total_attempts = self.total_attempts.load(Ordering::Relaxed);
-        if total_attempts == 0 {
+        let total_attempts = self.total_attempts.load_f64(Ordering::Relaxed);
+        if total_attempts == 0. {
             return ZERO_WEIGHT;
         }
-        let attempts = self.attempts.load(Ordering::Relaxed);
-        if attempts == 0 {
+        let attempts = self.attempts.load_f64(Ordering::Relaxed);
+        if attempts == 0. {
             return ZERO_WEIGHT;
         }
 
         // we want to
         // increase score for accepted ratio, coverage increase and crashes (likely a bug) and reduce it for syntax errors, as they are somewhat uninteresting
-        let cov_inc_rate = (self.cov_increases.load(Ordering::Relaxed) as f64 * 2.
-            + self.accepted.load(Ordering::Relaxed) as f64 * 0.5
-            + self.crash.load(Ordering::Relaxed) as f64
-            - self.syntax_err.load(Ordering::Relaxed) as f64)
-            / attempts as f64;
-        let exploration = (2.0 * (total_attempts as f64).ln() / attempts as f64).sqrt();
+        let cov_inc_rate = (self.cov_increases.load_f64(Ordering::Relaxed) * 2.
+            + self.accepted.load_f64(Ordering::Relaxed) * 0.5
+            + self.crash.load_f64(Ordering::Relaxed)
+            - self.syntax_err.load_f64(Ordering::Relaxed))
+            / attempts;
+        let exploration = (2. * (total_attempts).ln() / attempts).sqrt();
 
         cov_inc_rate + exploration
     }
@@ -226,7 +231,7 @@ impl Schedule for AdaptiveWeightedRandomScheduler {
             .filter_map(|id| {
                 from.entries.get(&id).map(|entry| {
                     let stats = self.stat_mapping.get(&id).unwrap();
-                    stats.attempts.fetch_add(1, Ordering::Relaxed);
+                    stats.attempts.add_f64(1., Ordering::Relaxed);
                     TestableEntry::new(entry.raw()).with_hook(stats.clone())
                 })
             })
@@ -235,6 +240,16 @@ impl Schedule for AdaptiveWeightedRandomScheduler {
 
     fn init(&mut self, ctx: SchedulerContext) {
         self.ctx = ctx
+    }
+
+    fn decay(&self, rate: f64) {
+        for stat in self.stat_mapping.values() {
+            stat.attempts.multiply_f64(rate, Ordering::Relaxed);
+            stat.cov_increases.multiply_f64(rate, Ordering::Relaxed);
+            stat.accepted.multiply_f64(rate, Ordering::Relaxed);
+            stat.syntax_err.multiply_f64(rate, Ordering::Relaxed);
+            stat.crash.multiply_f64(rate, Ordering::Relaxed);
+        }
     }
 }
 

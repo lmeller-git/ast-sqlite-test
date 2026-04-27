@@ -1,4 +1,4 @@
-use std::sync::{Arc, atomic::AtomicU32};
+use std::sync::{Arc, atomic::AtomicU64};
 
 use lsf_core::entry::{ID, RawEntry};
 use lsf_feedback::TestableEntry;
@@ -39,11 +39,12 @@ pub trait MutationStrategy: Send + Sync {
     ) -> Result<MutationState, MutationError>;
 
     fn init(&mut self, _ctx: StrategyContext) {}
+    fn decay(&self, _rate: f64) {}
 }
 
 #[derive(Clone, Default)]
 pub struct StrategyContext {
-    pub total_attempts: Arc<AtomicU32>,
+    pub total_attempts: Arc<AtomicU64>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

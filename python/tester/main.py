@@ -11,7 +11,7 @@ from tester.persistent_worker import SQLiteWorker
 
 
 async def main(args: Namespace):
-    max_edges = await init()
+    max_edges = await init(args.test_path)
     print("found ", max_edges, " max_edges")
     ipc_queue = engine.IPCTokenQueue(8, max_edges)
     oracle_queue = asyncio.PriorityQueue(1024)
@@ -47,6 +47,7 @@ async def main(args: Namespace):
             mutation_engine,
             oracle_queue,
             init_workers,
+            args.test_path,
         )
 
     mutation_engine.clear()
@@ -63,35 +64,11 @@ async def main(args: Namespace):
         ]
     )
 
-    oracle_task = asyncio.create_task(oracle(oracle_queue))
+    oracle_task = asyncio.create_task(oracle(oracle_queue, args.oracle_path))
 
     # TODO: force add guarded queries back to engine or skip this entirely
 
     mutation_engine.clear_strategies()
-    # [
-    #     mutation_engine.add_strategy(strat)
-    #     for strat in [
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.splice_in()),
-    #         engine.StrategyBuilder.random_sampler(
-    #             3,
-    #             7,
-    #             [
-    #                 engine.StrategyBuilder.op_flip(),
-    #                 engine.StrategyBuilder.num_bounds(),
-    #                 engine.StrategyBuilder.null_inject(),
-    #                 engine.StrategyBuilder.type_cast(),
-    #                 engine.StrategyBuilder.set_ops(),
-    #                 engine.StrategyBuilder.sub_query(),
-    #                 engine.StrategyBuilder.splice_in(),
-    #                 engine.StrategyBuilder.randomize(engine.StrategyBuilder.merger(), 0.2),
-    #             ],
-    #         ),
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.table_scrambler()),
-    #         engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.1),
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.expr_shuffle()),
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.relation_shuffle()),
-    #     ]
-    # ]
 
     [
         mutation_engine.add_strategy(strat)
@@ -158,6 +135,7 @@ async def main(args: Namespace):
             mutation_engine,
             oracle_queue,
             init_workers,
+            args.test_path,
         )
         for entry in snapshot
     ]
@@ -174,7 +152,8 @@ async def main(args: Namespace):
     print("\n===========\ninit done, entering loop\n==================\n")
 
     _ = await asyncio.gather(
-        fuzzing_loop(mutation_engine, ipc_queue, oracle_queue, args.stop_at), oracle_task
+        fuzzing_loop(mutation_engine, ipc_queue, oracle_queue, args.stop_at, args.test_path),
+        oracle_task,
     )
 
     if args.save_to is not None:
@@ -197,5 +176,7 @@ if __name__ == "__main__":
     _ = parser.add_argument("--seeds", default=None, type=str)
     _ = parser.add_argument("--stop_at", default=10000, type=int)
     _ = parser.add_argument("--save_to", default=None, type=str)
+    _ = parser.add_argument("--test_path", default="/home/test/sqlite3-src/build/sqlite3")
+    _ = parser.add_argument("--oracle_path", default="/usr/bin/sqlite3-3.39.4")
     args = parser.parse_args()
     asyncio.run(main(args))
