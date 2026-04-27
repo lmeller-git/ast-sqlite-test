@@ -124,6 +124,70 @@ pub struct AdaptiveWeightedRandomScheduler {
     hook: Option<Arc<dyn GenericHook>>,
 }
 
+impl Schedule for AdaptiveWeightedRandomScheduler {
+    fn next_batch<'a>(
+        &mut self,
+        from: &'a Corpus,
+        size: usize,
+        rng: &mut dyn Rng,
+    ) -> Vec<TestableEntry<&'a RawEntry>> {
+        if from.entries.is_empty() {
+            return Vec::new();
+        }
+
+        let (ids, weights): (Vec<_>, Vec<_>) = from
+            .entries
+            .keys()
+            .map(|id| {
+                let stats =
+                    self.stat_mapping
+                        .entry(*id)
+                        .or_insert(Arc::new(AdaptiveCorpusStats::new(
+                            self.ctx.total_attempts.clone(),
+                        )));
+
+                let score = stats.calculate_score();
+                (*id, score)
+            })
+            .unzip();
+
+        let dist = match WeightedIndex::new(&weights) {
+            Ok(dist) => dist,
+            Err(_) => WeightedIndex::new(vec![1.; weights.len()]).unwrap(),
+        };
+
+        if let Some(hook) = &self.hook {
+            hook.on_snapshot(self.snapshot());
+        }
+
+        dist.sample_iter(rng)
+            .take(size)
+            .map(|idx| ids[idx])
+            .filter_map(|id| {
+                from.entries.get(&id).and_then(|entry| {
+                    self.stat_mapping
+                        .get(&id)
+                        .map(|s| TestableEntry::new(entry.raw()).with_hook(s.clone()))
+                })
+            })
+            .collect()
+    }
+
+    fn init(&mut self, ctx: SchedulerContext) {
+        self.ctx = ctx
+    }
+
+    fn decay(&self, rate: f64) {
+        for stat in self.stat_mapping.values() {
+            stat.attempts.multiply_f64(rate, Ordering::Relaxed);
+            stat.cov_increases.multiply_f64(rate, Ordering::Relaxed);
+            stat.accepted.multiply_f64(rate, Ordering::Relaxed);
+            stat.syntax_err.multiply_f64(rate, Ordering::Relaxed);
+            stat.crash.multiply_f64(rate, Ordering::Relaxed);
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct AdaptiveCorpusStats {
     attempts: AtomicU64,
@@ -164,6 +228,7 @@ impl AdaptiveStatistics for AdaptiveCorpusStats {
                     self.accepted.add_f64(1., Ordering::Relaxed);
                 }
             },
+            _ => {}
         }
     }
 
@@ -254,73 +319,6 @@ impl FeedbackHook for AdaptiveCorpusStats {
     }
 }
 
-impl Schedule for AdaptiveWeightedRandomScheduler {
-    fn next_batch<'a>(
-        &mut self,
-        from: &'a Corpus,
-        size: usize,
-        rng: &mut dyn Rng,
-    ) -> Vec<TestableEntry<&'a RawEntry>> {
-        if from.entries.is_empty() {
-            return Vec::new();
-        }
-
-        let (ids, weights): (Vec<_>, Vec<_>) = from
-            .entries
-            .keys()
-            .map(|id| {
-                let stats =
-                    self.stat_mapping
-                        .entry(*id)
-                        .or_insert(Arc::new(AdaptiveCorpusStats::new(
-                            self.ctx.total_attempts.clone(),
-                        )));
-
-                let score = stats.calculate_score();
-                (*id, score)
-            })
-            .unzip();
-
-        let dist = match WeightedIndex::new(&weights) {
-            Ok(dist) => dist,
-            Err(_) => WeightedIndex::new(vec![1.; weights.len()]).unwrap(),
-        };
-
-        let batch = dist
-            .sample_iter(rng)
-            .take(size)
-            .map(|idx| ids[idx])
-            .filter_map(|id| {
-                from.entries.get(&id).map(|entry| {
-                    let stats = self.stat_mapping.get(&id).unwrap();
-                    stats.attempts.add_f64(1., Ordering::Relaxed);
-                    TestableEntry::new(entry.raw()).with_hook(stats.clone())
-                })
-            })
-            .collect();
-
-        if let Some(hook) = &self.hook {
-            hook.on_snapshot(self.snapshot());
-        }
-
-        batch
-    }
-
-    fn init(&mut self, ctx: SchedulerContext) {
-        self.ctx = ctx
-    }
-
-    fn decay(&self, rate: f64) {
-        for stat in self.stat_mapping.values() {
-            stat.attempts.multiply_f64(rate, Ordering::Relaxed);
-            stat.cov_increases.multiply_f64(rate, Ordering::Relaxed);
-            stat.accepted.multiply_f64(rate, Ordering::Relaxed);
-            stat.syntax_err.multiply_f64(rate, Ordering::Relaxed);
-            stat.crash.multiply_f64(rate, Ordering::Relaxed);
-        }
-    }
-}
-
 impl Clone for AdaptiveCorpusStats {
     fn clone(&self) -> Self {
         Self {
@@ -357,5 +355,28 @@ impl PartialEq for AdaptiveCorpusStats {
                 .crash
                 .load(Ordering::Relaxed)
                 .eq(&other.crash.load(Ordering::Relaxed))
+    }
+}
+
+// update attempts byt one per mutation applied to the scheduled test.
+// This counteracts random biasing of testcases, which randomly were mutated by more rules and thus expected to achieve a btter result
+
+pub struct AdaptiveCorpusStatsUpdateHook {
+    raw: Arc<AdaptiveCorpusStats>,
+}
+
+impl FeedbackHook for AdaptiveCorpusStatsUpdateHook {
+    fn fire(&self, test_outcome: TestOutcome) {
+        match test_outcome {
+            TestOutcome::Mutated => {
+                self.raw.attempts.add_f64(1., Ordering::Relaxed);
+                self.raw.total_attempts.add_f64(1., Ordering::Relaxed);
+            }
+            TestOutcome::NOOP => {
+                self.raw.attempts.add_f64(1., Ordering::Relaxed);
+                self.raw.total_attempts.add_f64(1., Ordering::Relaxed);
+            }
+            _ => {}
+        }
     }
 }

@@ -20,7 +20,7 @@ pub struct SpliceIn {}
 impl SpliceIn {}
 
 impl MutationStrategy for SpliceIn {
-    fn breed(
+    fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<&RawEntry>],
@@ -49,7 +49,7 @@ pub struct SubQuery {
 }
 
 impl MutationStrategy for SubQuery {
-    fn breed(
+    fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<&RawEntry>],
@@ -90,7 +90,7 @@ impl MutationStrategy for SubQuery {
 pub struct SetOps {}
 
 impl MutationStrategy for SetOps {
-    fn breed(
+    fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<&RawEntry>],

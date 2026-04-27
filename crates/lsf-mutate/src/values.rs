@@ -33,7 +33,7 @@ pub struct NumericBounds {
 }
 
 impl MutationStrategy for NumericBounds {
-    fn breed(
+    fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
         _parent_gen: &[TestableEntry<&RawEntry>],
@@ -75,7 +75,7 @@ pub struct OperatorFlip {
 }
 
 impl MutationStrategy for OperatorFlip {
-    fn breed(
+    fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
         _parent_gen: &[TestableEntry<&RawEntry>],
@@ -128,7 +128,7 @@ pub struct NullInject {
 }
 
 impl MutationStrategy for NullInject {
-    fn breed(
+    fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
         _parent_gen: &[TestableEntry<&RawEntry>],
@@ -166,7 +166,7 @@ pub struct TypeCast {
 }
 
 impl MutationStrategy for TypeCast {
-    fn breed(
+    fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
         _parent_gen: &[TestableEntry<&RawEntry>],

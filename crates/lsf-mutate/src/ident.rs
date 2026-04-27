@@ -19,7 +19,7 @@ pub struct TableNameScramble {}
 impl TableNameScramble {}
 
 impl MutationStrategy for TableNameScramble {
-    fn breed(
+    fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
         _parent_gen: &[TestableEntry<&RawEntry>],
@@ -79,7 +79,7 @@ impl MutationStrategy for TableNameScramble {
 pub struct TableGuard {}
 
 impl MutationStrategy for TableGuard {
-    fn breed(
+    fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
         _parent_gen: &[TestableEntry<&RawEntry>],

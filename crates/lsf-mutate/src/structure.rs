@@ -23,7 +23,7 @@ pub struct ExprShuffle {
 }
 
 impl MutationStrategy for ExprShuffle {
-    fn breed(
+    fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<&RawEntry>],
@@ -85,7 +85,7 @@ pub struct RelShuffle {
 }
 
 impl MutationStrategy for RelShuffle {
-    fn breed(
+    fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
         _parent_gen: &[TestableEntry<&RawEntry>],

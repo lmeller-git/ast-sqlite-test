@@ -14,6 +14,8 @@ pub use stats::*;
 pub enum TestOutcome {
     Rejected(RejectionReason),
     Accepted(AcceptanceReason),
+    Mutated,
+    NOOP,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -33,6 +35,7 @@ pub enum AcceptanceReason {
 pub struct TestableEntry<T> {
     entry: T,
     pub hooks: Vec<Arc<dyn FeedbackHook>>,
+    pub build_hooks: Vec<Arc<dyn FeedbackHook>>,
 }
 
 impl<T> TestableEntry<T> {
@@ -40,6 +43,7 @@ impl<T> TestableEntry<T> {
         Self {
             entry,
             hooks: Vec::new(),
+            build_hooks: Vec::new(),
         }
     }
 
@@ -54,6 +58,12 @@ impl<T> TestableEntry<T> {
 
     pub fn fire_hooks(&self, outcome: TestOutcome) {
         for hook in &self.hooks {
+            hook.fire(outcome);
+        }
+    }
+
+    pub fn fire_build_hooks(&self, outcome: TestOutcome) {
+        for hook in &self.build_hooks {
             hook.fire(outcome);
         }
     }
@@ -90,6 +100,7 @@ impl<T> From<T> for TestableEntry<T> {
         TestableEntry {
             entry,
             hooks: Vec::new(),
+            build_hooks: Vec::new(),
         }
     }
 }

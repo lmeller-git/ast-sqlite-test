@@ -28,6 +28,15 @@ impl RandomMutationSampler {
 }
 
 impl MutationStrategy for RandomMutationSampler {
+    fn breed_inner(
+        &self,
+        _parent: &TestableEntry<RawEntry>,
+        _parent_gen: &[TestableEntry<&RawEntry>],
+        _rng: &mut dyn Rng,
+    ) -> Result<MutationState, crate::MutationError> {
+        Err(crate::MutationError::NOOP)
+    }
+
     fn breed(
         &self,
         parent: &TestableEntry<RawEntry>,
@@ -45,7 +54,7 @@ impl MutationStrategy for RandomMutationSampler {
         for i in 0..n_chosen {
             let chosen_strategy = rng.random_range(..self.choices.len());
             if let Ok(MutationState::Mutated(mut next)) =
-                self.choices[chosen_strategy].breed(current_parent, parent_gen, rng)
+                self.choices[chosen_strategy].breed_inner(current_parent, parent_gen, rng)
             {
                 if i > 0 && status != MutationState::Unchanged {
                     next.parents_mut().extend(current_parent.parents());
@@ -56,6 +65,9 @@ impl MutationStrategy for RandomMutationSampler {
                 } else {
                     unreachable!()
                 };
+                parent.fire_build_hooks(lsf_feedback::TestOutcome::Mutated);
+            } else {
+                parent.fire_build_hooks(lsf_feedback::TestOutcome::NOOP);
             }
         }
 
@@ -86,6 +98,15 @@ impl Randomly {
 }
 
 impl MutationStrategy for Randomly {
+    fn breed_inner(
+        &self,
+        parent: &TestableEntry<RawEntry>,
+        parent_gen: &[TestableEntry<&RawEntry>],
+        rng: &mut dyn Rng,
+    ) -> Result<MutationState, crate::MutationError> {
+        self.over.breed(parent, parent_gen, rng)
+    }
+
     fn breed(
         &self,
         parent: &TestableEntry<RawEntry>,
@@ -93,7 +114,7 @@ impl MutationStrategy for Randomly {
         rng: &mut dyn Rng,
     ) -> Result<MutationState, crate::MutationError> {
         if rng.random_bool(self.prob) {
-            self.over.breed(parent, parent_gen, rng)
+            self.breed_inner(parent, parent_gen, rng)
         } else {
             Ok(MutationState::Unchanged)
         }
