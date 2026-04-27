@@ -63,6 +63,7 @@ pub trait MutationStrategy: Send + Sync + Debug {
 
     fn init(&mut self, _ctx: StrategyContext) {}
     fn decay(&self, _rate: f64) {}
+    fn snapshot_rule(&self) {}
 }
 
 #[derive(Clone, Default)]

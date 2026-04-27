@@ -7,6 +7,10 @@ requires-python = ">=3.7"
 readme = "README.md"
 description = "Project 1 for course Automated Software Testing ETH"
 dependencies = [
+    "matplotlib>=3.5.3",
+    "numpy>=1.21.6",
+    "pandas>=1.1.5",
+    "seaborn>=0.12.2",
     "tensorboard>=2.11.2",
     "tensorboardx>=2.6.2.2",
 ]

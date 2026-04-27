@@ -165,9 +165,13 @@ impl Schedule for AdaptiveWeightedRandomScheduler {
             .map(|idx| ids[idx])
             .filter_map(|id| {
                 from.entries.get(&id).and_then(|entry| {
-                    self.stat_mapping
-                        .get(&id)
-                        .map(|s| TestableEntry::new(entry.raw()).with_hook(s.clone()))
+                    self.stat_mapping.get(&id).map(|s| {
+                        TestableEntry::new(entry.raw())
+                            .with_hook(s.clone())
+                            .with_build_hook(Arc::new(AdaptiveCorpusStatsUpdateHook {
+                                raw: s.clone(),
+                            }))
+                    })
                 })
             })
             .collect()

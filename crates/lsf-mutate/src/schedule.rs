@@ -90,9 +90,6 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
         } else {
             parent.fire_build_hooks(TestOutcome::NOOP);
         }
-        if let Some(hook) = &self.hook {
-            hook.on_snapshot(self.snapshot());
-        }
         r
     }
 
@@ -111,6 +108,12 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
             .multiply_f64(rate, Ordering::Relaxed);
         self.stats.syntax_err.multiply_f64(rate, Ordering::Relaxed);
         self.stats.crash.multiply_f64(rate, Ordering::Relaxed);
+    }
+
+    fn snapshot_rule(&self) {
+        if let Some(hook) = &self.hook {
+            hook.on_snapshot(self.snapshot());
+        }
     }
 }
 

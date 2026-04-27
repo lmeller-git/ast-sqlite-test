@@ -105,15 +105,22 @@ impl Engine {
             .scheduler
             .next_batch(&self.corpus, batch_size, &mut self.rng);
 
+        for s in &self.strategies {
+            s.snapshot_rule();
+        }
+
         let generation: Generation = next_batch
             .iter()
             .filter_map(|entry| {
                 let mut state = MutationState::Unchanged;
                 let mut hooks = entry.hooks.clone();
-                let mut current_parent: &TestableEntry<RawEntry> =
-                    &TestableEntry::new((*entry.as_ref()).clone());
+                let build_hooks = entry.build_hooks.clone();
+                let mut current_parent: &mut TestableEntry<RawEntry> =
+                    &mut TestableEntry::new((*entry.as_ref()).clone());
 
                 for strategy in &self.strategies {
+                    // TODO move
+                    current_parent.build_hooks = build_hooks.clone();
                     if let Ok(MutationState::Mutated(next)) =
                         strategy.breed(current_parent, &next_batch, &mut self.rng)
                     {
@@ -134,9 +141,6 @@ impl Engine {
                 state.into_option()
             })
             .collect();
-
-        self.epoch
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         self.epoch
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
