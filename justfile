@@ -1,9 +1,9 @@
 build:
     uv sync
-    # uv run maturin develop --release
+    uv run maturin develop --release --uv
 
 build-debug:
-    uv run maturin develop
+    uv run maturin develop --uv
 
 run *args: build
     uv run python python/tester/main.py {{args}}
@@ -33,15 +33,15 @@ lint:
 
 run-docker:
     docker build -t ast-sqlite-fuzzer .
-    docker run -v $(pwd)/docker_out:/app/docker_out --init -it --rm ast-sqlite-fuzzer /usr/bin/test-db
+    docker run -v $(pwd)/docker_out:/app/docker_out -u $(id -u):$(id -g) --init -it --rm ast-sqlite-fuzzer /usr/bin/test-db
 
 run-docker-it:
     docker build -t ast-sqlite-fuzzer .
-    docker run -v $(pwd)/docker_out:/app/docker_out --init -it --rm ast-sqlite-fuzzer /bin/bash
+    docker run -v $(pwd)/docker_out:/app/docker_out -u $(id -u):$(id -g) --init -it --rm ast-sqlite-fuzzer /bin/bash
 
 run-docker-perf-it:
     docker build -t ast-sqlite-fuzzer .
-    docker run -p 6006:6006 --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --privileged -v $(pwd)/docker_out:/app/docker_out --init -it --rm ast-sqlite-fuzzer /bin/bash
+    docker run -p 6006:6006 --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --privileged -v $(pwd)/docker_out:/app/docker_out -u $(id -u):$(id -g) --init -it --rm ast-sqlite-fuzzer /bin/bash
 
 
 run-flamegraoph:

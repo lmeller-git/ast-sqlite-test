@@ -207,6 +207,7 @@ impl PartialEq for StrategySchedulerStats {
 impl Hookable for AdaptiveStrategyScheduler {
     fn snapshot(&self) -> lsf_feedback::SchedulerStatisticsSnapshot {
         lsf_feedback::SchedulerStatisticsSnapshot {
+            epoch: self.ctx.epoch.load(Ordering::Relaxed),
             global_attempts: Some(self.stats.total_attempts.load_f64(Ordering::Relaxed)),
             name: format!("{:?}", self),
             meta: Vec::new(),

@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     sync::{
         Arc,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU32, AtomicU64, Ordering},
     },
 };
 
@@ -52,6 +52,7 @@ pub trait Schedule: Send + Sync {
 #[derive(Clone, Default)]
 pub struct SchedulerContext {
     pub total_attempts: Arc<AtomicU64>,
+    pub epoch: Arc<AtomicU32>,
 }
 
 #[derive(Default)]
@@ -228,6 +229,7 @@ impl Hookable for AdaptiveWeightedRandomScheduler {
             .unzip();
 
         SchedulerStatisticsSnapshot {
+            epoch: self.ctx.epoch.load(Ordering::Relaxed),
             global_attempts: Some(self.ctx.total_attempts.load_f64(Ordering::Relaxed)),
             name: "AdaptiveWeightedRandomScheduler".into(),
             meta: ids.into_iter().map(|id| format!("Entry_{}", id)).collect(),

@@ -173,6 +173,8 @@ impl GenericHook for SchedulerHook__ {
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct SchedulerSnapshot {
     #[pyo3(get)]
+    pub epoch: u32,
+    #[pyo3(get)]
     pub global_attempts: Option<f64>,
     #[pyo3(get)]
     pub name: String,
@@ -197,6 +199,7 @@ pub struct SchedulerSnapshot {
 impl From<SchedulerStatisticsSnapshot> for SchedulerSnapshot {
     fn from(value: SchedulerStatisticsSnapshot) -> Self {
         Self {
+            epoch: value.epoch,
             global_attempts: value.global_attempts,
             name: value.name,
             meta: value.meta,

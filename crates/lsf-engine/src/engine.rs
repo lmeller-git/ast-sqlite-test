@@ -5,7 +5,10 @@ use std::{
     io::{self, Read},
     ops::RangeBounds,
     path::PathBuf,
-    sync::{Arc, atomic::AtomicU64},
+    sync::{
+        Arc,
+        atomic::{AtomicU32, AtomicU64},
+    },
 };
 
 use lsf_core::{
@@ -27,6 +30,7 @@ pub struct Engine {
     strategies: Vec<Box<dyn MutationStrategy>>,
     rng: SmallRng,
     total_mutations: Arc<AtomicU64>,
+    epoch: Arc<AtomicU32>,
 }
 
 impl Debug for Engine {
@@ -46,8 +50,10 @@ impl Engine {
         rng_seed: u64,
     ) -> Self {
         let total_mutations: Arc<std::sync::atomic::AtomicU64> = Arc::default();
+        let epoch: Arc<std::sync::atomic::AtomicU32> = Arc::default();
         scheduler.init(crate::SchedulerContext {
             total_attempts: total_mutations.clone(),
+            epoch: epoch.clone(),
         });
         Self {
             scheduler,
@@ -56,12 +62,14 @@ impl Engine {
             shmem_queue,
             rng: SmallRng::seed_from_u64(rng_seed),
             total_mutations,
+            epoch,
         }
     }
 
     pub fn with_scheduler(mut self, mut scheduler: Box<dyn Schedule>) -> Self {
         scheduler.init(crate::SchedulerContext {
             total_attempts: self.total_mutations.clone(),
+            epoch: self.epoch.clone(),
         });
         self.scheduler = scheduler;
         self
@@ -74,6 +82,7 @@ impl Engine {
     pub fn add_strategy(&mut self, mut strategy: Box<dyn MutationStrategy>) {
         strategy.init(lsf_mutate::StrategyContext {
             total_attempts: self.total_mutations.clone(),
+            epoch: self.epoch.clone(),
         });
         self.strategies.push(strategy);
     }
@@ -120,6 +129,9 @@ impl Engine {
             generation.members.len() as f64,
             std::sync::atomic::Ordering::Relaxed,
         );
+
+        self.epoch
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         self.decay();
 

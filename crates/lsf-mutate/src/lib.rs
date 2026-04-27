@@ -1,6 +1,9 @@
 use std::{
     fmt::Debug,
-    sync::{Arc, atomic::AtomicU64},
+    sync::{
+        Arc,
+        atomic::{AtomicU32, AtomicU64},
+    },
 };
 
 use lsf_core::entry::{ID, RawEntry};
@@ -48,6 +51,7 @@ pub trait MutationStrategy: Send + Sync + Debug {
 #[derive(Clone, Default)]
 pub struct StrategyContext {
     pub total_attempts: Arc<AtomicU64>,
+    pub epoch: Arc<AtomicU32>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

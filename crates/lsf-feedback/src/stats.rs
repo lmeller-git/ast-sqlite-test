@@ -7,6 +7,7 @@ pub trait AdaptiveStatistics {
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct SchedulerStatisticsSnapshot {
+    pub epoch: u32,
     pub global_attempts: Option<f64>,
     pub name: String,
     pub meta: Vec<String>,

@@ -95,7 +95,7 @@ async def csv_logger(
         for s in strategy_stats:
             strategy_writer.writerow(
                 [
-                    s.global_attempts,
+                    s.epoch,
                     s.name,
                     s.self_attempts[0],
                     s.accepted[0],
@@ -111,7 +111,7 @@ async def csv_logger(
             ):
                 scheduler_writer.writerow(
                     [
-                        s.global_attempts,
+                        s.epoch,
                         id,
                         attempts,
                         accepted,
