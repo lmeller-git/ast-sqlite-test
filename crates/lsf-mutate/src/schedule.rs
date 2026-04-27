@@ -36,6 +36,15 @@ impl AdaptiveStrategyScheduler {
 }
 
 impl MutationStrategy for AdaptiveStrategyScheduler {
+    fn breed_inner(
+        &self,
+        parent: &TestableEntry<RawEntry>,
+        parent_gen: &[TestableEntry<&RawEntry>],
+        rng: &mut dyn rand::Rng,
+    ) -> Result<MutationState, MutationError> {
+        self.strategy.breed_inner(parent, parent_gen, rng)
+    }
+
     fn breed(
         &self,
         parent: &TestableEntry<RawEntry>,
@@ -49,15 +58,24 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
         } else {
             sigmoid(score)
         };
+
         if !rng.random_bool(ratio) {
             return Ok(MutationState::Unchanged);
         }
 
-        let mut r = self.strategy.breed(parent, parent_gen, rng);
+        // this should optimally sit in update, as now probability is updated WITHIN one epoch, even though no stats are collected.
+        // It is here right now, since we also need to updated this even if we do not insert a hook, i.e. if r != MutationState::Mutated.
+        // This would require some kind of NullHook (TODO add later)
+        self.stats.attempts.add_f64(1., Ordering::Relaxed);
+        self.stats.total_attempts.add_f64(1., Ordering::Relaxed);
+
+        let mut r = self.breed_inner(parent, parent_gen, rng);
 
         if let Ok(MutationState::Mutated(result)) = &mut r {
-            self.stats.attempts.add_f64(1., Ordering::Relaxed);
             result.attach_hook(self.stats.clone());
+            parent.fire_build_hooks(TestOutcome::Mutated);
+        } else {
+            parent.fire_build_hooks(TestOutcome::NOOP);
         }
 
         r
@@ -122,6 +140,7 @@ impl AdaptiveStatistics for StrategySchedulerStats {
                     self.accepted.add_f64(1., Ordering::Relaxed);
                 }
             },
+            _ => {}
         }
     }
 

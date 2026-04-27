@@ -36,7 +36,7 @@ pub struct TreeMutator<T> {
 }
 
 impl<T: AstNode + Send + Sync + Clone> MutationStrategy for TreeMutator<T> {
-    fn breed(
+    fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<&RawEntry>],
@@ -94,7 +94,7 @@ pub struct RecursiveExpandExpr {
 }
 
 impl MutationStrategy for RecursiveExpandExpr {
-    fn breed(
+    fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
         _parent_gen: &[TestableEntry<&RawEntry>],

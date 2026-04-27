@@ -31,12 +31,29 @@ pub use structure::*;
 pub use values::*;
 
 pub trait MutationStrategy: Send + Sync {
-    fn breed(
+    fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<MutationState, MutationError>;
+
+    fn breed(
+        &self,
+        parent: &TestableEntry<RawEntry>,
+        parent_gen: &[TestableEntry<&RawEntry>],
+        rng: &mut dyn Rng,
+    ) -> Result<MutationState, MutationError> {
+        let r = self.breed_inner(parent, parent_gen, rng);
+        match r {
+            Ok(MutationState::Mutated(_)) => {
+                parent.fire_build_hooks(lsf_feedback::TestOutcome::Mutated)
+            }
+            _ => parent.fire_hooks(lsf_feedback::TestOutcome::NOOP),
+        }
+
+        r
+    }
 
     fn init(&mut self, _ctx: StrategyContext) {}
     fn decay(&self, _rate: f64) {}
