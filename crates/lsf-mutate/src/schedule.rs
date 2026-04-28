@@ -66,8 +66,10 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
         // this should optimally sit in update, as now probability is updated WITHIN one epoch, even though no stats are collected.
         // It is here right now, since we also need to updated this even if we do not insert a hook, i.e. if r != MutationState::Mutated.
         // This would require some kind of NullHook (TODO add later)
-        self.stats.attempts.add_f64(1., Ordering::Relaxed);
-        self.stats.total_attempts.add_f64(1., Ordering::Relaxed);
+        self.stats.attempts.atomic_add_f64(1., Ordering::Relaxed);
+        self.stats
+            .total_attempts
+            .atomic_add_f64(1., Ordering::Relaxed);
 
         let mut r = self.breed_inner(parent, parent_gen, rng);
 
@@ -89,13 +91,21 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
     }
 
     fn decay(&self, rate: f64) {
-        self.stats.attempts.multiply_f64(rate, Ordering::Relaxed);
-        self.stats.accepted.multiply_f64(rate, Ordering::Relaxed);
+        self.stats
+            .attempts
+            .atomic_multiply_f64(rate, Ordering::Relaxed);
+        self.stats
+            .accepted
+            .atomic_multiply_f64(rate, Ordering::Relaxed);
         self.stats
             .cov_increases
-            .multiply_f64(rate, Ordering::Relaxed);
-        self.stats.syntax_err.multiply_f64(rate, Ordering::Relaxed);
-        self.stats.crash.multiply_f64(rate, Ordering::Relaxed);
+            .atomic_multiply_f64(rate, Ordering::Relaxed);
+        self.stats
+            .syntax_err
+            .atomic_multiply_f64(rate, Ordering::Relaxed);
+        self.stats
+            .crash
+            .atomic_multiply_f64(rate, Ordering::Relaxed);
     }
 }
 
@@ -124,20 +134,20 @@ impl AdaptiveStatistics for StrategySchedulerStats {
         match test_result {
             TestOutcome::Rejected(r) => match r {
                 RejectionReason::SyntaxError => {
-                    self.syntax_err.add_f64(1., Ordering::Relaxed);
+                    self.syntax_err.atomic_add_f64(1., Ordering::Relaxed);
                 }
                 RejectionReason::TriggersCrash => {
-                    self.crash.add_f64(1., Ordering::Relaxed);
+                    self.crash.atomic_add_f64(1., Ordering::Relaxed);
                 }
                 RejectionReason::Bad => {}
             },
             TestOutcome::Accepted(s) => match s {
                 AcceptanceReason::CovIncrease => {
-                    self.accepted.add_f64(1., Ordering::Relaxed);
-                    self.cov_increases.add_f64(1., Ordering::Relaxed);
+                    self.accepted.atomic_add_f64(1., Ordering::Relaxed);
+                    self.cov_increases.atomic_add_f64(1., Ordering::Relaxed);
                 }
                 AcceptanceReason::IsDiverse => {
-                    self.accepted.add_f64(1., Ordering::Relaxed);
+                    self.accepted.atomic_add_f64(1., Ordering::Relaxed);
                 }
             },
             _ => {}
@@ -147,21 +157,21 @@ impl AdaptiveStatistics for StrategySchedulerStats {
     fn calculate_score(&self) -> f64 {
         // ucb1
         // TODO add more relevant terms
-        let total_attempts = self.total_attempts.load_f64(Ordering::Relaxed);
+        let total_attempts = self.total_attempts.atomic_load_f64(Ordering::Relaxed);
         if total_attempts == 0. {
             return f64::INFINITY;
         }
-        let attempts = self.attempts.load_f64(Ordering::Relaxed);
+        let attempts = self.attempts.atomic_load_f64(Ordering::Relaxed);
         if attempts == 0. {
             return f64::INFINITY;
         }
 
         // we want to
         // increase score for accepted ratio, coverage increase and crashes (likely a bug) and reduce it for syntax errors, as they are somewhat uninteresting
-        let cov_inc_rate = (self.cov_increases.load_f64(Ordering::Relaxed)
-            + self.accepted.load_f64(Ordering::Relaxed) * 0.2
-            + self.crash.load_f64(Ordering::Relaxed) * 2.
-            - self.syntax_err.load_f64(Ordering::Relaxed) * 0.5)
+        let cov_inc_rate = (self.cov_increases.atomic_load_f64(Ordering::Relaxed)
+            + self.accepted.atomic_load_f64(Ordering::Relaxed) * 0.2
+            + self.crash.atomic_load_f64(Ordering::Relaxed) * 2.
+            - self.syntax_err.atomic_load_f64(Ordering::Relaxed) * 0.5)
             / attempts;
         let exploration = (2. * (total_attempts).ln() / attempts).sqrt();
 

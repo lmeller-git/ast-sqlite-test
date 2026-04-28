@@ -1,11 +1,9 @@
-use std::{
-    collections::HashMap,
-    sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering},
-    },
+use std::sync::{
+    Arc,
+    atomic::{AtomicU32, AtomicU64, Ordering},
 };
 
+use indexmap::IndexMap;
 use lsf_core::{
     AtomicF64Ext,
     entry::{ID, Meta, RawEntry},
@@ -23,7 +21,7 @@ use rand::{
     distr::{Distribution, weighted::WeightedIndex},
 };
 
-use crate::Corpus;
+use crate::{Corpus, GRANULARITY};
 
 pub trait Schedule: Send + Sync {
     fn next_batch<'a>(
@@ -49,6 +47,7 @@ pub trait Schedule: Send + Sync {
 #[derive(Clone, Default)]
 pub struct SchedulerContext {
     pub total_attempts: Arc<AtomicU64>,
+    pub epoch: Arc<AtomicU32>,
 }
 
 #[derive(Default)]
@@ -115,7 +114,8 @@ const ZERO_WEIGHT: f64 = 100.;
 
 #[derive(Default)]
 pub struct AdaptiveWeightedRandomScheduler {
-    stat_mapping: HashMap<ID, Arc<AdaptiveCorpusStats>>,
+    stat_mapping: IndexMap<ID, Arc<AdaptiveCorpusStats>>,
+    dist: Option<WeightedIndex<f64>>,
     ctx: SchedulerContext,
 }
 
@@ -130,35 +130,44 @@ impl Schedule for AdaptiveWeightedRandomScheduler {
             return Vec::new();
         }
 
-        let (ids, weights): (Vec<_>, Vec<_>) = from
-            .entries
-            .keys()
-            .map(|id| {
-                let stats =
-                    self.stat_mapping
-                        .entry(*id)
-                        .or_insert(Arc::new(AdaptiveCorpusStats::new(
-                            self.ctx.total_attempts.clone(),
-                        )));
+        if self.dist.is_none()
+            || self
+                .ctx
+                .epoch
+                .load(Ordering::Relaxed)
+                .is_multiple_of(GRANULARITY as u32)
+        {
+            let weights: Vec<_> =
+                from.entries
+                    .keys()
+                    .map(|id| {
+                        let stats = self.stat_mapping.entry(*id).or_insert(Arc::new(
+                            AdaptiveCorpusStats::new(self.ctx.total_attempts.clone()),
+                        ));
 
-                let score = stats.calculate_score();
-                (*id, score)
-            })
-            .unzip();
+                        stats.calculate_score()
+                    })
+                    .collect();
 
-        let dist = match WeightedIndex::new(&weights) {
-            Ok(dist) => dist,
-            Err(_) => WeightedIndex::new(vec![1.; weights.len()]).unwrap(),
-        };
+            let dist = match WeightedIndex::new(&weights) {
+                Ok(dist) => dist,
+                Err(_) => WeightedIndex::new(vec![1.; weights.len()]).unwrap(),
+            };
+            self.dist.replace(dist);
+        }
 
-        dist.sample_iter(rng)
+        self.dist
+            .as_ref()
+            .unwrap()
+            .sample_iter(rng)
             .take(size)
-            .map(|idx| ids[idx])
-            .filter_map(|id| {
-                from.entries.get(&id).and_then(|entry| {
-                    self.stat_mapping
-                        .get(&id)
-                        .map(|s| TestableEntry::new(entry.raw()).with_hook(s.clone()))
+            .filter_map(|idx| {
+                self.stat_mapping.get_index(idx).and_then(|(id, _)| {
+                    from.entries.get(id).and_then(|entry| {
+                        self.stat_mapping
+                            .get_index(idx)
+                            .map(|s| TestableEntry::new(entry.raw()).with_hook(s.1.clone()))
+                    })
                 })
             })
             .collect()
@@ -170,11 +179,12 @@ impl Schedule for AdaptiveWeightedRandomScheduler {
 
     fn decay(&self, rate: f64) {
         for stat in self.stat_mapping.values() {
-            stat.attempts.multiply_f64(rate, Ordering::Relaxed);
-            stat.cov_increases.multiply_f64(rate, Ordering::Relaxed);
-            stat.accepted.multiply_f64(rate, Ordering::Relaxed);
-            stat.syntax_err.multiply_f64(rate, Ordering::Relaxed);
-            stat.crash.multiply_f64(rate, Ordering::Relaxed);
+            stat.attempts.atomic_multiply_f64(rate, Ordering::Relaxed);
+            stat.cov_increases
+                .atomic_multiply_f64(rate, Ordering::Relaxed);
+            stat.accepted.atomic_multiply_f64(rate, Ordering::Relaxed);
+            stat.syntax_err.atomic_multiply_f64(rate, Ordering::Relaxed);
+            stat.crash.atomic_multiply_f64(rate, Ordering::Relaxed);
         }
     }
 }
@@ -203,20 +213,20 @@ impl AdaptiveStatistics for AdaptiveCorpusStats {
         match test_result {
             TestOutcome::Rejected(r) => match r {
                 RejectionReason::SyntaxError => {
-                    self.syntax_err.add_f64(1., Ordering::Relaxed);
+                    self.syntax_err.atomic_add_f64(1., Ordering::Relaxed);
                 }
                 RejectionReason::TriggersCrash => {
-                    self.crash.add_f64(1., Ordering::Relaxed);
+                    self.crash.atomic_add_f64(1., Ordering::Relaxed);
                 }
                 RejectionReason::Bad => {}
             },
             TestOutcome::Accepted(s) => match s {
                 AcceptanceReason::CovIncrease => {
-                    self.accepted.add_f64(1., Ordering::Relaxed);
-                    self.cov_increases.add_f64(1., Ordering::Relaxed);
+                    self.accepted.atomic_add_f64(1., Ordering::Relaxed);
+                    self.cov_increases.atomic_add_f64(1., Ordering::Relaxed);
                 }
                 AcceptanceReason::IsDiverse => {
-                    self.accepted.add_f64(1., Ordering::Relaxed);
+                    self.accepted.atomic_add_f64(1., Ordering::Relaxed);
                 }
             },
             _ => {}
@@ -226,21 +236,21 @@ impl AdaptiveStatistics for AdaptiveCorpusStats {
     fn calculate_score(&self) -> f64 {
         // ucb1
         // TODO add more relevant terms
-        let total_attempts = self.total_attempts.load_f64(Ordering::Relaxed);
+        let total_attempts = self.total_attempts.atomic_load_f64(Ordering::Relaxed);
         if total_attempts == 0. {
             return ZERO_WEIGHT;
         }
-        let attempts = self.attempts.load_f64(Ordering::Relaxed);
+        let attempts = self.attempts.atomic_load_f64(Ordering::Relaxed);
         if attempts == 0. {
             return ZERO_WEIGHT;
         }
 
         // we want to
         // increase score for accepted ratio, coverage increase and crashes (likely a bug) and reduce it for syntax errors, as they are somewhat uninteresting
-        let cov_inc_rate = (self.cov_increases.load_f64(Ordering::Relaxed) * 2.
-            + self.accepted.load_f64(Ordering::Relaxed) * 0.5
-            + self.crash.load_f64(Ordering::Relaxed)
-            - self.syntax_err.load_f64(Ordering::Relaxed))
+        let cov_inc_rate = (self.cov_increases.atomic_load_f64(Ordering::Relaxed) * 2.
+            + self.accepted.atomic_load_f64(Ordering::Relaxed) * 0.5
+            + self.crash.atomic_load_f64(Ordering::Relaxed)
+            - self.syntax_err.atomic_load_f64(Ordering::Relaxed))
             / attempts;
         let exploration = (2. * (total_attempts).ln() / attempts).sqrt();
 
@@ -304,12 +314,16 @@ impl FeedbackHook for AdaptiveCorpusStatsUpdateHook {
     fn fire(&self, test_outcome: TestOutcome) {
         match test_outcome {
             TestOutcome::Mutated => {
-                self.raw.attempts.add_f64(1., Ordering::Relaxed);
-                self.raw.total_attempts.add_f64(1., Ordering::Relaxed);
+                self.raw.attempts.atomic_add_f64(1., Ordering::Relaxed);
+                self.raw
+                    .total_attempts
+                    .atomic_add_f64(1., Ordering::Relaxed);
             }
             TestOutcome::NOOP => {
-                self.raw.attempts.add_f64(1., Ordering::Relaxed);
-                self.raw.total_attempts.add_f64(1., Ordering::Relaxed);
+                self.raw.attempts.atomic_add_f64(1., Ordering::Relaxed);
+                self.raw
+                    .total_attempts
+                    .atomic_add_f64(1., Ordering::Relaxed);
             }
             _ => {}
         }
