@@ -235,7 +235,8 @@ async def main(args: Namespace):
 
     print("\n===========\ninit done, entering loop\n==================\n")
 
-    csv_logger_task = asyncio.create_task(csv_logger(scheduler_hook, strategy_scheduler_hook))
+    if args.scheduler_stats:
+        csv_logger_task = asyncio.create_task(csv_logger(scheduler_hook, strategy_scheduler_hook))
 
     _ = await asyncio.gather(
         fuzzing_loop(
@@ -256,7 +257,8 @@ async def main(args: Namespace):
 
     await asyncio.sleep(0.5)
 
-    _ = csv_logger_task.cancel()
+    if args.scheduler_stats:
+        _ = csv_logger_task.cancel()
 
 
 def add(n1: int, n2: int) -> int:
