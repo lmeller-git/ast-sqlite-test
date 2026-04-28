@@ -1,17 +1,11 @@
 #![allow(clippy::missing_safety_doc, clippy::manual_c_str_literals)]
 use core::{
-    ffi::CStr,
     ptr::null_mut,
     sync::atomic::{AtomicBool, AtomicPtr, AtomicU32},
 };
-use std::sync::OnceLock;
+use std::{env, sync::OnceLock};
 
 use shared_memory::{Shmem, ShmemConf};
-
-unsafe extern "C" {
-    fn getenv(name: *const i8) -> *const i8;
-    fn printf(format: *const i8, ...) -> i32;
-}
 
 static SHMEM_MAP: AtomicPtr<u8> = AtomicPtr::new(null_mut());
 static EDGES: AtomicU32 = AtomicU32::new(0);
@@ -39,27 +33,20 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(start: *mut u32, st
         *guard = id;
     }
 
-    let init_key = b"FUZZER_INIT\0".as_ptr() as *const i8;
-    let is_init_mode = !unsafe { getenv(init_key) }.is_null();
-
-    if is_init_mode {
-        let fmt = b"FUZZER_INIT: max edges = %u\n\0".as_ptr() as *const i8;
-        unsafe { printf(fmt, EDGES.load(core::sync::atomic::Ordering::Acquire)) };
+    if env::var("FUZZER_INIT").is_ok() {
+        println!(
+            "FUZZER_INIT: max edges = {}",
+            EDGES.load(std::sync::atomic::Ordering::Acquire)
+        );
     } else if NEED_INIT.swap(false, core::sync::atomic::Ordering::AcqRel) {
-        let path_key = b"FUZZER_SHMEM_PATH\0".as_ptr() as *const i8;
-        let path_ptr = unsafe { getenv(path_key) };
+        let path = env::var("FUZZER_SHMEM_PATH").expect("no memory for pc_guard provided");
 
-        if path_ptr.is_null() {
-            return;
-        }
-        if let Ok(path) = unsafe { CStr::from_ptr(path_ptr) }.to_str() {
-            let shmem = ShmemConf::new()
-                .os_id(path)
-                .open()
-                .expect("could not open shmem");
-            SHMEM_MAP.store(shmem.as_ptr(), core::sync::atomic::Ordering::Release);
-            _ = SHMEM_STORAGE.set(StoreShmem { _shmem: shmem });
-        }
+        let shmem = ShmemConf::new()
+            .os_id(path)
+            .open()
+            .expect("could not open shmem");
+        SHMEM_MAP.store(shmem.as_ptr(), core::sync::atomic::Ordering::Release);
+        _ = SHMEM_STORAGE.set(StoreShmem { _shmem: shmem });
     }
 }
 
