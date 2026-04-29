@@ -1,3 +1,5 @@
+ARG USE_ASAN=false
+
 # prep
 FROM theosotr/sqlite3-test:latest AS chef
 
@@ -59,34 +61,40 @@ RUN cargo build --release -p lsf-hooks
 
 WORKDIR /home/test/sqlite3-src/build
 
-RUN clang -O3 \
-    -DSQLITE_ENABLE_MATH_FUNCTIONS=1 \
-    -DSQLITE_ENABLE_FTS4=1 \
-    -DSQLITE_ENABLE_FTS5=1 \
-    -DSQLITE_ENABLE_GEOPOLY=1 \
-    -DSQLITE_ENABLE_RTREE=1 \
-    -DSQLITE_ENABLE_SESSION=1 \
-    -DSQLITE_ENABLE_PREUPDATE_HOOK=1 \
-    -DSQLITE_ENABLE_FTS3=1 \
-    -DSQLITE_ENABLE_FTS3_PARENTHESIS=1 \
-    -DSQLITE_ENABLE_JSON1=1 \
-    -DSQLITE_ENABLE_STAT4=1 \
-    -DSQLITE_ENABLE_UPDATE_DELETE_LIMIT=1 \
-    -DSQLITE_ENABLE_COLUMN_METADATA=1 \
-    -DSQLITE_ENABLE_DBSTAT_VTAB=1 \
-    -DSQLITE_ENABLE_EXPLAIN_COMMENTS=1 \
-    -DSQLITE_ENABLE_UNKNOWN_SQL_FUNCTION=1 \
-    -DSQLITE_ENABLE_STMTVTAB=1 \
-    -DSQLITE_ENABLE_DBPAGE_VTAB=1 \
-    -DSQLITE_ENABLE_BYTECODE_VTAB=1 \
-    -DSQLITE_ENABLE_OFFSET_SQL_FUNC=1 \
-    # ASAN seems to have a race condition leading to segfault on startup with our pc_guard hook. Not sure what the issue is exactly, maybe rust std lib
-    -fsanitize=address \
-    -fsanitize-coverage=trace-pc-guard \
-    -o ./sqlite3 \
-    /home/test/sqlite3-src/build/sqlite3.c \
-    /home/test/sqlite3-src/build/shell.c \
-    -Wl,--whole-archive /app/target/release/liblsf_hooks.a -Wl,--no-whole-archive
+# ASAN + pc_guard leads to random segfaults due to address randomization (i think). since we do (probably) not control the run flags, we cannot set security opts and thus we cannot disable adde randomization. In this case we cannot use ASAN
+RUN SQLITE_FLAGS="-DSQLITE_ENABLE_MATH_FUNCTIONS=1 \
+        -DSQLITE_ENABLE_FTS4=1 \
+        -DSQLITE_ENABLE_FTS5=1 \
+        -DSQLITE_ENABLE_GEOPOLY=1 \
+        -DSQLITE_ENABLE_RTREE=1 \
+        -DSQLITE_ENABLE_SESSION=1 \
+        -DSQLITE_ENABLE_PREUPDATE_HOOK=1 \
+        -DSQLITE_ENABLE_FTS3=1 \
+        -DSQLITE_ENABLE_FTS3_PARENTHESIS=1 \
+        -DSQLITE_ENABLE_JSON1=1 \
+        -DSQLITE_ENABLE_STAT4=1 \
+        -DSQLITE_ENABLE_UPDATE_DELETE_LIMIT=1 \
+        -DSQLITE_ENABLE_COLUMN_METADATA=1 \
+        -DSQLITE_ENABLE_DBSTAT_VTAB=1 \
+        -DSQLITE_ENABLE_EXPLAIN_COMMENTS=1 \
+        -DSQLITE_ENABLE_UNKNOWN_SQL_FUNCTION=1 \
+        -DSQLITE_ENABLE_STMTVTAB=1 \
+        -DSQLITE_ENABLE_DBPAGE_VTAB=1 \
+        -DSQLITE_ENABLE_BYTECODE_VTAB=1 \
+        -DSQLITE_ENABLE_OFFSET_SQL_FUNC=1" && \
+    \
+    if [ "$USE_ASAN" = "true" ]; then \
+        EXTRA_FLAGS="-fsanitize=address"; \
+    else \
+        EXTRA_FLAGS=""; \
+    fi && \
+    \
+    clang -O3 $SQLITE_FLAGS $EXTRA_FLAGS \
+        -fsanitize-coverage=trace-pc-guard \
+        -o ./sqlite3 \
+        /home/test/sqlite3-src/build/sqlite3.c \
+        /home/test/sqlite3-src/build/shell.c \
+        -Wl,--whole-archive /app/target/release/liblsf_hooks.a -Wl,--no-whole-archive
 
 # build lsf
 WORKDIR /app
@@ -98,6 +106,8 @@ RUN cargo build --release
 WORKDIR /app
 COPY test-db.sh /usr/bin/test-db
 RUN chmod +x /usr/bin/test-db
+COPY test-db-internal.sh /usr/bin/test-db-internal
+RUN chmod +x /usr/bin/test-db-internal
 
 
 RUN mkdir -p /app/docker_out/crashes /app/docker_out/queries

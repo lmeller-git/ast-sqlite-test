@@ -2,15 +2,19 @@ from lib_sf import engine
 from argparse import ArgumentParser, Namespace
 import asyncio
 import os
+import platform
 
 from lib_sf.lib_sf import TestableEntry
 from tester.event_loop import fuzzing_loop
 from tester.exec import init, run_single_mutation
 from tester.oracle import oracle
-from tester.persistent_worker import SQLiteWorker
+from tester.persistent_worker import SQLiteWorker, PLATFORM
 
 
 async def main(args: Namespace):
+    if args.disable_addr_randomization:
+        PLATFORM = platform.machine()
+
     max_edges = await init(args.test_path)
     print("found ", max_edges, " max_edges")
     ipc_queue = engine.IPCTokenQueue(8, max_edges)
@@ -178,5 +182,6 @@ if __name__ == "__main__":
     _ = parser.add_argument("--save_to", default=None, type=str)
     _ = parser.add_argument("--test_path", default="/home/test/sqlite3-src/build/sqlite3")
     _ = parser.add_argument("--oracle_path", default="/usr/bin/sqlite3-3.39.4")
+    _ = parser.add_argument("--disable-addr-randomization", default=False, type=bool)
     args = parser.parse_args()
     asyncio.run(main(args))
