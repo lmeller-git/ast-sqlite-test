@@ -176,22 +176,20 @@ impl AdaptiveStatistics for StrategySchedulerStats {
         // ucb1
         // TODO add more relevant terms
         let total_attempts = self.total_attempts.atomic_load_f64(Ordering::Relaxed);
-        if total_attempts == 0. {
+        if total_attempts < 1. {
             return f64::INFINITY;
         }
         let attempts = self.attempts.atomic_load_f64(Ordering::Relaxed);
-        if attempts == 0. {
+        if attempts < 1. {
             return f64::INFINITY;
         }
 
         // we want to
         // increase score for accepted ratio, coverage increase and crashes (likely a bug) and reduce it for syntax errors, as they are somewhat uninteresting
         let cov_inc_rate = (self.cov_increases.atomic_load_f64(Ordering::Relaxed)
-            + self.accepted.atomic_load_f64(Ordering::Relaxed) * 0.2
-            + self.crash.atomic_load_f64(Ordering::Relaxed) * 2.
-            - self.syntax_err.atomic_load_f64(Ordering::Relaxed) * 0.5)
+            + self.crash.atomic_load_f64(Ordering::Relaxed) * 10.)
             / attempts;
-        let exploration = (2. * (total_attempts).ln() / attempts).sqrt();
+        let exploration = (2. * (total_attempts).ln().max(0.) / attempts).sqrt();
 
         cov_inc_rate + exploration
     }

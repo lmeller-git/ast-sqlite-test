@@ -206,6 +206,59 @@ async def main(args: Namespace):
             ]
         ]
 
+    # mutation_engine.clear_strategies()
+    # [
+    #     mutation_engine.add_strategy(strat)
+    #     for strat in [
+    #         engine.StrategyBuilder.randomize(engine.StrategyBuilder.splice_in(), 0.5),
+    #         engine.StrategyBuilder.random_sampler(
+    #             3,
+    #             6,
+    #             [
+    #                 engine.StrategyBuilder.op_flip(),
+    #                 engine.StrategyBuilder.num_bounds(),
+    #                 engine.StrategyBuilder.null_inject(),
+    #                 engine.StrategyBuilder.type_cast(),
+    #                 engine.StrategyBuilder.set_ops(),
+    #                 engine.StrategyBuilder.sub_query(),
+    #                 engine.StrategyBuilder.splice_in(),
+    #             ],
+    #         ),
+    #         engine.StrategyBuilder.randomize(
+    #             engine.StrategyBuilder.random_sampler(
+    #                 1,
+    #                 1,
+    #                 [
+    #                     engine.StrategyBuilder.tree_mutate_expr(
+    #                         engine.TreeMutatorOperation.null_random()
+    #                     ),
+    #                     engine.StrategyBuilder.tree_mutate_expr(
+    #                         engine.TreeMutatorOperation.shuffle_two()
+    #                     ),
+    #                 ],
+    #             ),
+    #             0.5,
+    #         ),
+    #         engine.StrategyBuilder.randomize(
+    #             engine.StrategyBuilder.random_sampler(
+    #                 1,
+    #                 1,
+    #                 [
+    #                     engine.StrategyBuilder.tree_mutate_stmt(
+    #                         engine.TreeMutatorOperation.null_random()
+    #                     ),
+    #                     engine.StrategyBuilder.tree_mutate_stmt(
+    #                         engine.TreeMutatorOperation.shuffle_two()
+    #                     ),
+    #                 ],
+    #             ),
+    #             0.4,
+    #         ),
+    #         engine.StrategyBuilder.randomize(engine.StrategyBuilder.recursive_expand_expr(), 0.3),
+    #         engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.1),
+    #     ]
+    # ]
+
     snapshot = mutation_engine.snapshot()
 
     for entry in snapshot:

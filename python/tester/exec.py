@@ -56,13 +56,19 @@ async def run_single_mutation(
 
         if is_crash or is_hang:
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.crash()))
+            if stats is not None:
+                stats["tokens_in_use"] -= 1
             mutation_engine.return_token(token)
         elif is_syntax_err:
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()))
+            if stats is not None:
+                stats["tokens_in_use"] -= 1
             mutation_engine.return_token(token)
         else:
             if stats is not None:
                 t_commit = time.perf_counter()
+            if stats is not None:
+                stats["tokens_in_use"] -= 1
             mutation_engine.commit_test_result(entry, engine.TestResult(capture.exec_time, token))
             if stats is not None:
                 stats["rust_s"] += time.perf_counter() - t_commit
@@ -82,10 +88,9 @@ async def run_single_mutation(
 
     except Exception:
         entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()))
-        mutation_engine.return_token(token)
-    finally:
         if stats is not None:
             stats["tokens_in_use"] -= 1
+        mutation_engine.return_token(token)
 
 
 async def init(test_path: str) -> int:
