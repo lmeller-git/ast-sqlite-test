@@ -237,21 +237,17 @@ impl AdaptiveStatistics for AdaptiveCorpusStats {
         // ucb1
         // TODO add more relevant terms
         let total_attempts = self.total_attempts.atomic_load_f64(Ordering::Relaxed);
-        if total_attempts == 0. {
+        if total_attempts < 1. {
             return ZERO_WEIGHT;
         }
         let attempts = self.attempts.atomic_load_f64(Ordering::Relaxed);
-        if attempts == 0. {
+        if attempts < 1. {
             return ZERO_WEIGHT;
         }
 
         // we want to
         // increase score for accepted ratio, coverage increase and crashes (likely a bug) and reduce it for syntax errors, as they are somewhat uninteresting
-        let cov_inc_rate = (self.cov_increases.atomic_load_f64(Ordering::Relaxed) * 2.
-            + self.accepted.atomic_load_f64(Ordering::Relaxed) * 0.5
-            + self.crash.atomic_load_f64(Ordering::Relaxed)
-            - self.syntax_err.atomic_load_f64(Ordering::Relaxed))
-            / attempts;
+        let cov_inc_rate = (self.cov_increases.atomic_load_f64(Ordering::Relaxed)) / attempts;
         let exploration = (2. * (total_attempts).ln() / attempts).sqrt();
 
         cov_inc_rate + exploration
