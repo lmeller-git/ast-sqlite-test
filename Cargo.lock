@@ -363,7 +363,6 @@ dependencies = [
 name = "lsf-hooks"
 version = "0.1.0"
 dependencies = [
- "lsf-cov",
  "shared_memory",
 ]
 

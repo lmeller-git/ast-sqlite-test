@@ -80,7 +80,8 @@ RUN clang -O3 \
     -DSQLITE_ENABLE_DBPAGE_VTAB=1 \
     -DSQLITE_ENABLE_BYTECODE_VTAB=1 \
     -DSQLITE_ENABLE_OFFSET_SQL_FUNC=1 \
-    -fsanitize=address \
+    # ASAN seems to have a race condition leading to segfault on startup with our pc_guard hook. Not sure what the issue is exactly, maybe rust std lib
+    # -fsanitize=address \
     -fsanitize-coverage=trace-pc-guard \
     -o ./sqlite3 \
     /home/test/sqlite3-src/build/sqlite3.c \

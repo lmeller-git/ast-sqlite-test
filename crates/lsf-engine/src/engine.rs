@@ -23,6 +23,8 @@ use sqlparser::{dialect::SQLiteDialect, parser::Parser};
 
 use crate::{Corpus, schedule::Schedule};
 
+pub const GRANULARITY: usize = 50;
+
 pub struct Engine {
     corpus: Corpus,
     shmem_queue: Arc<SharedMemHandle>,
@@ -78,8 +80,8 @@ impl Engine {
 
     pub fn with_scheduler(mut self, mut scheduler: Box<dyn Schedule>) -> Self {
         scheduler.init(crate::SchedulerContext {
-            epoch: self.epoch.clone(),
             total_attempts: self.scheduler_norm.clone(),
+            epoch: self.epoch.clone(),
         });
         self.scheduler = scheduler;
         self
@@ -141,11 +143,13 @@ impl Engine {
             })
             .collect();
 
-        self.epoch
+        let current_epoch = self
+            .epoch
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-        self.decay();
-
+        if current_epoch.is_multiple_of(GRANULARITY as u32) {
+            self.decay();
+        }
         generation
     }
 
@@ -204,11 +208,15 @@ impl Engine {
 
     pub fn decay(&self) {
         const DECAY_RATE: f64 = 0.95;
+
+        let decay = DECAY_RATE.powf(GRANULARITY as f64);
         self.scheduler_norm
-            .multiply_f64(DECAY_RATE, std::sync::atomic::Ordering::Relaxed);
-        self.scheduler.decay(DECAY_RATE);
+            .atomic_multiply_f64(decay, std::sync::atomic::Ordering::Relaxed);
+        self.mutation_norm
+            .atomic_multiply_f64(decay, std::sync::atomic::Ordering::Relaxed);
+        self.scheduler.decay(decay);
         for s in &self.strategies {
-            s.decay(DECAY_RATE);
+            s.decay(decay);
         }
     }
 
