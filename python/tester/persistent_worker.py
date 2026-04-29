@@ -4,6 +4,9 @@ import time
 import os
 import tempfile
 import shutil
+import platform
+
+arch = platform.machine()
 
 
 @dataclass(order=True)
@@ -40,14 +43,18 @@ class SQLiteWorker:
         if self.env is not None:
             full_env.update(self.env)
 
+        # HACK setarch -R disables address space randomization, which prevents a 'rare' address collision on pc_guard_init with ASAN
         self.proc = await asyncio.create_subprocess_exec(
+            "setarch",
+            arch,
+            "-R",
             self.proc_path,
             self.db_path,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=full_env,
-            cwd=self.workdir
+            cwd=self.workdir,
         )
 
     async def _read_until_sentinel(
