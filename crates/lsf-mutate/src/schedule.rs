@@ -119,12 +119,14 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
             .stats
             .crash
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
+        self.strategy.decay(rate);
     }
 
     fn snapshot_rule(&self) {
         if let Some(hook) = &self.hook {
             hook.on_snapshot(self.snapshot());
         }
+        self.strategy.snapshot_rule();
     }
 }
 
