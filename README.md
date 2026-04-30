@@ -14,7 +14,7 @@ To run in a docker container:
 just run-docker
 ```
 
-This will build a docker container and execute `test-db.sh` inside it
+This will build a docker container and execute `test-db-internal.sh` inside it
 
 
 ## References

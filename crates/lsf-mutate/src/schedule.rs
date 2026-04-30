@@ -1,12 +1,9 @@
 use std::{
     f64,
-    sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering},
-    },
+    sync::{Arc, atomic::Ordering},
 };
 
-use lsf_core::{AtomicF64Ext, entry::RawEntry};
+use lsf_core::entry::RawEntry;
 use lsf_feedback::{
     AcceptanceReason,
     AdaptiveStatistics,
@@ -15,6 +12,7 @@ use lsf_feedback::{
     TestOutcome,
     TestableEntry,
 };
+use portable_atomic::AtomicF64;
 use rand::RngExt;
 
 use crate::{MutationError, MutationState, MutationStrategy, StrategyContext};
@@ -66,10 +64,8 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
         // this should optimally sit in update, as now probability is updated WITHIN one epoch, even though no stats are collected.
         // It is here right now, since we also need to updated this even if we do not insert a hook, i.e. if r != MutationState::Mutated.
         // This would require some kind of NullHook (TODO add later)
-        self.stats.attempts.atomic_add_f64(1., Ordering::Relaxed);
-        self.stats
-            .total_attempts
-            .atomic_add_f64(1., Ordering::Relaxed);
+        self.stats.attempts.fetch_add(1., Ordering::Relaxed);
+        self.stats.total_attempts.fetch_add(1., Ordering::Relaxed);
 
         let mut r = self.breed_inner(parent, parent_gen, rng);
 
@@ -91,21 +87,26 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
     }
 
     fn decay(&self, rate: f64) {
-        self.stats
+        _ = self
+            .stats
             .attempts
-            .atomic_multiply_f64(rate, Ordering::Relaxed);
-        self.stats
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
+        _ = self
+            .stats
             .accepted
-            .atomic_multiply_f64(rate, Ordering::Relaxed);
-        self.stats
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
+        _ = self
+            .stats
             .cov_increases
-            .atomic_multiply_f64(rate, Ordering::Relaxed);
-        self.stats
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
+        _ = self
+            .stats
             .syntax_err
-            .atomic_multiply_f64(rate, Ordering::Relaxed);
-        self.stats
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
+        _ = self
+            .stats
             .crash
-            .atomic_multiply_f64(rate, Ordering::Relaxed);
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
     }
 }
 
@@ -115,12 +116,12 @@ fn sigmoid(val: f64) -> f64 {
 
 #[derive(Debug, Default)]
 pub struct StrategySchedulerStats {
-    attempts: AtomicU64,
-    accepted: AtomicU64,
-    cov_increases: AtomicU64,
-    syntax_err: AtomicU64,
-    crash: AtomicU64,
-    total_attempts: Arc<AtomicU64>,
+    attempts: AtomicF64,
+    accepted: AtomicF64,
+    cov_increases: AtomicF64,
+    syntax_err: AtomicF64,
+    crash: AtomicF64,
+    total_attempts: Arc<AtomicF64>,
 }
 
 impl FeedbackHook for StrategySchedulerStats {
@@ -134,20 +135,20 @@ impl AdaptiveStatistics for StrategySchedulerStats {
         match test_result {
             TestOutcome::Rejected(r) => match r {
                 RejectionReason::SyntaxError => {
-                    self.syntax_err.atomic_add_f64(1., Ordering::Relaxed);
+                    self.syntax_err.fetch_add(1., Ordering::Relaxed);
                 }
                 RejectionReason::TriggersCrash => {
-                    self.crash.atomic_add_f64(1., Ordering::Relaxed);
+                    self.crash.fetch_add(1., Ordering::Relaxed);
                 }
                 RejectionReason::Bad => {}
             },
             TestOutcome::Accepted(s) => match s {
                 AcceptanceReason::CovIncrease => {
-                    self.accepted.atomic_add_f64(1., Ordering::Relaxed);
-                    self.cov_increases.atomic_add_f64(1., Ordering::Relaxed);
+                    self.accepted.fetch_add(1., Ordering::Relaxed);
+                    self.cov_increases.fetch_add(1., Ordering::Relaxed);
                 }
                 AcceptanceReason::IsDiverse => {
-                    self.accepted.atomic_add_f64(1., Ordering::Relaxed);
+                    self.accepted.fetch_add(1., Ordering::Relaxed);
                 }
             },
             _ => {}
@@ -157,19 +158,19 @@ impl AdaptiveStatistics for StrategySchedulerStats {
     fn calculate_score(&self) -> f64 {
         // ucb1
         // TODO add more relevant terms
-        let total_attempts = self.total_attempts.atomic_load_f64(Ordering::Relaxed);
+        let total_attempts = self.total_attempts.load(Ordering::Relaxed);
         if total_attempts < 1. {
             return f64::INFINITY;
         }
-        let attempts = self.attempts.atomic_load_f64(Ordering::Relaxed);
+        let attempts = self.attempts.load(Ordering::Relaxed);
         if attempts < 1. {
             return f64::INFINITY;
         }
 
         // we want to
         // increase score for accepted ratio, coverage increase and crashes (likely a bug) and reduce it for syntax errors, as they are somewhat uninteresting
-        let cov_inc_rate = (self.cov_increases.atomic_load_f64(Ordering::Relaxed)
-            + self.crash.atomic_load_f64(Ordering::Relaxed) * 10.)
+        let cov_inc_rate = (self.cov_increases.load(Ordering::Relaxed)
+            + self.crash.load(Ordering::Relaxed) * 10.)
             / attempts;
         let exploration = (2. * (total_attempts).ln() / attempts).sqrt();
 

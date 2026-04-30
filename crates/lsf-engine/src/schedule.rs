@@ -1,13 +1,10 @@
 use std::sync::{
     Arc,
-    atomic::{AtomicU32, AtomicU64, Ordering},
+    atomic::{AtomicU32, Ordering},
 };
 
 use indexmap::IndexMap;
-use lsf_core::{
-    AtomicF64Ext,
-    entry::{ID, Meta, RawEntry},
-};
+use lsf_core::entry::{ID, Meta, RawEntry};
 use lsf_feedback::{
     AcceptanceReason,
     AdaptiveStatistics,
@@ -16,6 +13,7 @@ use lsf_feedback::{
     TestOutcome,
     TestableEntry,
 };
+use portable_atomic::AtomicF64;
 use rand::{
     Rng,
     distr::{Distribution, weighted::WeightedIndex},
@@ -46,7 +44,7 @@ pub trait Schedule: Send + Sync {
 
 #[derive(Clone, Default)]
 pub struct SchedulerContext {
-    pub total_attempts: Arc<AtomicU64>,
+    pub total_attempts: Arc<AtomicF64>,
     pub epoch: Arc<AtomicU32>,
 }
 
@@ -179,28 +177,37 @@ impl Schedule for AdaptiveWeightedRandomScheduler {
 
     fn decay(&self, rate: f64) {
         for stat in self.stat_mapping.values() {
-            stat.attempts.atomic_multiply_f64(rate, Ordering::Relaxed);
-            stat.cov_increases
-                .atomic_multiply_f64(rate, Ordering::Relaxed);
-            stat.accepted.atomic_multiply_f64(rate, Ordering::Relaxed);
-            stat.syntax_err.atomic_multiply_f64(rate, Ordering::Relaxed);
-            stat.crash.atomic_multiply_f64(rate, Ordering::Relaxed);
+            _ = stat
+                .attempts
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
+            _ = stat
+                .cov_increases
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
+            _ = stat
+                .accepted
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
+            _ = stat
+                .syntax_err
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
+            _ = stat
+                .crash
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
         }
     }
 }
 
 #[derive(Default)]
 pub struct AdaptiveCorpusStats {
-    attempts: AtomicU64,
-    accepted: AtomicU64,
-    cov_increases: AtomicU64,
-    syntax_err: AtomicU64,
-    crash: AtomicU64,
-    total_attempts: Arc<AtomicU64>,
+    attempts: AtomicF64,
+    accepted: AtomicF64,
+    cov_increases: AtomicF64,
+    syntax_err: AtomicF64,
+    crash: AtomicF64,
+    total_attempts: Arc<AtomicF64>,
 }
 
 impl AdaptiveCorpusStats {
-    fn new(total_attempts: Arc<AtomicU64>) -> Self {
+    fn new(total_attempts: Arc<AtomicF64>) -> Self {
         Self {
             total_attempts,
             ..Default::default()
@@ -213,20 +220,20 @@ impl AdaptiveStatistics for AdaptiveCorpusStats {
         match test_result {
             TestOutcome::Rejected(r) => match r {
                 RejectionReason::SyntaxError => {
-                    self.syntax_err.atomic_add_f64(1., Ordering::Relaxed);
+                    self.syntax_err.fetch_add(1., Ordering::Relaxed);
                 }
                 RejectionReason::TriggersCrash => {
-                    self.crash.atomic_add_f64(1., Ordering::Relaxed);
+                    self.crash.fetch_add(1., Ordering::Relaxed);
                 }
                 RejectionReason::Bad => {}
             },
             TestOutcome::Accepted(s) => match s {
                 AcceptanceReason::CovIncrease => {
-                    self.accepted.atomic_add_f64(1., Ordering::Relaxed);
-                    self.cov_increases.atomic_add_f64(1., Ordering::Relaxed);
+                    self.accepted.fetch_add(1., Ordering::Relaxed);
+                    self.cov_increases.fetch_add(1., Ordering::Relaxed);
                 }
                 AcceptanceReason::IsDiverse => {
-                    self.accepted.atomic_add_f64(1., Ordering::Relaxed);
+                    self.accepted.fetch_add(1., Ordering::Relaxed);
                 }
             },
             _ => {}
@@ -236,18 +243,18 @@ impl AdaptiveStatistics for AdaptiveCorpusStats {
     fn calculate_score(&self) -> f64 {
         // ucb1
         // TODO add more relevant terms
-        let total_attempts = self.total_attempts.atomic_load_f64(Ordering::Relaxed);
+        let total_attempts = self.total_attempts.load(Ordering::Relaxed);
         if total_attempts < 1. {
             return ZERO_WEIGHT;
         }
-        let attempts = self.attempts.atomic_load_f64(Ordering::Relaxed);
+        let attempts = self.attempts.load(Ordering::Relaxed);
         if attempts < 1. {
             return ZERO_WEIGHT;
         }
 
         // we want to
         // increase score for accepted ratio, coverage increase and crashes (likely a bug) and reduce it for syntax errors, as they are somewhat uninteresting
-        let cov_inc_rate = (self.cov_increases.atomic_load_f64(Ordering::Relaxed)) / attempts;
+        let cov_inc_rate = (self.cov_increases.load(Ordering::Relaxed)) / attempts;
         let exploration = (2. * (total_attempts).ln() / attempts).sqrt();
 
         cov_inc_rate + exploration
@@ -310,16 +317,12 @@ impl FeedbackHook for AdaptiveCorpusStatsUpdateHook {
     fn fire(&self, test_outcome: TestOutcome) {
         match test_outcome {
             TestOutcome::Mutated => {
-                self.raw.attempts.atomic_add_f64(1., Ordering::Relaxed);
-                self.raw
-                    .total_attempts
-                    .atomic_add_f64(1., Ordering::Relaxed);
+                self.raw.attempts.fetch_add(1., Ordering::Relaxed);
+                self.raw.total_attempts.fetch_add(1., Ordering::Relaxed);
             }
             TestOutcome::NOOP => {
-                self.raw.attempts.atomic_add_f64(1., Ordering::Relaxed);
-                self.raw
-                    .total_attempts
-                    .atomic_add_f64(1., Ordering::Relaxed);
+                self.raw.attempts.fetch_add(1., Ordering::Relaxed);
+                self.raw.total_attempts.fetch_add(1., Ordering::Relaxed);
             }
             _ => {}
         }

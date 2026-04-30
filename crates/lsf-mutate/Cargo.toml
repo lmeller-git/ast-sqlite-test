@@ -9,9 +9,9 @@ repository.workspace = true
 [dependencies]
 sqlparser = { workspace = true }
 serde = { workspace = true }
-thiserror = { workspace = true }
-anyhow = { workspace = true }
 lsf-core = { workspace = true }
 rand = { workspace = true }
+portable-atomic = { workspace = true }
 lsf-feedback = { workspace = true }
 serde_json = "1.0.149"
+thiserror = "2.0.18"

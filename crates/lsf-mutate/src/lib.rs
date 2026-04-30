@@ -1,7 +1,8 @@
-use std::sync::{Arc, atomic::AtomicU64};
+use std::sync::Arc;
 
 use lsf_core::entry::{ID, RawEntry};
 use lsf_feedback::TestableEntry;
+use portable_atomic::AtomicF64;
 use rand::Rng;
 use thiserror::Error;
 
@@ -61,7 +62,7 @@ pub trait MutationStrategy: Send + Sync {
 
 #[derive(Clone, Default)]
 pub struct StrategyContext {
-    pub total_attempts: Arc<AtomicU64>,
+    pub total_attempts: Arc<AtomicF64>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
