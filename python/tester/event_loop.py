@@ -32,7 +32,7 @@ async def fuzzing_loop(
             epoch += 1
             if epoch % 2000 == 0:
                 print(f"epoch {epoch}\nCorpus size: {mutation_engine.corpus_size()}")
-                mutation_engine.gc()
+                # mutation_engine.gc()
 
         if not active_tasks:
             continue
