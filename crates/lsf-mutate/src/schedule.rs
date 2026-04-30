@@ -107,6 +107,7 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
             .stats
             .crash
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
+        self.strategy.decay(rate);
     }
 }
 

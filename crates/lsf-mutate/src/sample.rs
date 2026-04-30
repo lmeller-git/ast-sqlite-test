@@ -78,6 +78,12 @@ impl MutationStrategy for RandomMutationSampler {
             s.init(ctx.clone());
         }
     }
+
+    fn decay(&self, rate: f64) {
+        for s in &self.choices {
+            s.decay(rate);
+        }
+    }
 }
 
 /// applies the strategy over with probability prob
@@ -120,6 +126,10 @@ impl MutationStrategy for Randomly {
 
     fn init(&mut self, ctx: crate::StrategyContext) {
         self.over.init(ctx);
+    }
+
+    fn decay(&self, rate: f64) {
+        self.over.decay(rate);
     }
 }
 
