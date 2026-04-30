@@ -55,11 +55,11 @@ async def fuzzing_loop(
 
             if epoch % 2000 == 0:
                 print(f"epoch {epoch}\nCorpus size: {mutation_engine.corpus_size()}")
-                if track_stats:
-                    t_gc = time.perf_counter()
-                mutation_engine.gc()
-                if track_stats:
-                    stats["rust_s"] += time.perf_counter() - t_gc
+                # if track_stats:
+                #     t_gc = time.perf_counter()
+                # mutation_engine.gc()
+                # if track_stats:
+                #     stats["rust_s"] += time.perf_counter() - t_gc
 
         if not active_tasks:
             continue

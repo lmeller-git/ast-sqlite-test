@@ -9,12 +9,11 @@ repository.workspace = true
 [dependencies]
 sqlparser = { workspace = true }
 serde = { workspace = true }
-thiserror = { workspace = true }
-anyhow = { workspace = true }
 lsf-core = { workspace = true }
 lsf-mutate = { workspace = true }
 lsf-cov = { workspace = true }
 lsf-feedback = { workspace = true }
 rand = { workspace = true }
+portable-atomic = { workspace = true }
 indexmap = "2.13.0"
 siphasher = "1.0.2"

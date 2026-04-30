@@ -5,19 +5,14 @@ use std::{
     io::{self, Read},
     ops::RangeBounds,
     path::PathBuf,
-    sync::{
-        Arc,
-        atomic::{AtomicU32, AtomicU64},
-    },
+    sync::{Arc, atomic::AtomicU32},
 };
 
-use lsf_core::{
-    AtomicF64Ext,
-    entry::{CorpusEntry, Meta, RawEntry},
-};
+use lsf_core::entry::{CorpusEntry, Meta, RawEntry};
 use lsf_cov::ipc::{IPCToken, SharedMemHandle};
 use lsf_feedback::{AcceptanceReason, RejectionReason, TestOutcome, TestableEntry};
 use lsf_mutate::{MutationState, MutationStrategy};
+use portable_atomic::AtomicF64;
 use rand::{SeedableRng, rngs::SmallRng};
 use sqlparser::{dialect::SQLiteDialect, parser::Parser};
 
@@ -31,8 +26,8 @@ pub struct Engine {
     scheduler: Box<dyn Schedule>,
     strategies: Vec<Box<dyn MutationStrategy>>,
     rng: SmallRng,
-    scheduler_norm: Arc<AtomicU64>,
-    mutation_norm: Arc<AtomicU64>,
+    scheduler_norm: Arc<AtomicF64>,
+    mutation_norm: Arc<AtomicF64>,
     epoch: Arc<AtomicU32>,
 }
 
@@ -52,8 +47,8 @@ impl Engine {
         shmem_queue: Arc<SharedMemHandle>,
         rng_seed: u64,
     ) -> Self {
-        let scheduler_norm: Arc<std::sync::atomic::AtomicU64> = Arc::default();
-        let mutation_norm: Arc<std::sync::atomic::AtomicU64> = Arc::default();
+        let scheduler_norm: Arc<AtomicF64> = Arc::default();
+        let mutation_norm: Arc<AtomicF64> = Arc::default();
         let epoch: Arc<std::sync::atomic::AtomicU32> = Arc::default();
         scheduler.init(crate::SchedulerContext {
             total_attempts: scheduler_norm.clone(),
@@ -210,10 +205,16 @@ impl Engine {
         const DECAY_RATE: f64 = 0.95;
 
         let decay = DECAY_RATE.powf(GRANULARITY as f64);
-        self.scheduler_norm
-            .atomic_multiply_f64(decay, std::sync::atomic::Ordering::Relaxed);
-        self.mutation_norm
-            .atomic_multiply_f64(decay, std::sync::atomic::Ordering::Relaxed);
+        _ = self.scheduler_norm.fetch_update(
+            std::sync::atomic::Ordering::Relaxed,
+            std::sync::atomic::Ordering::Relaxed,
+            |f| Some(f * decay),
+        );
+        _ = self.mutation_norm.fetch_update(
+            std::sync::atomic::Ordering::Relaxed,
+            std::sync::atomic::Ordering::Relaxed,
+            |f| Some(f * decay),
+        );
         self.scheduler.decay(decay);
         for s in &self.strategies {
             s.decay(decay);

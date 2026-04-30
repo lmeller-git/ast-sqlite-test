@@ -32,15 +32,15 @@ lint:
 
 
 run-docker:
-    docker build -t ast-sqlite-fuzzer .
-    docker run -v $(pwd)/docker_out:/app/docker_out -u $(id -u):$(id -g) --init -it --rm ast-sqlite-fuzzer /usr/bin/test-db
+    docker build --build-arg USE_ASAN=true -t ast-sqlite-fuzzer .
+    docker run --security-opt seccomp=unconfined -v $(pwd)/docker_out:/app/docker_out -u $(id -u):$(id -g) --init -it --rm ast-sqlite-fuzzer /usr/bin/test-db-internal
 
 run-docker-it:
-    docker build -t ast-sqlite-fuzzer .
-    docker run -v $(pwd)/docker_out:/app/docker_out -u $(id -u):$(id -g) --init -it --rm ast-sqlite-fuzzer /bin/bash
+    docker build --build-arg USE_ASAN=true -t ast-sqlite-fuzzer .
+    docker run --security-opt seccomp=unconfined -v $(pwd)/docker_out:/app/docker_out -u $(id -u):$(id -g) --init -it --rm ast-sqlite-fuzzer /bin/bash
 
 run-docker-perf-it:
-    docker build -t ast-sqlite-fuzzer .
+    docker build --build-arg USE_ASAN=true -t ast-sqlite-fuzzer .
     docker run -p 6006:6006 --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --privileged -v $(pwd)/docker_out:/app/docker_out -u $(id -u):$(id -g) --init -it --rm ast-sqlite-fuzzer /bin/bash
 
 

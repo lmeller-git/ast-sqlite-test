@@ -3,7 +3,7 @@ use core::{
     ptr::null_mut,
     sync::atomic::{AtomicBool, AtomicPtr, AtomicU32},
 };
-use std::{env, sync::OnceLock};
+use std::{env, process::exit, sync::OnceLock};
 
 use shared_memory::{Shmem, ShmemConf};
 
@@ -38,6 +38,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(start: *mut u32, st
             "FUZZER_INIT: max edges = {}",
             EDGES.load(std::sync::atomic::Ordering::Acquire)
         );
+        exit(0);
     } else if NEED_INIT.swap(false, core::sync::atomic::Ordering::AcqRel) {
         let path = env::var("FUZZER_SHMEM_PATH").expect("no memory for pc_guard provided");
 
