@@ -39,7 +39,7 @@ async def main(args: Namespace):
     mutation_engine = engine.Engine(
         engine.SchedulerBuilder.weighted_random()
         if not args.scheduler_stats
-        else engine.SchedulerBuilder.hooked_adaptive_weighted_random(scheduler_hook),
+        else engine.SchedulerBuilder.weighted_random(),
         [engine.StrategyBuilder.table_guard()],
         ipc_queue,
         42,

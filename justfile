@@ -45,13 +45,13 @@ run-docker-perf-it:
 
 
 run-flamegraoph:
-    uv run py-spy record -o docker_out/perf_out/flamegraph.svg --native -- python python/tester/main.py --stop_at 5000
+    uv run py-spy record -o docker_out/perf_out/flamegraph.svg --native -- python python/tester/main.py --stop_at 5000 --disable-addr-randomization true
 
 run-tracer:
-    uv run viztracer --log_async python/tester/main.py --stop_at 200
+    uv run viztracer --log_async python/tester/main.py --stop_at 200 --disable-addr-randomization true
 
 run-with-tensorboard:
     @echo "starting tensorboard in bg. You may connect to it via port 6006"
     uvx --with "setuptools<70" tensorboard --logdir /app/docker_out/perf_out/runs/fuzzer_stats --host 0.0.0.0 --port 6006 >/dev/null 2>&1 &
     # uv run tensorboard --logdir /app/docker_out/perf_out/runs/fuzzer_stats --host 0.0.0.0 --port 6006 > /dev/null 2>&1 &
-    uv run python python/tester/main.py --stats true --stop_at 20000
+    uv run python python/tester/main.py --stats true --stop_at 20000 --disable-addr-randomization true

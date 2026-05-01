@@ -34,7 +34,6 @@ manifest-path = "crates/lsf-ffi/Cargo.toml"
 module-name = "lib_sf"
 features = ["pyo3/extension-module"]
 python-source = "python"
-UV_CONFIG_SETTINGS="--build-option=--release"
 
 [tool.ruff]
 cache-dir = ".ruff_cache"

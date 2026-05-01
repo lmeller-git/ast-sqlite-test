@@ -1,0 +1,18 @@
+Original Name,Short ID
+AdaptiveStrategyScheduler { strategy: SpliceIn },S0
+"AdaptiveStrategyScheduler { strategy: RandomMutationSampler { choices: [AdaptiveStrategyScheduler { strategy: TreeMutator { node_chance: 0.3, field_chance: 0.1, op: NullRandom, ty: ""Statement"" } }, AdaptiveStrategyScheduler { strategy: TreeMutator { node_chance: 0.3, field_chance: 0.1, op: NullRandom, ty: ""Expr"" } }, AdaptiveStrategyScheduler { strategy: TypeCast { mutation_chance: 0.3 } }, AdaptiveStrategyScheduler { strategy: NullInject { mutation_chance: 0.3 } }, AdaptiveStrategyScheduler { strategy: OperatorFlip { flip_chance: 0.3 } }, AdaptiveStrategyScheduler { strategy: RecursiveExpandExpr { max_depth: 3, chance_per_node: 0.1, chance_per_level: 0.5 } }], choose_max: 5, choose_min: 3 } }",S1
+"AdaptiveStrategyScheduler { strategy: TreeMutator { node_chance: 0.3, field_chance: 0.1, op: NullRandom, ty: ""Statement"" } }",S2
+"AdaptiveStrategyScheduler { strategy: TreeMutator { node_chance: 0.3, field_chance: 0.1, op: NullRandom, ty: ""Expr"" } }",S3
+AdaptiveStrategyScheduler { strategy: TypeCast { mutation_chance: 0.3 } },S4
+AdaptiveStrategyScheduler { strategy: NullInject { mutation_chance: 0.3 } },S5
+AdaptiveStrategyScheduler { strategy: OperatorFlip { flip_chance: 0.3 } },S6
+"AdaptiveStrategyScheduler { strategy: RecursiveExpandExpr { max_depth: 3, chance_per_node: 0.1, chance_per_level: 0.5 } }",S7
+"AdaptiveStrategyScheduler { strategy: RandomMutationSampler { choices: [AdaptiveStrategyScheduler { strategy: NumericBounds { mutate_chance: 0.3 } }, AdaptiveStrategyScheduler { strategy: OperatorFlip { flip_chance: 0.3 } }, AdaptiveStrategyScheduler { strategy: NullInject { mutation_chance: 0.3 } }, AdaptiveStrategyScheduler { strategy: TypeCast { mutation_chance: 0.3 } }, AdaptiveStrategyScheduler { strategy: RelShuffle { chance_per_node: 0.3 } }, AdaptiveStrategyScheduler { strategy: ExprShuffle { chance_per_node: 0.3 } }], choose_max: 3, choose_min: 1 } }",S8
+AdaptiveStrategyScheduler { strategy: NumericBounds { mutate_chance: 0.3 } },S9
+AdaptiveStrategyScheduler { strategy: RelShuffle { chance_per_node: 0.3 } },S10
+AdaptiveStrategyScheduler { strategy: ExprShuffle { chance_per_node: 0.3 } },S11
+"AdaptiveStrategyScheduler { strategy: RandomMutationSampler { choices: [AdaptiveStrategyScheduler { strategy: TreeMutator { node_chance: 0.3, field_chance: 0.1, op: ShuffleTwo, ty: ""Statement"" } }, AdaptiveStrategyScheduler { strategy: TreeMutator { node_chance: 0.3, field_chance: 0.1, op: ShuffleTwo, ty: ""Expr"" } }, AdaptiveStrategyScheduler { strategy: SetOps }, AdaptiveStrategyScheduler { strategy: SubQuery { mutation_chance: 0.3 } }, AdaptiveStrategyScheduler { strategy: RecursiveExpandExpr { max_depth: 3, chance_per_node: 0.1, chance_per_level: 0.5 } }], choose_max: 3, choose_min: 1 } }",S12
+"AdaptiveStrategyScheduler { strategy: TreeMutator { node_chance: 0.3, field_chance: 0.1, op: ShuffleTwo, ty: ""Statement"" } }",S13
+"AdaptiveStrategyScheduler { strategy: TreeMutator { node_chance: 0.3, field_chance: 0.1, op: ShuffleTwo, ty: ""Expr"" } }",S14
+AdaptiveStrategyScheduler { strategy: SetOps },S15
+AdaptiveStrategyScheduler { strategy: SubQuery { mutation_chance: 0.3 } },S16
