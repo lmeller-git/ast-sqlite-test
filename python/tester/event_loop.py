@@ -8,6 +8,7 @@ from tester.tb_logger import metrics_logger
 from tester.exec import run_single_mutation
 from tester.persistent_worker import SQLiteWorker, TestCapture
 
+CONCURRENCY_LIMIT = 8
 
 async def fuzzing_loop(
     mutation_engine: engine.Engine,
@@ -24,12 +25,11 @@ async def fuzzing_loop(
 
     workers: dict[int, SQLiteWorker] = {}
     active_tasks: set[asyncio.Task[None]] = set()
-    CONCURRENCY_LIMIT = 8
-    TASK_QUEUE_LIMIT = CONCURRENCY_LIMIT * 3
+    TASK_QUEUE_LIMIT = CONCURRENCY_LIMIT * 10
     epoch = 0
 
     if track_stats:
-        metrics_task = asyncio.create_task(metrics_logger(writer, stats, CONCURRENCY_LIMIT * 2))
+        metrics_task = asyncio.create_task(metrics_logger(writer, stats, CONCURRENCY_LIMIT))
 
     while True:
         if len(active_tasks) < TASK_QUEUE_LIMIT / 2:

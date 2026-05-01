@@ -13,35 +13,30 @@ def create_id_mapping(df, prefix, output_csv):
     unique_names = df["name"].unique()
     mapping_dict = {name: f"{prefix}{i}" for i, name in enumerate(unique_names)}
 
-    # Export mapping to CSV for reference
     mapping_df = pd.DataFrame(list(mapping_dict.items()), columns=["Original Name", "Short ID"])
     mapping_df.to_csv(output_csv, index=False)
 
-    # Swap names in the original dataframe
     df["name"] = df["name"].map(mapping_dict)
     return df, mapping_dict
 
 
 def stable_softmax(col):
     """Computes a numerically stable softmax for a pandas column."""
-    # Subtract max to prevent float overflow when ratings are large
     exps = np.exp(col - np.max(col))
     return exps / np.sum(exps)
 
 
-def run_comprehensive_analysis(strategy_file, scheduler_file):
+def run_comprehensive_analysis(strategy_file, scheduler_file, smoothing_span=15):
     # ==========================================
     # 1. Load and Clean Data
     # ==========================================
     df_strat = pd.read_csv(strategy_file).sort_values(by=["tick"]).ffill().fillna(0)
     df_sched = pd.read_csv(scheduler_file).sort_values(by=["tick"]).ffill().fillna(0)
 
-    # Apply ID Mapping
+    # Apply ID Mapping ONLY to Strategies
     df_strat, strat_map = create_id_mapping(df_strat, "S", "strategy_mapping.csv")
-    df_sched, sched_map = create_id_mapping(df_sched, "C", "corpus_mapping.csv")
 
     # Add derived metrics
-    # Efficiency: Coverage per attempt (avoid division by zero)
     df_strat["efficiency"] = df_strat["cov_increase"] / df_strat["attempts"].replace(0, 1)
 
     # Get last known states
@@ -62,28 +57,35 @@ def run_comprehensive_analysis(strategy_file, scheduler_file):
         ax = axes[idx]
         for s_idx, strategy in enumerate(unique_strategies):
             strat_data = df_strat[df_strat["name"] == strategy]
+
+            raw_y = strat_data[metric]
+            # Calculate Exponential Moving Average
+            smoothed_y = raw_y.ewm(span=smoothing_span, adjust=False).mean()
+
+            # Plot raw data as a faint background line
+            ax.plot(strat_data["tick"], raw_y, color=colors[s_idx], linewidth=1, alpha=0.15)
+
+            # Plot the smoothed trendline over top
             ax.plot(
                 strat_data["tick"],
-                strat_data[metric],
-                label=strategy,
+                smoothed_y,
+                label=strategy if idx == 0 else "",  # Avoid duplicate legends
                 color=colors[s_idx],
-                linewidth=2,
-                alpha=0.8,
+                linewidth=2.5,
+                alpha=0.9,
             )
-            if metric != "efficiency":  # Fill between gets messy for ratio metrics
-                ax.fill_between(
-                    strat_data["tick"], strat_data[metric], 0, color=colors[s_idx], alpha=0.1
-                )
+
+            if metric != "efficiency":
+                ax.fill_between(strat_data["tick"], smoothed_y, 0, color=colors[s_idx], alpha=0.05)
 
         ax.set_title(metric.capitalize().replace("_", " "))
         ax.grid(True, linestyle="--", alpha=0.6)
         ax.tick_params(axis="x", rotation=45)
 
     fig.suptitle(
-        "Strategy Statistics Over Time (Refer to strategy_mapping.csv)", fontsize=20, y=1.02
+        f"Strategy Statistics Over Time (EMA Smoothed, Span={smoothing_span})", fontsize=20, y=1.02
     )
 
-    # Unified Legend
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(
         handles,
@@ -104,7 +106,6 @@ def run_comprehensive_analysis(strategy_file, scheduler_file):
     fig, axes = plt.subplots(1, 3, figsize=(22, 6))
     fig.suptitle("Strategy Behavior & Efficiency Analysis", fontsize=18)
 
-    # Plot A: Attempts vs Coverage Increase
     sns.scatterplot(
         data=final_strat,
         x="attempts",
@@ -116,7 +117,6 @@ def run_comprehensive_analysis(strategy_file, scheduler_file):
         legend=False,
         ax=axes[0],
     )
-    # Add strategy ID labels to the points so you know who is who!
     for line in range(0, final_strat.shape[0]):
         axes[0].text(
             final_strat.attempts[line],
@@ -127,12 +127,10 @@ def run_comprehensive_analysis(strategy_file, scheduler_file):
             color="black",
         )
 
-    axes[0].set_title("Attempts vs. Coverage (Dot Size = Final Probability)")
+    axes[0].set_title("Attempts vs. Coverage (Dot Size = Final Prob)")
     axes[0].set_xlabel("Total Attempts")
     axes[0].set_ylabel("Total Coverage Increase")
 
-    # Plot B: Global Fuzzer Progress (Cumulative Coverage across all strategies)
-    # Group by tick and sum coverage
     global_cov = df_strat.groupby("tick")["cov_increase"].sum().reset_index()
     axes[1].plot(global_cov["tick"], global_cov["cov_increase"], color="purple", linewidth=3)
     axes[1].fill_between(
@@ -143,7 +141,6 @@ def run_comprehensive_analysis(strategy_file, scheduler_file):
     axes[1].set_ylabel("Sum of All Strategies' Coverage")
     axes[1].grid(True, linestyle="--", alpha=0.6)
 
-    # Plot C: Correlation Matrix
     strat_corr_cols = [
         "attempts",
         "accepted",
@@ -165,47 +162,40 @@ def run_comprehensive_analysis(strategy_file, scheduler_file):
     # ==========================================
     # 4. Corpus Scheduler Analysis (Heatmaps)
     # ==========================================
-    # We will generate TWO heatmaps side-by-side: Raw Rating and Softmax
     fig, axes = plt.subplots(1, 2, figsize=(24, 12))
 
-    # Prep the matrix
     heatmap_data = df_sched.pivot_table(index="name", columns="tick", values="rating")
     heatmap_data = heatmap_data.ffill(axis=1).fillna(0)
     first_appearance = df_sched.groupby("name")["tick"].min().sort_values()
     heatmap_data = heatmap_data.loc[first_appearance.index]
 
-    # Plot 1: Raw Ratings
+    # Turned yticklabels back on to show the actual corpus names
     sns.heatmap(
-        heatmap_data,
-        cmap="viridis",
-        cbar_kws={"label": "Raw Rating"},
-        yticklabels=False,
-        ax=axes[0],
+        heatmap_data, cmap="viridis", cbar_kws={"label": "Raw Rating"}, yticklabels=True, ax=axes[0]
     )
     axes[0].set_title("Raw Corpus Ratings Over Time", fontsize=16)
     axes[0].set_xlabel("Tick")
     axes[0].set_ylabel("Entries (Oldest at top, Newest at bottom)")
+    # Rotate the y-axis labels if they are long hashes so they don't overlap
+    axes[0].tick_params(axis="y", rotation=0, labelsize=8)
 
-    # Plot 2: Softmax Normalization (Relative Dominance)
     softmax_heatmap = heatmap_data.apply(stable_softmax, axis=0)
     sns.heatmap(
         softmax_heatmap,
         cmap="magma",
         cbar_kws={"label": "Selection Probability (Softmax)"},
-        yticklabels=False,
+        yticklabels=True,
         ax=axes[1],
     )
     axes[1].set_title("Normalized Entry Dominance (Softmax)", fontsize=16)
     axes[1].set_xlabel("Tick")
     axes[1].set_ylabel("")
+    axes[1].tick_params(axis="y", rotation=0, labelsize=8)
 
     plt.tight_layout()
     plt.savefig("scheduler_corpus_heatmaps.png", dpi=300, bbox_inches="tight")
     plt.close()
 
-
-# Example usage:
-# run_comprehensive_analysis("strategy_log.csv", "scheduler_log.csv")
 
 if __name__ == "__main__":
     run_comprehensive_analysis(

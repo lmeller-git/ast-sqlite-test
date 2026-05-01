@@ -5,7 +5,7 @@ import os
 import platform
 
 from lib_sf.lib_sf import TestableEntry
-from tester.event_loop import fuzzing_loop
+from tester.event_loop import CONCURRENCY_LIMIT, fuzzing_loop
 from tester.exec import init, run_single_mutation
 from tester.oracle import oracle
 from tester.tb_logger import csv_logger
@@ -19,6 +19,7 @@ from tester.rules import (
     make_ruleset_structural_hooked,
 )
 
+RNG = 42
 
 async def main(args: Namespace):
     if args.disable_addr_randomization:
@@ -26,7 +27,7 @@ async def main(args: Namespace):
 
     max_edges = await init(args.test_path)
     print("found ", max_edges, " max_edges")
-    ipc_queue = engine.IPCTokenQueue(8, max_edges)
+    ipc_queue = engine.IPCTokenQueue(CONCURRENCY_LIMIT, max_edges)
     oracle_queue = asyncio.PriorityQueue(1024)
 
     if args.scheduler_stats:
@@ -37,12 +38,12 @@ async def main(args: Namespace):
         strategy_scheduler_hook = None
 
     mutation_engine = engine.Engine(
-        engine.SchedulerBuilder.weighted_random()
+        engine.SchedulerBuilder.adaptive_weighted_random()
         if not args.scheduler_stats
-        else engine.SchedulerBuilder.weighted_random(),
+        else engine.SchedulerBuilder.hooked_adaptive_weighted_random(scheduler_hook),
         [engine.StrategyBuilder.table_guard()],
         ipc_queue,
-        42,
+        RNG,
     )
 
     # populate coverage map with "basic edges"

@@ -5,7 +5,7 @@ use shared_memory::{Shmem, ShmemConf};
 
 use crate::bitmap::EdgeMapView;
 
-const TOKENS_PER_WORKER: usize = 2;
+const TOKENS_PER_WORKER: usize = 1;
 
 pub struct SharedMemHandle {
     token_queue: Queue<Box<IPCToken>>,

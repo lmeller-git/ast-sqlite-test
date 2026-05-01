@@ -53,7 +53,7 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
         parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<MutationState, MutationError> {
-        self.strategy.breed_inner(parent, parent_gen, rng)
+        self.strategy.breed(parent, parent_gen, rng)
     }
 
     fn breed(
@@ -84,9 +84,6 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
 
         if let Ok(MutationState::Mutated(result)) = &mut r {
             result.attach_hook(self.stats.clone());
-            parent.fire_build_hooks(TestOutcome::Mutated);
-        } else {
-            parent.fire_build_hooks(TestOutcome::NOOP);
         }
         r
     }
@@ -192,7 +189,7 @@ impl AdaptiveStatistics for StrategySchedulerStats {
         let cov_inc_rate = (self.cov_increases.load(Ordering::Relaxed)
             + self.crash.load(Ordering::Relaxed) * 10.)
             / attempts;
-        let exploration = (2. * (total_attempts).ln().max(0.) / attempts).sqrt();
+        let exploration = (2. * (total_attempts).ln() / attempts).sqrt();
 
         cov_inc_rate + exploration
     }

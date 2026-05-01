@@ -55,8 +55,8 @@ def make_ruleset_structural():
 
 def make_ruleset_havoc_hooked(hook: engine.SchedulerHook):
     return engine.StrategyBuilder.random_sampler(
-        3,
-        5,
+        6,
+        6,
         [
             engine.StrategyBuilder.hooked_scheduled(
                 engine.StrategyBuilder.tree_mutate_stmt(engine.TreeMutatorOperation.null_random()),
@@ -78,8 +78,8 @@ def make_ruleset_havoc_hooked(hook: engine.SchedulerHook):
 
 def make_ruleset_semantic_hooked(hook: engine.SchedulerHook):
     return engine.StrategyBuilder.random_sampler(
-        1,
-        3,
+        6,
+        6,
         [
             engine.StrategyBuilder.hooked_scheduled(engine.StrategyBuilder.num_bounds(), hook),
             engine.StrategyBuilder.hooked_scheduled(engine.StrategyBuilder.op_flip(), hook),
@@ -95,8 +95,8 @@ def make_ruleset_semantic_hooked(hook: engine.SchedulerHook):
 
 def make_ruleset_structural_hooked(hook: engine.SchedulerHook):
     return engine.StrategyBuilder.random_sampler(
-        1,
-        3,
+        5,
+        5,
         [
             engine.StrategyBuilder.hooked_scheduled(
                 engine.StrategyBuilder.tree_mutate_stmt(engine.TreeMutatorOperation.shuffle_two()),

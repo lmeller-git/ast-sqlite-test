@@ -49,26 +49,32 @@ impl MutationStrategy for RandomMutationSampler {
         }
 
         let mut status = MutationState::Unchanged;
+        let mut hooks = parent.hooks.clone();
         let mut current_parent: &TestableEntry<RawEntry> = parent;
 
         for i in 0..n_chosen {
             let chosen_strategy = rng.random_range(..self.choices.len());
             if let Ok(MutationState::Mutated(mut next)) =
-                self.choices[chosen_strategy].breed_inner(current_parent, parent_gen, rng)
+                self.choices[chosen_strategy].breed(current_parent, parent_gen, rng)
             {
                 if i > 0 && status != MutationState::Unchanged {
                     next.parents_mut().extend(current_parent.parents());
                 }
+
+                hooks.append(&mut next.hooks);
+
+                next.build_hooks.extend(parent.build_hooks.clone());
                 status = MutationState::Mutated(next);
                 current_parent = if let MutationState::Mutated(next) = &status {
                     next
                 } else {
                     unreachable!()
                 };
-                parent.fire_build_hooks(lsf_feedback::TestOutcome::Mutated);
-            } else {
-                parent.fire_build_hooks(lsf_feedback::TestOutcome::NOOP);
             }
+        }
+
+        if let MutationState::Mutated(ref mut next) = status {
+            next.hooks.append(&mut hooks);
         }
 
         Ok(status)
