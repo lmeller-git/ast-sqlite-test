@@ -24,7 +24,7 @@ test-rust: build-debug
     cargo test --exclude lib-sf --exclude sqlparser --exclude sqlparser_derive --workspace --locked --all-features --all-targets
 
 test-py: build-debug
-    uv  run pytest
+    uv run pytest
 
 lint:
     cargo clippy --no-deps

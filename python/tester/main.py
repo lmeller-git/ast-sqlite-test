@@ -11,6 +11,7 @@ from tester.oracle import oracle
 from tester.persistent_worker import SQLiteWorker, PLATFORM
 from tester.rules import make_ruleset_havoc, make_ruleset_semantic, make_ruleset_structural
 
+RNG = 912943712967
 
 async def main(args: Namespace):
     if args.disable_addr_randomization:
@@ -25,7 +26,7 @@ async def main(args: Namespace):
         engine.SchedulerBuilder.weighted_random(),
         [engine.StrategyBuilder.table_guard()],
         ipc_queue,
-        42,
+        RNG,
     )
 
     # populate coverage map with "basic edges"
