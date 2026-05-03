@@ -5,13 +5,13 @@ import os
 import platform
 
 from lib_sf.lib_sf import TestableEntry
-from tester.event_loop import fuzzing_loop
+from tester.event_loop import CONCURRENCY_LIMIT, fuzzing_loop
 from tester.exec import init, run_single_mutation
 from tester.oracle import oracle
 from tester.persistent_worker import SQLiteWorker, PLATFORM
 from tester.rules import make_ruleset_havoc, make_ruleset_semantic, make_ruleset_structural
 
-RNG = 912943712967
+RNG = 42
 
 async def main(args: Namespace):
     if args.disable_addr_randomization:
@@ -19,11 +19,11 @@ async def main(args: Namespace):
 
     max_edges = await init(args.test_path)
     print("found ", max_edges, " max_edges")
-    ipc_queue = engine.IPCTokenQueue(8, max_edges)
+    ipc_queue = engine.IPCTokenQueue(CONCURRENCY_LIMIT, max_edges)
     oracle_queue = asyncio.PriorityQueue(1024)
 
     mutation_engine = engine.Engine(
-        engine.SchedulerBuilder.weighted_random(),
+        engine.SchedulerBuilder.adaptive_weighted_random(),
         [engine.StrategyBuilder.table_guard()],
         ipc_queue,
         RNG,

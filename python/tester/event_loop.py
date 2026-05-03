@@ -5,6 +5,7 @@ import sys
 from tester.exec import run_single_mutation
 from tester.persistent_worker import SQLiteWorker, TestCapture
 
+CONCURRENCY_LIMIT = 16
 
 async def fuzzing_loop(
     mutation_engine: engine.Engine,
@@ -15,7 +16,6 @@ async def fuzzing_loop(
 ):
     workers: dict[int, SQLiteWorker] = {}
     active_tasks: set[asyncio.Task[None]] = set()
-    CONCURRENCY_LIMIT = 8
     TASK_QUEUE_LIMIT = CONCURRENCY_LIMIT * 3
     epoch = 0
 

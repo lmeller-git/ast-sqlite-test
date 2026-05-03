@@ -108,8 +108,6 @@ impl Schedule for WeightedRandomScheduler {
     }
 }
 
-const ZERO_WEIGHT: f64 = 100.;
-
 #[derive(Default)]
 pub struct AdaptiveWeightedRandomScheduler {
     stat_mapping: IndexMap<ID, Arc<AdaptiveCorpusStats>>,
@@ -196,6 +194,9 @@ impl Schedule for AdaptiveWeightedRandomScheduler {
     }
 }
 
+const ATTEMPT_EPS: f64 = 0.0001;
+const TOTAL_ATTEMPTS_EPS: f64 = 0.0001;
+
 #[derive(Default)]
 pub struct AdaptiveCorpusStats {
     attempts: AtomicF64,
@@ -244,18 +245,13 @@ impl AdaptiveStatistics for AdaptiveCorpusStats {
         // ucb1
         // TODO add more relevant terms
         let total_attempts = self.total_attempts.load(Ordering::Relaxed);
-        if total_attempts < 1. {
-            return ZERO_WEIGHT;
-        }
         let attempts = self.attempts.load(Ordering::Relaxed);
-        if attempts < 1. {
-            return ZERO_WEIGHT;
-        }
 
         // we want to
         // increase score for accepted ratio, coverage increase and crashes (likely a bug) and reduce it for syntax errors, as they are somewhat uninteresting
-        let cov_inc_rate = (self.cov_increases.load(Ordering::Relaxed)) / attempts;
-        let exploration = (2. * (total_attempts).ln() / attempts).sqrt();
+        let cov_inc_rate = (self.cov_increases.load(Ordering::Relaxed)) / (attempts + ATTEMPT_EPS);
+        let exploration =
+            (2. * (total_attempts + TOTAL_ATTEMPTS_EPS).ln() / (attempts + ATTEMPT_EPS)).sqrt();
 
         cov_inc_rate + exploration
     }

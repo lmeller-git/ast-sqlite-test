@@ -40,7 +40,7 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
         parent_gen: &[TestableEntry<&RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<MutationState, MutationError> {
-        self.strategy.breed_inner(parent, parent_gen, rng)
+        self.strategy.breed(parent, parent_gen, rng)
     }
 
     fn breed(
@@ -71,9 +71,6 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
 
         if let Ok(MutationState::Mutated(result)) = &mut r {
             result.attach_hook(self.stats.clone());
-            parent.fire_build_hooks(TestOutcome::Mutated);
-        } else {
-            parent.fire_build_hooks(TestOutcome::NOOP);
         }
 
         r
@@ -112,7 +109,8 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
 }
 
 fn sigmoid(val: f64) -> f64 {
-    1. / (1. + (-val).exp())
+    const SCALER: f64 = 0.5;
+    1. / (1. + (-SCALER * val).exp())
 }
 
 #[derive(Debug, Default)]
