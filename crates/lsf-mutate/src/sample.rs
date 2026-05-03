@@ -48,6 +48,8 @@ impl MutationStrategy for RandomMutationSampler {
             return Ok(MutationState::Unchanged);
         }
 
+        // we can assume that parent.hooks is empty, since it is part of the selected parents
+        debug_assert!(parent.hooks.is_empty());
         let mut status = MutationState::Unchanged;
         let mut hooks = parent.hooks.clone();
         let mut current_parent: &TestableEntry<RawEntry> = parent;
@@ -62,8 +64,10 @@ impl MutationStrategy for RandomMutationSampler {
                 }
 
                 hooks.append(&mut next.hooks);
-
+                // we can further assume that the childs build hooks are empty, since consumers "use but not add" build hooks
+                debug_assert!(next.build_hooks.is_empty());
                 next.build_hooks.extend(parent.build_hooks.clone());
+
                 status = MutationState::Mutated(next);
                 current_parent = if let MutationState::Mutated(next) = &status {
                     next

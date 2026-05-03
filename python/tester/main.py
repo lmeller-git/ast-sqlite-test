@@ -21,6 +21,7 @@ from tester.rules import (
 
 RNG = 42
 
+
 async def main(args: Namespace):
     if args.disable_addr_randomization:
         PLATFORM = platform.machine()

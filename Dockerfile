@@ -124,8 +124,10 @@ COPY python/lib_sf python/lib_sf
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=cache,target=/root/.cargo/registry \
+    --mount=type=cache,target=/root/.cargo/git \
     --mount=type=cache,target=/app/target \
-    uv sync --frozen --no-dev --no-editable
+    uvx maturin build --release --out /tmp/wheels --locked && \
+    uv pip install --reinstall --no-deps /tmp/wheels/*.whl
 
 COPY . .
 
