@@ -27,7 +27,7 @@ pub enum RejectionReason {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum AcceptanceReason {
-    CovIncrease,
+    CovIncrease(usize),
     IsDiverse,
 }
 

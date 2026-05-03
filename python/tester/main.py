@@ -13,6 +13,7 @@ from tester.rules import make_ruleset_havoc, make_ruleset_semantic, make_ruleset
 
 RNG = 42
 
+
 async def main(args: Namespace):
     if args.disable_addr_randomization:
         PLATFORM = platform.machine()
@@ -75,59 +76,6 @@ async def main(args: Namespace):
     # TODO: force add guarded queries back to engine or skip this entirely
 
     mutation_engine.clear_strategies()
-
-    # [
-    #     mutation_engine.add_strategy(strat)
-    #     for strat in [
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.splice_in()),
-    #         engine.StrategyBuilder.scheduled(
-    #             engine.StrategyBuilder.random_sampler(
-    #                 1,
-    #                 1,
-    #                 [
-    #                     engine.StrategyBuilder.scheduled(
-    #                         engine.StrategyBuilder.tree_mutate_stmt(
-    #                             engine.TreeMutatorOperation.null_random()
-    #                         )
-    #                     ),
-    #                     engine.StrategyBuilder.scheduled(
-    #                         engine.StrategyBuilder.tree_mutate_stmt(
-    #                             engine.TreeMutatorOperation.shuffle_two()
-    #                         )
-    #                     ),
-    #                 ],
-    #             )
-    #         ),
-    #         engine.StrategyBuilder.scheduled(
-    #             engine.StrategyBuilder.random_sampler(
-    #                 1,
-    #                 1,
-    #                 [
-    #                     engine.StrategyBuilder.scheduled(
-    #                         engine.StrategyBuilder.tree_mutate_stmt(
-    #                             engine.TreeMutatorOperation.null_random()
-    #                         )
-    #                     ),
-    #                     engine.StrategyBuilder.scheduled(
-    #                         engine.StrategyBuilder.tree_mutate_stmt(
-    #                             engine.TreeMutatorOperation.shuffle_two()
-    #                         )
-    #                     ),
-    #                 ],
-    #             )
-    #         ),
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.recursive_expand_expr()),
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.num_bounds()),
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.op_flip()),
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.null_inject()),
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.type_cast()),
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.set_ops()),
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.sub_query()),
-    #         engine.StrategyBuilder.scheduled(engine.StrategyBuilder.relation_shuffle()),
-    #         engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.6),
-    #         engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_name_guard(), 0.6),
-    #     ]
-    # ]
 
     [
         mutation_engine.add_strategy(strat)

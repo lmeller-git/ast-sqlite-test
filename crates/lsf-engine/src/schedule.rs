@@ -229,9 +229,10 @@ impl AdaptiveStatistics for AdaptiveCorpusStats {
                 RejectionReason::Bad => {}
             },
             TestOutcome::Accepted(s) => match s {
-                AcceptanceReason::CovIncrease => {
+                AcceptanceReason::CovIncrease(n_found) => {
                     self.accepted.fetch_add(1., Ordering::Relaxed);
-                    self.cov_increases.fetch_add(1., Ordering::Relaxed);
+                    self.cov_increases
+                        .fetch_add(n_found as f64, Ordering::Relaxed);
                 }
                 AcceptanceReason::IsDiverse => {
                     self.accepted.fetch_add(1., Ordering::Relaxed);
@@ -251,7 +252,7 @@ impl AdaptiveStatistics for AdaptiveCorpusStats {
         // increase score for accepted ratio, coverage increase and crashes (likely a bug) and reduce it for syntax errors, as they are somewhat uninteresting
         let cov_inc_rate = (self.cov_increases.load(Ordering::Relaxed)) / (attempts + ATTEMPT_EPS);
         let exploration =
-            (2. * (total_attempts + TOTAL_ATTEMPTS_EPS).ln() / (attempts + ATTEMPT_EPS)).sqrt();
+            (4. * (total_attempts + TOTAL_ATTEMPTS_EPS).ln() / (attempts + ATTEMPT_EPS)).sqrt();
 
         cov_inc_rate + exploration
     }

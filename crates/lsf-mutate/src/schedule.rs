@@ -142,9 +142,10 @@ impl AdaptiveStatistics for StrategySchedulerStats {
                 RejectionReason::Bad => {}
             },
             TestOutcome::Accepted(s) => match s {
-                AcceptanceReason::CovIncrease => {
+                AcceptanceReason::CovIncrease(n_found) => {
                     self.accepted.fetch_add(1., Ordering::Relaxed);
-                    self.cov_increases.fetch_add(1., Ordering::Relaxed);
+                    self.cov_increases
+                        .fetch_add(n_found as f64, Ordering::Relaxed);
                 }
                 AcceptanceReason::IsDiverse => {
                     self.accepted.fetch_add(1., Ordering::Relaxed);

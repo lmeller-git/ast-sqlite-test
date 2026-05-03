@@ -177,7 +177,9 @@ impl Engine {
                 raw_entry.fire_hooks(TestOutcome::Rejected(RejectionReason::Bad));
                 return;
             }
-            raw_entry.fire_hooks(TestOutcome::Accepted(AcceptanceReason::CovIncrease));
+            raw_entry.fire_hooks(TestOutcome::Accepted(AcceptanceReason::CovIncrease(
+                meta.new_cov_nodes,
+            )));
         } else {
             raw_entry.fire_hooks(TestOutcome::Accepted(AcceptanceReason::IsDiverse));
         }
@@ -198,7 +200,7 @@ impl Engine {
     }
 
     pub fn decay(&self) {
-        const DECAY_RATE: f64 = 0.95;
+        const DECAY_RATE: f64 = 0.999;
 
         let decay = DECAY_RATE.powf(GRANULARITY as f64);
         _ = self.scheduler_norm.fetch_update(
