@@ -5,11 +5,19 @@ class Generation:
     def into_members(self) -> list[TestableEntry]: ...
 
 
+class MABBody:
+    def __init__(self) -> None: ...
+
+
 class SchedulerBuilder:
     @staticmethod
     def weighted_random() -> SchedulerBuilder: ...
     @staticmethod
     def adaptive_weighted_random() -> SchedulerBuilder: ...
+    @staticmethod
+    def ucb1(body: MABBody) -> SchedulerBuilder: ...
+    @staticmethod
+    def weighted_ucb1(body: MABBody) -> SchedulerBuilder: ...
 
 
 class StrategyBuilder:
@@ -40,7 +48,7 @@ class StrategyBuilder:
     @staticmethod
     def relation_shuffle(mutation_chance: float = 0.3) -> StrategyBuilder: ...
     @staticmethod
-    def scheduled(strategy: StrategyBuilder) -> StrategyBuilder: ...
+    def scheduled(strategy: StrategyBuilder, body: MABBody) -> StrategyBuilder: ...
     @staticmethod
     def tree_mutate_stmt(
         operator: TreeMutatorOperation, chance_per_node: float = 0.3, chance_per_field: float = 0.1
@@ -55,6 +63,8 @@ class StrategyBuilder:
     def recursive_expand_expr(
         max_depth: int = 3, chance_per_node: float = 0.1, chance_per_level: float = 0.5
     ) -> StrategyBuilder: ...
+    @staticmethod
+    def ucb1(body: MABBody, strategies: list[StrategyBuilder], choose: int = 1) -> StrategyBuilder: ...
 
 
 class TreeMutatorOperation:
@@ -79,6 +89,7 @@ class Engine:
         scheduler: SchedulerBuilder,
         strategies: list[StrategyBuilder],
         shmem_queue: IPCTokenQueue,
+        mab_bodies: list[MABBody] = [],
         rng_seed: int = 42,
     ) -> None: ...
     def populate(self, seed_builders: list[SeedGeneratorBuilder]) -> None: ...

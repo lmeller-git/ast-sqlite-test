@@ -5,14 +5,13 @@ use std::{
     io::{self, Read},
     ops::RangeBounds,
     path::PathBuf,
-    sync::{Arc, atomic::AtomicU32},
+    sync::Arc,
 };
 
 use lsf_core::entry::{CorpusEntry, Meta, RawEntry};
 use lsf_cov::ipc::{IPCToken, SharedMemHandle};
-use lsf_feedback::{AcceptanceReason, RejectionReason, TestOutcome, TestableEntry};
+use lsf_feedback::{AcceptanceReason, RejectionReason, TestOutcome, TestableEntry, mab::MABBody};
 use lsf_mutate::{MutationState, MutationStrategy};
-use portable_atomic::AtomicF64;
 use rand::{SeedableRng, rngs::SmallRng};
 use sqlparser::{dialect::SQLiteDialect, parser::Parser};
 
@@ -26,9 +25,7 @@ pub struct Engine {
     scheduler: Box<dyn Schedule>,
     strategies: Vec<Box<dyn MutationStrategy>>,
     rng: SmallRng,
-    scheduler_norm: Arc<AtomicF64>,
-    mutation_norm: Arc<AtomicF64>,
-    epoch: Arc<AtomicU32>,
+    mab_bodies: Vec<Arc<MABBody>>,
 }
 
 impl Debug for Engine {
@@ -42,43 +39,23 @@ impl Debug for Engine {
 
 impl Engine {
     pub fn new(
-        mut scheduler: Box<dyn Schedule>,
-        mut strategies: Vec<Box<dyn MutationStrategy>>,
+        scheduler: Box<dyn Schedule>,
+        strategies: Vec<Box<dyn MutationStrategy>>,
         shmem_queue: Arc<SharedMemHandle>,
+        mab_bodies: Vec<Arc<MABBody>>,
         rng_seed: u64,
     ) -> Self {
-        let scheduler_norm: Arc<AtomicF64> = Arc::default();
-        let mutation_norm: Arc<AtomicF64> = Arc::default();
-        let epoch: Arc<std::sync::atomic::AtomicU32> = Arc::default();
-
-        scheduler.init(crate::SchedulerContext {
-            total_attempts: scheduler_norm.clone(),
-            epoch: epoch.clone(),
-        });
-
-        for s in &mut strategies {
-            s.init(lsf_mutate::StrategyContext {
-                total_attempts: mutation_norm.clone(),
-            });
-        }
-
         Self {
             scheduler,
             strategies,
             corpus: Corpus::new(shmem_queue.shmem_size),
             shmem_queue,
             rng: SmallRng::seed_from_u64(rng_seed),
-            scheduler_norm,
-            mutation_norm,
-            epoch,
+            mab_bodies,
         }
     }
 
-    pub fn with_scheduler(mut self, mut scheduler: Box<dyn Schedule>) -> Self {
-        scheduler.init(crate::SchedulerContext {
-            total_attempts: self.scheduler_norm.clone(),
-            epoch: self.epoch.clone(),
-        });
+    pub fn with_scheduler(mut self, scheduler: Box<dyn Schedule>) -> Self {
         self.scheduler = scheduler;
         self
     }
@@ -87,11 +64,12 @@ impl Engine {
         self.strategies.clear();
     }
 
-    pub fn add_strategy(&mut self, mut strategy: Box<dyn MutationStrategy>) {
-        strategy.init(lsf_mutate::StrategyContext {
-            total_attempts: self.mutation_norm.clone(),
-        });
+    pub fn add_strategy(&mut self, strategy: Box<dyn MutationStrategy>) {
         self.strategies.push(strategy);
+    }
+
+    pub fn add_mab_body(&mut self, mab: Arc<MABBody>) {
+        self.mab_bodies.push(mab);
     }
 
     pub fn mutate_batch(&mut self, batch_size: usize) -> Generation {
@@ -106,19 +84,19 @@ impl Engine {
             .iter()
             .filter_map(|entry| {
                 let mut state = MutationState::Unchanged;
-                let mut hooks = entry.hooks.clone();
-                let build_hooks = entry.build_hooks.clone();
+                let mut hooks = entry.applied_rule_stats.clone();
+                let build_hooks = entry.parent_stats.clone();
                 let mut current_parent: &mut TestableEntry<RawEntry> =
                     &mut TestableEntry::new((*entry.as_ref()).clone());
 
                 for strategy in &self.strategies {
-                    current_parent.build_hooks = build_hooks.clone();
+                    current_parent.parent_stats = build_hooks.clone();
                     if let Ok(MutationState::Mutated(next)) =
                         strategy.breed(current_parent, &next_batch, &mut self.rng)
                     {
                         state = MutationState::Mutated(next);
                         current_parent = if let MutationState::Mutated(next_parent) = &mut state {
-                            hooks.append(&mut next_parent.hooks);
+                            hooks.append(&mut next_parent.applied_rule_stats);
                             next_parent
                         } else {
                             unreachable!()
@@ -127,20 +105,17 @@ impl Engine {
                 }
 
                 if let MutationState::Mutated(state) = &mut state {
-                    state.hooks.append(&mut hooks);
+                    state.applied_rule_stats.append(&mut hooks);
                 }
 
                 state.into_option()
             })
             .collect();
 
-        let current_epoch = self
-            .epoch
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-
-        if current_epoch.is_multiple_of(GRANULARITY as u32) {
-            self.decay();
+        for body in &self.mab_bodies {
+            body.tick_by(1);
         }
+
         generation
     }
 
@@ -159,7 +134,7 @@ impl Engine {
             .try_insert(raw_entry.id(), raw_entry.ast());
 
         if !is_diverse && new_edges.is_empty() {
-            raw_entry.fire_hooks(TestOutcome::Rejected(RejectionReason::Bad));
+            raw_entry.fire_rule_hooks(TestOutcome::Rejected(RejectionReason::Bad));
             return;
         }
 
@@ -174,14 +149,14 @@ impl Engine {
             );
 
             if !is_best && !is_diverse {
-                raw_entry.fire_hooks(TestOutcome::Rejected(RejectionReason::Bad));
+                raw_entry.fire_rule_hooks(TestOutcome::Rejected(RejectionReason::Bad));
                 return;
             }
-            raw_entry.fire_hooks(TestOutcome::Accepted(AcceptanceReason::CovIncrease(
+            raw_entry.fire_rule_hooks(TestOutcome::Accepted(AcceptanceReason::CovIncrease(
                 meta.new_cov_nodes,
             )));
         } else {
-            raw_entry.fire_hooks(TestOutcome::Accepted(AcceptanceReason::IsDiverse));
+            raw_entry.fire_rule_hooks(TestOutcome::Accepted(AcceptanceReason::IsDiverse));
         }
 
         let entry = Into::<RawEntry>::into(raw_entry).into_corpus_entry(meta);
@@ -191,32 +166,12 @@ impl Engine {
     }
 
     pub fn commit_generation(&mut self, generation: SelectedGeneration) {
-        self.corpus.entries.extend(
-            generation
-                .members
-                .into_iter()
-                .map(|entry| (entry.id(), entry)),
-        );
-    }
-
-    pub fn decay(&self) {
-        const DECAY_RATE: f64 = 0.999;
-
-        let decay = DECAY_RATE.powf(GRANULARITY as f64);
-        _ = self.scheduler_norm.fetch_update(
-            std::sync::atomic::Ordering::Relaxed,
-            std::sync::atomic::Ordering::Relaxed,
-            |f| Some(f * decay),
-        );
-        _ = self.mutation_norm.fetch_update(
-            std::sync::atomic::Ordering::Relaxed,
-            std::sync::atomic::Ordering::Relaxed,
-            |f| Some(f * decay),
-        );
-        self.scheduler.decay(decay);
-        for s in &self.strategies {
-            s.decay(decay);
-        }
+        self.corpus
+            .entries
+            .extend(generation.members.into_iter().map(|entry| {
+                self.scheduler.add_entry(&entry);
+                (entry.id(), entry)
+            }));
     }
 
     pub fn return_token(&mut self, token: Box<IPCToken>) {
@@ -428,6 +383,7 @@ mod tests {
             Box::new(WeightedRandomScheduler {}),
             vec![Box::new(SpliceIn {})],
             Arc::new(SharedMemHandle::new(1, 1)),
+            vec![],
             42,
         );
         engine.clear_strategies();

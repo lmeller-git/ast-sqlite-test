@@ -20,6 +20,7 @@ use visitor::{
 use crate::engine::{
     IPCTokenHandle,
     IPCTokenQueue,
+    MABBody,
     SeedGeneratorBuilder,
     TestResult,
     TreeMutatorOperation,
@@ -204,7 +205,7 @@ impl TestableEntry {
     }
 
     pub fn fire_hooks(&self, outcome: TestOutcome) {
-        self.0.as_ref().unwrap().fire_hooks(outcome.0);
+        self.0.as_ref().unwrap().fire_rule_hooks(outcome.0);
     }
 
     #[staticmethod]
@@ -236,6 +237,7 @@ fn lib_sf(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     engine.add_class::<IPCTokenQueue>()?;
     engine.add_class::<TestResult>()?;
     engine.add_class::<TreeMutatorOperation>()?;
+    engine.add_class::<MABBody>()?;
     m.add_submodule(&engine)?;
 
     let visitor = PyModule::new(py, "visitor")?;

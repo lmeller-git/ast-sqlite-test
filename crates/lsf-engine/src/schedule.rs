@@ -1,19 +1,12 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicU32, Ordering},
-};
+use std::sync::{Arc, atomic::Ordering};
 
 use indexmap::IndexMap;
-use lsf_core::entry::{ID, Meta, RawEntry};
+use lsf_core::entry::{CorpusEntry, ID, Meta, RawEntry};
 use lsf_feedback::{
-    AcceptanceReason,
     AdaptiveStatistics,
-    FeedbackHook,
-    RejectionReason,
-    TestOutcome,
     TestableEntry,
+    mab::{MABArm, MABBody},
 };
-use portable_atomic::AtomicF64;
 use rand::{
     Rng,
     distr::{Distribution, weighted::WeightedIndex},
@@ -37,15 +30,7 @@ pub trait Schedule: Send + Sync {
         self.next_batch(from, 1, rng).into_iter().next()
     }
 
-    fn init(&mut self, _ctx: SchedulerContext) {}
-
-    fn decay(&self, _rate: f64) {}
-}
-
-#[derive(Clone, Default)]
-pub struct SchedulerContext {
-    pub total_attempts: Arc<AtomicF64>,
-    pub epoch: Arc<AtomicU32>,
+    fn add_entry(&mut self, _entry: &CorpusEntry) {}
 }
 
 #[derive(Default)]
@@ -110,9 +95,9 @@ impl Schedule for WeightedRandomScheduler {
 
 #[derive(Default)]
 pub struct AdaptiveWeightedRandomScheduler {
-    stat_mapping: IndexMap<ID, Arc<AdaptiveCorpusStats>>,
+    stat_mapping: IndexMap<ID, Arc<MABArm>>,
     dist: Option<WeightedIndex<f64>>,
-    ctx: SchedulerContext,
+    body: Arc<MABBody>,
 }
 
 impl Schedule for AdaptiveWeightedRandomScheduler {
@@ -128,22 +113,27 @@ impl Schedule for AdaptiveWeightedRandomScheduler {
 
         if self.dist.is_none()
             || self
-                .ctx
+                .body
                 .epoch
                 .load(Ordering::Relaxed)
                 .is_multiple_of(GRANULARITY as u32)
         {
-            let weights: Vec<_> =
-                from.entries
-                    .keys()
-                    .map(|id| {
-                        let stats = self.stat_mapping.entry(*id).or_insert(Arc::new(
-                            AdaptiveCorpusStats::new(self.ctx.total_attempts.clone()),
-                        ));
+            let weights: Vec<_> = from
+                .entries
+                .keys()
+                .map(|id| {
+                    let stats = self
+                        .stat_mapping
+                        .entry(*id)
+                        .or_insert(Arc::new(MABArm::new(self.body.clone())));
 
-                        stats.calculate_score()
-                    })
-                    .collect();
+                    let mut stats = stats.calculate_score();
+                    if stats.is_infinite() {
+                        stats = 0.5;
+                    }
+                    stats
+                })
+                .collect();
 
             let dist = match WeightedIndex::new(&weights) {
                 Ok(dist) => dist,
@@ -167,161 +157,5 @@ impl Schedule for AdaptiveWeightedRandomScheduler {
                 })
             })
             .collect()
-    }
-
-    fn init(&mut self, ctx: SchedulerContext) {
-        self.ctx = ctx
-    }
-
-    fn decay(&self, rate: f64) {
-        for stat in self.stat_mapping.values() {
-            _ = stat
-                .attempts
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
-            _ = stat
-                .cov_increases
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
-            _ = stat
-                .accepted
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
-            _ = stat
-                .syntax_err
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
-            _ = stat
-                .crash
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f * rate));
-        }
-    }
-}
-
-const ATTEMPT_EPS: f64 = 0.0001;
-const TOTAL_ATTEMPTS_EPS: f64 = 0.0001;
-
-#[derive(Default)]
-pub struct AdaptiveCorpusStats {
-    attempts: AtomicF64,
-    accepted: AtomicF64,
-    cov_increases: AtomicF64,
-    syntax_err: AtomicF64,
-    crash: AtomicF64,
-    total_attempts: Arc<AtomicF64>,
-}
-
-impl AdaptiveCorpusStats {
-    fn new(total_attempts: Arc<AtomicF64>) -> Self {
-        Self {
-            total_attempts,
-            ..Default::default()
-        }
-    }
-}
-
-impl AdaptiveStatistics for AdaptiveCorpusStats {
-    fn update(&self, test_result: lsf_feedback::TestOutcome) {
-        match test_result {
-            TestOutcome::Rejected(r) => match r {
-                RejectionReason::SyntaxError => {
-                    self.syntax_err.fetch_add(1., Ordering::Relaxed);
-                }
-                RejectionReason::TriggersCrash => {
-                    self.crash.fetch_add(1., Ordering::Relaxed);
-                }
-                RejectionReason::Bad => {}
-            },
-            TestOutcome::Accepted(s) => match s {
-                AcceptanceReason::CovIncrease(n_found) => {
-                    self.accepted.fetch_add(1., Ordering::Relaxed);
-                    self.cov_increases
-                        .fetch_add(n_found as f64, Ordering::Relaxed);
-                }
-                AcceptanceReason::IsDiverse => {
-                    self.accepted.fetch_add(1., Ordering::Relaxed);
-                }
-            },
-            _ => {}
-        }
-    }
-
-    fn calculate_score(&self) -> f64 {
-        // ucb1
-        // TODO add more relevant terms
-        let total_attempts = self.total_attempts.load(Ordering::Relaxed);
-        let attempts = self.attempts.load(Ordering::Relaxed);
-
-        // we want to
-        // increase score for accepted ratio, coverage increase and crashes (likely a bug) and reduce it for syntax errors, as they are somewhat uninteresting
-        let cov_inc_rate = (self.cov_increases.load(Ordering::Relaxed)) / (attempts + ATTEMPT_EPS);
-        let exploration =
-            (4. * (total_attempts + TOTAL_ATTEMPTS_EPS).ln() / (attempts + ATTEMPT_EPS)).sqrt();
-
-        cov_inc_rate + exploration
-    }
-}
-
-impl FeedbackHook for AdaptiveCorpusStats {
-    fn fire(&self, test_outcome: lsf_feedback::TestOutcome) {
-        self.update(test_outcome);
-    }
-}
-
-impl Clone for AdaptiveCorpusStats {
-    fn clone(&self) -> Self {
-        Self {
-            attempts: self.attempts.load(Ordering::Relaxed).into(),
-            accepted: self.accepted.load(Ordering::Relaxed).into(),
-            cov_increases: self.cov_increases.load(Ordering::Relaxed).into(),
-            syntax_err: self.syntax_err.load(Ordering::Relaxed).into(),
-            crash: self.crash.load(Ordering::Relaxed).into(),
-            total_attempts: self.total_attempts.clone(),
-        }
-    }
-}
-
-impl Eq for AdaptiveCorpusStats {}
-
-impl PartialEq for AdaptiveCorpusStats {
-    fn eq(&self, other: &Self) -> bool {
-        self.attempts
-            .load(Ordering::Relaxed)
-            .eq(&other.attempts.load(Ordering::Relaxed))
-            && self
-                .accepted
-                .load(Ordering::Relaxed)
-                .eq(&other.accepted.load(Ordering::Relaxed))
-            && self
-                .cov_increases
-                .load(Ordering::Relaxed)
-                .eq(&other.cov_increases.load(Ordering::Relaxed))
-            && self
-                .syntax_err
-                .load(Ordering::Relaxed)
-                .eq(&other.syntax_err.load(Ordering::Relaxed))
-            && self
-                .crash
-                .load(Ordering::Relaxed)
-                .eq(&other.crash.load(Ordering::Relaxed))
-    }
-}
-
-// update attempts byt one per mutation applied to the scheduled test.
-// This counteracts random biasing of testcases, which randomly were mutated by more rules and thus expected to achieve a btter result
-
-pub struct AdaptiveCorpusStatsUpdateHook {
-    raw: Arc<AdaptiveCorpusStats>,
-}
-
-impl FeedbackHook for AdaptiveCorpusStatsUpdateHook {
-    fn fire(&self, test_outcome: TestOutcome) {
-        match test_outcome {
-            TestOutcome::Mutated => {
-                self.raw.attempts.fetch_add(1., Ordering::Relaxed);
-                self.raw.total_attempts.fetch_add(1., Ordering::Relaxed);
-            }
-            TestOutcome::NOOP => {
-                self.raw.attempts.fetch_add(1., Ordering::Relaxed);
-                self.raw.total_attempts.fetch_add(1., Ordering::Relaxed);
-            }
-            _ => {}
-        }
     }
 }

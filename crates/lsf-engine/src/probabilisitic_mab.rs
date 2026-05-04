@@ -1,0 +1,184 @@
+use std::sync::Arc;
+
+use lsf_core::entry::ID;
+use lsf_feedback::{
+    AdaptiveStatistics,
+    TestableEntry,
+    mab::{MABArm, MABBody},
+};
+use rand::RngExt;
+
+use crate::Schedule;
+
+const ZERO_WEIGHT: f64 = 0.001;
+const MAX_WEIGHT: f64 = 1e42;
+
+pub fn align_up(n: usize, alignment: usize) -> usize {
+    (n + alignment - 1) & !(alignment - 1)
+}
+
+pub struct SmallSchedueldItem<T> {
+    pub epoch: u32,
+    pub stats: Arc<MABArm>,
+    pub item: T,
+}
+
+impl<T> SmallSchedueldItem<T> {
+    pub fn new(body: Arc<MABBody>, item: T) -> Self {
+        let epoch = body.epoch.load(std::sync::atomic::Ordering::Relaxed);
+        let stats = MABArm::new(body);
+        Self {
+            epoch,
+            stats: stats.into(),
+            item,
+        }
+    }
+}
+
+pub struct BlockSumTable {
+    leaves: Vec<f64>,
+    blocks: Vec<f64>,
+    total_sum: f64,
+    block_size: usize,
+}
+
+impl BlockSumTable {
+    pub fn new(initial_capacity: usize) -> Self {
+        let block_size = (initial_capacity as f64).sqrt().ceil() as usize;
+        let block_size = align_up(block_size, 2);
+
+        Self {
+            leaves: Vec::with_capacity(initial_capacity),
+            blocks: Vec::with_capacity(initial_capacity / block_size + 1),
+            total_sum: 0.0,
+            block_size,
+        }
+    }
+
+    pub fn push(&mut self, weight: f64) -> usize {
+        let weight = weight.clamp(ZERO_WEIGHT, MAX_WEIGHT);
+        let idx = self.leaves.len();
+        let block_idx = idx / self.block_size;
+
+        if block_idx >= self.blocks.len() {
+            self.blocks.push(0.0);
+        }
+
+        self.leaves.push(weight);
+        self.blocks[block_idx] += weight;
+        self.total_sum += weight;
+        idx
+    }
+
+    pub fn remove(&mut self, idx: usize) {
+        let block_idx = idx / self.block_size;
+
+        if let Some(block) = self.blocks.get_mut(block_idx)
+            && let Some(leave) = self.leaves.get_mut(idx)
+        {
+            *block -= *leave;
+            self.total_sum -= *leave;
+            *leave = 0.;
+        }
+    }
+
+    pub fn update(&mut self, idx: usize, weight: f64) {
+        if let Some(leave) = self.leaves.get_mut(idx)
+            && let Some(block) = self.blocks.get_mut(idx / self.block_size)
+        {
+            let new_weight = weight.clamp(ZERO_WEIGHT, MAX_WEIGHT);
+            let delta = new_weight - *leave;
+            *leave = new_weight;
+            *block += delta;
+            self.total_sum += delta
+        }
+    }
+
+    pub fn sample(&self, rng: &mut dyn rand::Rng) -> Option<usize> {
+        if self.leaves.is_empty() {
+            return None;
+        }
+
+        let mut target = rng.random_range(0.0..self.total_sum);
+
+        let mut block_idx = 0;
+        for (i, &sum) in self.blocks.iter().enumerate() {
+            if target < sum {
+                block_idx = i;
+                break;
+            }
+            target -= sum;
+        }
+
+        let start = block_idx * self.block_size;
+        let end = (start + self.block_size).min(self.leaves.len());
+
+        for (i, &weight) in self.leaves[start..end].iter().enumerate() {
+            if target < weight {
+                return Some(start + i);
+            }
+            target -= weight;
+        }
+
+        Some(self.leaves.len() - 1)
+    }
+}
+
+pub struct ProbabilisticMABScheduler {
+    queue: BlockSumTable,
+    id_mapping: Vec<SmallSchedueldItem<ID>>,
+    mab: Arc<MABBody>,
+}
+
+impl ProbabilisticMABScheduler {
+    pub fn new(body: Arc<MABBody>) -> Self {
+        Self {
+            queue: BlockSumTable::new(10000),
+            id_mapping: Vec::with_capacity(10000),
+            mab: body,
+        }
+    }
+}
+
+impl Schedule for ProbabilisticMABScheduler {
+    fn next_batch<'a>(
+        &mut self,
+        from: &'a crate::Corpus,
+        size: usize,
+        rng: &mut dyn rand::Rng,
+    ) -> Vec<lsf_feedback::TestableEntry<&'a lsf_core::entry::RawEntry>> {
+        const ACCEPT_UNDER: u32 = 50;
+
+        let current_epoch = self.mab.epoch.load(std::sync::atomic::Ordering::Relaxed);
+
+        let mut parents = Vec::with_capacity(size);
+
+        while parents.len() < size
+            && let Some(top) = self.queue.sample(rng)
+        {
+            if let Some(item) = self.id_mapping.get_mut(top) {
+                if item.epoch.abs_diff(current_epoch) > ACCEPT_UNDER {
+                    item.epoch = current_epoch;
+                    self.queue.update(top, item.stats.calculate_score());
+                } else if let Some(entry) = from.entries.get(&item.item) {
+                    parents.push(TestableEntry::new(entry.raw()));
+                }
+            }
+        }
+
+        parents
+    }
+
+    fn add_entry(&mut self, entry: &lsf_core::entry::CorpusEntry) {
+        let item = SmallSchedueldItem::new(self.mab.clone(), entry.id());
+        let idx = self.queue.push(item.stats.calculate_score());
+        debug_assert_eq!(idx, self.id_mapping.len());
+        self.id_mapping.push(item);
+    }
+}
+
+impl Default for ProbabilisticMABScheduler {
+    fn default() -> Self {
+        Self::new(MABBody::default().into())
+    }
+}

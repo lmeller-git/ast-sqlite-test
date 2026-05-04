@@ -48,9 +48,9 @@ impl MutationStrategy for RandomMutationSampler {
         }
 
         // we can assume that parent.hooks is empty, since it is part of the selected parents
-        debug_assert!(parent.hooks.is_empty());
+        debug_assert!(parent.applied_rule_stats.is_empty());
         let mut status = MutationState::Unchanged;
-        let mut hooks = parent.hooks.clone();
+        let mut hooks = parent.applied_rule_stats.clone();
         let mut current_parent: &TestableEntry<RawEntry> = parent;
 
         for i in 0..n_chosen {
@@ -62,10 +62,10 @@ impl MutationStrategy for RandomMutationSampler {
                     next.parents_mut().extend(current_parent.parents());
                 }
 
-                hooks.append(&mut next.hooks);
+                hooks.append(&mut next.applied_rule_stats);
                 // we can further assume that the childs build hooks are empty, since consumers "use but not add" build hooks
-                debug_assert!(next.build_hooks.is_empty());
-                next.build_hooks.extend(parent.build_hooks.clone());
+                debug_assert!(next.parent_stats.is_empty());
+                next.parent_stats.extend(parent.parent_stats.clone());
 
                 status = MutationState::Mutated(next);
                 current_parent = if let MutationState::Mutated(next) = &status {
@@ -77,22 +77,10 @@ impl MutationStrategy for RandomMutationSampler {
         }
 
         if let MutationState::Mutated(ref mut next) = status {
-            next.hooks.append(&mut hooks);
+            next.applied_rule_stats.append(&mut hooks);
         }
 
         Ok(status)
-    }
-
-    fn init(&mut self, ctx: crate::StrategyContext) {
-        for s in &mut self.choices {
-            s.init(ctx.clone());
-        }
-    }
-
-    fn decay(&self, rate: f64) {
-        for s in &self.choices {
-            s.decay(rate);
-        }
     }
 }
 
@@ -132,14 +120,6 @@ impl MutationStrategy for Randomly {
         } else {
             Ok(MutationState::Unchanged)
         }
-    }
-
-    fn init(&mut self, ctx: crate::StrategyContext) {
-        self.over.init(ctx);
-    }
-
-    fn decay(&self, rate: f64) {
-        self.over.decay(rate);
     }
 }
 
