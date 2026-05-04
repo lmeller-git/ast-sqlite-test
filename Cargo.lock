@@ -354,6 +354,7 @@ name = "lsf-feedback"
 version = "0.1.0"
 dependencies = [
  "lsf-core",
+ "portable-atomic",
 ]
 
 [[package]]

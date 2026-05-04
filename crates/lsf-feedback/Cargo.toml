@@ -8,3 +8,4 @@ repository.workspace = true
 
 [dependencies]
 lsf-core = { workspace = true  }
+portable-atomic = { workspace = true }

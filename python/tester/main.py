@@ -23,10 +23,23 @@ async def main(args: Namespace):
     ipc_queue = engine.IPCTokenQueue(CONCURRENCY_LIMIT, max_edges)
     oracle_queue = asyncio.PriorityQueue(1024)
 
+    corpus_scheduler_body = engine.MABBody()
+    rule_scheduler_body = engine.MABBody()
+    havoc_rule_scheduler_body = engine.MABBody()
+    struct_rule_scheduler_body = engine.MABBody()
+    sem_rule_scheduler_body = engine.MABBody()
+
     mutation_engine = engine.Engine(
-        engine.SchedulerBuilder.adaptive_weighted_random(),
+        engine.SchedulerBuilder.weighted_ucb1(corpus_scheduler_body),
         [engine.StrategyBuilder.table_guard()],
         ipc_queue,
+        [
+            corpus_scheduler_body,
+            rule_scheduler_body,
+            havoc_rule_scheduler_body,
+            sem_rule_scheduler_body,
+            struct_rule_scheduler_body,
+        ],
         RNG,
     )
 
@@ -80,10 +93,16 @@ async def main(args: Namespace):
     [
         mutation_engine.add_strategy(strat)
         for strat in [
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.splice_in()),
-            engine.StrategyBuilder.scheduled(make_ruleset_havoc()),
-            engine.StrategyBuilder.scheduled(make_ruleset_semantic()),
-            engine.StrategyBuilder.scheduled(make_ruleset_structural()),
+            engine.StrategyBuilder.ucb1(
+                rule_scheduler_body,
+                [
+                    engine.StrategyBuilder.splice_in(),
+                    make_ruleset_havoc(havoc_rule_scheduler_body),
+                    make_ruleset_semantic(sem_rule_scheduler_body),
+                    make_ruleset_structural(struct_rule_scheduler_body),
+                ],
+                1,
+            ),
             engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.7),
             engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_name_guard(), 0.7),
         ]

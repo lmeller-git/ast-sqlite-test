@@ -1,53 +1,45 @@
 from lib_sf import engine
 
 
-def make_ruleset_havoc():
-    return engine.StrategyBuilder.random_sampler(
-        3,
-        5,
+def make_ruleset_havoc(body: engine.MABBody):
+    return engine.StrategyBuilder.ucb1(
+        body,
         [
-            engine.StrategyBuilder.scheduled(
-                engine.StrategyBuilder.tree_mutate_stmt(engine.TreeMutatorOperation.null_random())
-            ),
-            engine.StrategyBuilder.scheduled(
-                engine.StrategyBuilder.tree_mutate_expr(engine.TreeMutatorOperation.null_random())
-            ),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.type_cast()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.null_inject()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.op_flip()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.recursive_expand_expr()),
+            engine.StrategyBuilder.tree_mutate_stmt(engine.TreeMutatorOperation.null_random()),
+            engine.StrategyBuilder.tree_mutate_expr(engine.TreeMutatorOperation.null_random()),
+            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.type_cast(), body),
+            engine.StrategyBuilder.null_inject(),
+            engine.StrategyBuilder.op_flip(),
+            engine.StrategyBuilder.recursive_expand_expr(),
         ],
+        2
     )
 
 
-def make_ruleset_semantic():
-    return engine.StrategyBuilder.random_sampler(
-        2,
-        4,
+def make_ruleset_semantic(body: engine.MABBody):
+    return engine.StrategyBuilder.ucb1(
+        body,
         [
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.num_bounds()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.op_flip()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.null_inject()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.type_cast()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.relation_shuffle()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.expr_shuffle()),
+            engine.StrategyBuilder.num_bounds(),
+            engine.StrategyBuilder.op_flip(),
+            engine.StrategyBuilder.null_inject(),
+            engine.StrategyBuilder.type_cast(),
+            engine.StrategyBuilder.relation_shuffle(),
+            engine.StrategyBuilder.expr_shuffle(),
         ],
+        2
     )
 
 
-def make_ruleset_structural():
-    return engine.StrategyBuilder.random_sampler(
-        2,
-        4,
+def make_ruleset_structural(body: engine.MABBody):
+    return engine.StrategyBuilder.ucb1(
+        body,
         [
-            engine.StrategyBuilder.scheduled(
-                engine.StrategyBuilder.tree_mutate_stmt(engine.TreeMutatorOperation.shuffle_two())
-            ),
-            engine.StrategyBuilder.scheduled(
-                engine.StrategyBuilder.tree_mutate_expr(engine.TreeMutatorOperation.shuffle_two())
-            ),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.set_ops()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.sub_query()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.recursive_expand_expr()),
+            engine.StrategyBuilder.tree_mutate_stmt(engine.TreeMutatorOperation.shuffle_two()),
+            engine.StrategyBuilder.tree_mutate_expr(engine.TreeMutatorOperation.shuffle_two()),
+            engine.StrategyBuilder.set_ops(),
+            engine.StrategyBuilder.sub_query(),
+            engine.StrategyBuilder.recursive_expand_expr(),
         ],
+        2
     )

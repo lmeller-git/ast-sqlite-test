@@ -1,8 +1,5 @@
-use std::sync::Arc;
-
 use lsf_core::entry::{ID, RawEntry};
 use lsf_feedback::TestableEntry;
-use portable_atomic::AtomicF64;
 use rand::Rng;
 use thiserror::Error;
 
@@ -48,21 +45,13 @@ pub trait MutationStrategy: Send + Sync {
         let r = self.breed_inner(parent, parent_gen, rng);
         match r {
             Ok(MutationState::Mutated(_)) => {
-                parent.fire_build_hooks(lsf_feedback::TestOutcome::Mutated)
+                parent.fire_parent_hooks(lsf_feedback::TestOutcome::Mutated)
             }
-            _ => parent.fire_hooks(lsf_feedback::TestOutcome::NOOP),
+            _ => parent.fire_parent_hooks(lsf_feedback::TestOutcome::NOOP),
         }
 
         r
     }
-
-    fn init(&mut self, _ctx: StrategyContext) {}
-    fn decay(&self, _rate: f64) {}
-}
-
-#[derive(Clone, Default)]
-pub struct StrategyContext {
-    pub total_attempts: Arc<AtomicF64>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

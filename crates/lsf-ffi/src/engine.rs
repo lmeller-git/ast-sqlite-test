@@ -6,7 +6,9 @@ use lsf_engine::{
     Engine as RawEngine,
     Generation as RawGeneration,
     LiteralSeeder,
+    MABScheduler,
     ObtainSeed,
+    ProbabilisticMABScheduler,
     Schedule,
     SeedDirReader,
     WeightedRandomScheduler,
@@ -42,17 +44,19 @@ pub struct Engine(RawEngine);
 #[pymethods]
 impl Engine {
     #[new]
-    #[pyo3(signature = (scheduler, strategies, shmem_queue, rng_seed = 42))]
+    #[pyo3(signature = (scheduler, strategies, shmem_queue, mab_bodies = Vec::new(), rng_seed = 42))]
     pub fn new(
         mut scheduler: PyRefMut<SchedulerBuilder>,
         mut strategies: Vec<PyRefMut<StrategyBuilder>>,
         shmem_queue: PyRef<IPCTokenQueue>,
+        mab_bodies: Vec<PyRef<MABBody>>,
         rng_seed: u64,
     ) -> Self {
         Self(RawEngine::new(
             scheduler.0.take().unwrap(),
             strategies.iter_mut().map(|s| s.0.take().unwrap()).collect(),
             shmem_queue.0.clone(),
+            mab_bodies.iter().map(|b| b.0.clone()).collect(),
             rng_seed,
         ))
     }
@@ -157,6 +161,17 @@ impl TestResult {
 }
 
 #[pyclass]
+pub struct MABBody(Arc<lsf_feedback::mab::MABBody>);
+
+#[pymethods]
+impl MABBody {
+    #[new]
+    pub fn new() -> Self {
+        Self(Arc::new(lsf_feedback::mab::MABBody::new()))
+    }
+}
+
+#[pyclass]
 pub struct SchedulerBuilder(Option<Box<dyn Schedule>>);
 
 #[pymethods]
@@ -169,6 +184,18 @@ impl SchedulerBuilder {
     #[staticmethod]
     pub fn adaptive_weighted_random() -> Self {
         Self(Some(Box::new(AdaptiveWeightedRandomScheduler::default())))
+    }
+
+    #[staticmethod]
+    pub fn ucb1(body: PyRef<MABBody>) -> Self {
+        Self(Some(Box::new(MABScheduler::new(body.0.clone()))))
+    }
+
+    #[staticmethod]
+    pub fn weighted_ucb1(body: PyRef<MABBody>) -> Self {
+        Self(Some(Box::new(ProbabilisticMABScheduler::new(
+            body.0.clone(),
+        ))))
     }
 }
 
@@ -263,9 +290,10 @@ impl StrategyBuilder {
     }
 
     #[staticmethod]
-    pub fn scheduled(mut strategy: PyRefMut<StrategyBuilder>) -> Self {
+    pub fn scheduled(mut strategy: PyRefMut<StrategyBuilder>, body: PyRef<MABBody>) -> Self {
         Self(Some(Box::new(AdaptiveStrategyScheduler::new(
             strategy.0.take().unwrap(),
+            body.0.clone(),
         ))))
     }
 
@@ -316,6 +344,20 @@ impl StrategyBuilder {
             chance_per_node,
             chance_per_level,
         })))
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (body, strategies, choose = 1))]
+    pub fn ucb1(
+        body: PyRef<MABBody>,
+        mut strategies: Vec<PyRefMut<StrategyBuilder>>,
+        choose: usize,
+    ) -> Self {
+        Self(Some(Box::new(lsf_mutate::MABScheduler::new(
+            body.0.clone(),
+            strategies.iter_mut().map(|s| s.0.take().unwrap()),
+            choose,
+        ))))
     }
 }
 

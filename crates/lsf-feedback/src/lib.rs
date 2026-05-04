@@ -5,10 +5,13 @@ use std::{
 };
 
 mod hooks;
+pub mod mab;
 mod stats;
 pub use hooks::*;
 use lsf_core::entry::RawEntry;
 pub use stats::*;
+
+use crate::mab::MABArm;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TestOutcome {
@@ -34,46 +37,46 @@ pub enum AcceptanceReason {
 #[derive(Clone)]
 pub struct TestableEntry<T> {
     entry: T,
-    pub hooks: Vec<Arc<dyn FeedbackHook>>,
-    pub build_hooks: Vec<Arc<dyn FeedbackHook>>,
+    pub applied_rule_stats: Vec<Arc<MABArm>>,
+    pub parent_stats: Vec<Arc<MABArm>>,
 }
 
 impl<T> TestableEntry<T> {
     pub fn new(entry: T) -> Self {
         Self {
             entry,
-            hooks: Vec::new(),
-            build_hooks: Vec::new(),
+            applied_rule_stats: Vec::new(),
+            parent_stats: Vec::new(),
         }
     }
 
-    pub fn attach_hook(&mut self, hook: Arc<dyn FeedbackHook>) {
-        self.hooks.push(hook);
+    pub fn attach_hook(&mut self, hook: Arc<MABArm>) {
+        self.applied_rule_stats.push(hook);
     }
 
-    pub fn with_hook(mut self, hook: Arc<dyn FeedbackHook>) -> Self {
+    pub fn with_hook(mut self, hook: Arc<MABArm>) -> Self {
         self.attach_hook(hook);
         self
     }
 
-    pub fn attach_build_hook(&mut self, hook: Arc<dyn FeedbackHook>) {
-        self.build_hooks.push(hook);
+    pub fn attach_build_hook(&mut self, hook: Arc<MABArm>) {
+        self.parent_stats.push(hook);
     }
 
-    pub fn with_build_hook(mut self, hook: Arc<dyn FeedbackHook>) -> Self {
+    pub fn with_build_hook(mut self, hook: Arc<MABArm>) -> Self {
         self.attach_build_hook(hook);
         self
     }
 
-    pub fn fire_hooks(&self, outcome: TestOutcome) {
-        for hook in &self.hooks {
-            hook.fire(outcome);
+    pub fn fire_rule_hooks(&self, outcome: TestOutcome) {
+        for hook in &self.applied_rule_stats {
+            hook.on_exec(outcome);
         }
     }
 
-    pub fn fire_build_hooks(&self, outcome: TestOutcome) {
-        for hook in &self.build_hooks {
-            hook.fire(outcome);
+    pub fn fire_parent_hooks(&self, outcome: TestOutcome) {
+        for hook in &self.parent_stats {
+            hook.on_mutate(outcome);
         }
     }
 }
@@ -108,8 +111,8 @@ impl<T> From<T> for TestableEntry<T> {
     fn from(entry: T) -> TestableEntry<T> {
         TestableEntry {
             entry,
-            hooks: Vec::new(),
-            build_hooks: Vec::new(),
+            applied_rule_stats: Vec::new(),
+            parent_stats: Vec::new(),
         }
     }
 }
@@ -134,7 +137,7 @@ where
             f,
             "TestableEntry with {:?} and {} attached hooks",
             self.entry,
-            self.hooks.len()
+            self.applied_rule_stats.len()
         )
     }
 }
