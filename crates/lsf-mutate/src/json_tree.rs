@@ -4,6 +4,7 @@ use lsf_core::{ast::AST, entry::RawEntry};
 use lsf_feedback::TestableEntry;
 use rand::RngExt;
 use serde::{Serialize, de::DeserializeOwned};
+use smallvec::smallvec;
 use sqlparser::ast::{
     Expr,
     Statement,
@@ -39,7 +40,7 @@ impl<T: AstNode + Send + Sync + Clone> MutationStrategy for TreeMutator<T> {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        parent_gen: &[TestableEntry<&RawEntry>],
+        parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         Ok(match self.operation {
@@ -78,7 +79,7 @@ impl<T: AstNode + Send + Sync + Clone> MutationStrategy for TreeMutator<T> {
                 });
 
                 if is_mutated {
-                    MutationState::Mutated(RawEntry::new(child_ast, [parent.id()].into()).into())
+                    MutationState::Mutated(RawEntry::new(child_ast, smallvec![parent.id()]).into())
                 } else {
                     MutationState::Unchanged
                 }
@@ -97,7 +98,7 @@ impl MutationStrategy for RecursiveExpandExpr {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        _parent_gen: &[TestableEntry<&RawEntry>],
+        _parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<MutationState, crate::MutationError> {
         let mut is_mutated = false;
@@ -147,7 +148,7 @@ impl MutationStrategy for RecursiveExpandExpr {
 
         if is_mutated {
             Ok(MutationState::Mutated(
-                RawEntry::new(child_ast, [parent.id()].into()).into(),
+                RawEntry::new(child_ast, smallvec![parent.id()]).into(),
             ))
         } else {
             Ok(MutationState::Unchanged)

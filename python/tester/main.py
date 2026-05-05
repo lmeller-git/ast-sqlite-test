@@ -1,7 +1,6 @@
 from lib_sf import engine
 from argparse import ArgumentParser, Namespace
 import asyncio
-import os
 import platform
 
 from lib_sf.lib_sf import TestableEntry
@@ -29,8 +28,14 @@ async def main(args: Namespace):
     struct_rule_scheduler_body = engine.MABBody()
     sem_rule_scheduler_body = engine.MABBody()
 
+    if args.save_to is not None:
+        corpus_handler = engine.CorpusManagerBuilder.dynamic_cache(args.save_to)
+    else:
+        corpus_handler = engine.CorpusManagerBuilder.in_memory()
+
     mutation_engine = engine.Engine(
         engine.SchedulerBuilder.weighted_ucb1(corpus_scheduler_body),
+        corpus_handler,
         [engine.StrategyBuilder.table_guard()],
         ipc_queue,
         [
@@ -110,9 +115,6 @@ async def main(args: Namespace):
 
     snapshot = mutation_engine.snapshot()
 
-    for entry in snapshot:
-        print(entry.to_sql_string())
-
     tasks = [
         run_single_mutation(
             TestableEntry.from_raw(entry.clone_raw()),
@@ -132,7 +134,7 @@ async def main(args: Namespace):
 
     print(f"Done executing {r.__len__()} setup queries", flush=True)
 
-    mutation_engine.gc()
+    # mutation_engine.gc()
 
     print("\n===========\ninit done, entering loop\n==================\n")
 
@@ -140,16 +142,6 @@ async def main(args: Namespace):
         fuzzing_loop(mutation_engine, ipc_queue, oracle_queue, args.stop_at, args.test_path),
         oracle_task,
     )
-
-    if args.save_to is not None:
-        print(f"Saving {mutation_engine.corpus_size()} queries to {args.save_to}\n", flush=True)
-
-        snapshot = mutation_engine.snapshot()
-
-        os.makedirs(args.save_to, exist_ok=True)
-        for i, query in enumerate(snapshot):
-            with open(f"{args.save_to}/query_{i}.sql", "w", encoding="utf-8") as f:
-                _ = f.write(query.to_sql_string())
 
 
 def add(n1: int, n2: int) -> int:

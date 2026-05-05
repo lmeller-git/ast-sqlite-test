@@ -17,3 +17,6 @@ rand = { workspace = true }
 portable-atomic = { workspace = true }
 indexmap = "2.13.0"
 siphasher = "1.0.2"
+smallvec = { workspace = true }
+priority-queue = "2.7.0"
+ordered-float = "5.3.0"

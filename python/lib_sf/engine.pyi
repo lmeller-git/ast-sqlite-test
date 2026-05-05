@@ -9,6 +9,12 @@ class MABBody:
     def __init__(self) -> None: ...
 
 
+class CorpusManagerBuilder:
+    @staticmethod
+    def dynamic_cache(cache_dir: str) -> CorpusManagerBuilder: ...
+    @staticmethod
+    def in_memory() -> CorpusManagerBuilder: ...
+
 class SchedulerBuilder:
     @staticmethod
     def weighted_random() -> SchedulerBuilder: ...
@@ -87,6 +93,7 @@ class Engine:
     def __init__(
         self,
         scheduler: SchedulerBuilder,
+        corpus_handler: CorpusManagerBuilder,
         strategies: list[StrategyBuilder],
         shmem_queue: IPCTokenQueue,
         mab_bodies: list[MABBody] = [],

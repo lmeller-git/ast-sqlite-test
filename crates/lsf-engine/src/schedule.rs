@@ -12,21 +12,17 @@ use rand::{
     distr::{Distribution, weighted::WeightedIndex},
 };
 
-use crate::{Corpus, GRANULARITY};
+use crate::{Corpus, CorpusHandler, GRANULARITY};
 
 pub trait Schedule: Send + Sync {
-    fn next_batch<'a>(
+    fn next_batch(
         &mut self,
-        from: &'a Corpus,
+        from: &mut Corpus,
         size: usize,
         rng: &mut dyn Rng,
-    ) -> Vec<TestableEntry<&'a RawEntry>>;
+    ) -> Vec<TestableEntry<RawEntry>>;
 
-    fn next<'a>(
-        &mut self,
-        from: &'a Corpus,
-        rng: &mut dyn Rng,
-    ) -> Option<TestableEntry<&'a RawEntry>> {
+    fn next(&mut self, from: &mut Corpus, rng: &mut dyn Rng) -> Option<TestableEntry<RawEntry>> {
         self.next_batch(from, 1, rng).into_iter().next()
     }
 
@@ -56,24 +52,26 @@ impl WeightedRandomScheduler {
         weight
     }
 }
-
+// DO NOT USE. VERY INEFFICIENT TODO IMPROVE
 impl Schedule for WeightedRandomScheduler {
-    fn next_batch<'a>(
+    fn next_batch(
         &mut self,
-        from: &'a Corpus,
+        from: &mut Corpus,
         size: usize,
         rng: &mut dyn Rng,
-    ) -> Vec<TestableEntry<&'a RawEntry>> {
-        if from.entries.is_empty() {
+    ) -> Vec<TestableEntry<RawEntry>> {
+        if from.size() == 0 {
             return Vec::new();
         }
 
-        let mut ids = Vec::with_capacity(from.entries.len());
-        let mut weights = Vec::with_capacity(from.entries.len());
+        let mut ids = Vec::with_capacity(from.size());
+        let mut weights = Vec::with_capacity(from.size());
 
-        for (id, entry) in from.entries.iter() {
-            ids.push(*id);
-            weights.push(Self::calculate_weight(entry.meta()));
+        for id in from.ids() {
+            if let Some(entry) = from.get(&id) {
+                ids.push(id);
+                weights.push(Self::calculate_weight(entry.meta()));
+            }
         }
 
         let dist = match WeightedIndex::new(&weights) {
@@ -85,9 +83,8 @@ impl Schedule for WeightedRandomScheduler {
             .take(size)
             .map(|idx| ids[idx])
             .filter_map(|id| {
-                from.entries
-                    .get(&id)
-                    .map(|entry| TestableEntry::new(entry.raw()))
+                from.get(&id)
+                    .map(|entry| TestableEntry::new(entry.raw().clone()))
             })
             .collect()
     }
@@ -101,13 +98,13 @@ pub struct AdaptiveWeightedRandomScheduler {
 }
 
 impl Schedule for AdaptiveWeightedRandomScheduler {
-    fn next_batch<'a>(
+    fn next_batch(
         &mut self,
-        from: &'a Corpus,
+        from: &mut Corpus,
         size: usize,
         rng: &mut dyn Rng,
-    ) -> Vec<TestableEntry<&'a RawEntry>> {
-        if from.entries.is_empty() {
+    ) -> Vec<TestableEntry<RawEntry>> {
+        if from.size() == 0 {
             return Vec::new();
         }
 
@@ -119,12 +116,12 @@ impl Schedule for AdaptiveWeightedRandomScheduler {
                 .is_multiple_of(GRANULARITY as u32)
         {
             let weights: Vec<_> = from
-                .entries
-                .keys()
+                .ids()
+                .into_iter()
                 .map(|id| {
                     let stats = self
                         .stat_mapping
-                        .entry(*id)
+                        .entry(id)
                         .or_insert(Arc::new(MABArm::new(self.body.clone())));
 
                     let mut stats = stats.calculate_score();
@@ -149,10 +146,10 @@ impl Schedule for AdaptiveWeightedRandomScheduler {
             .take(size)
             .filter_map(|idx| {
                 self.stat_mapping.get_index(idx).and_then(|(id, _)| {
-                    from.entries.get(id).and_then(|entry| {
+                    from.get(id).and_then(|entry| {
                         self.stat_mapping
                             .get_index(idx)
-                            .map(|s| TestableEntry::new(entry.raw()).with_hook(s.1.clone()))
+                            .map(|s| TestableEntry::new(entry.raw().clone()).with_hook(s.1.clone()))
                     })
                 })
             })

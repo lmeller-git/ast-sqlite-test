@@ -320,6 +320,7 @@ name = "lsf-core"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "smallvec",
  "sqlparser",
 ]
 
@@ -342,10 +343,13 @@ dependencies = [
  "lsf-cov",
  "lsf-feedback",
  "lsf-mutate",
+ "ordered-float",
  "portable-atomic",
+ "priority-queue",
  "rand 0.10.1",
  "serde",
  "siphasher",
+ "smallvec",
  "sqlparser",
 ]
 
@@ -374,6 +378,7 @@ dependencies = [
  "rand 0.10.1",
  "serde",
  "serde_json",
+ "smallvec",
  "sqlparser",
  "thiserror",
 ]
@@ -500,6 +505,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
+name = "ordered-float"
+version = "5.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7d950ca161dc355eaf28f82b11345ed76c6e1f6eb1f4f4479e0323b9e2fbd0e"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "owo-colors"
 version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -550,6 +564,17 @@ checksum = "479ca8adacdd7ce8f1fb39ce9ecccbfe93a3f1344b3d0d97f20bc0196208f62b"
 dependencies = [
  "proc-macro2",
  "syn",
+]
+
+[[package]]
+name = "priority-queue"
+version = "2.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93980406f12d9f8140ed5abe7155acb10bb1e69ea55c88960b9c2f117445ef96"
+dependencies = [
+ "equivalent",
+ "indexmap",
+ "serde",
 ]
 
 [[package]]
@@ -877,9 +902,9 @@ dependencies = [
 
 [[package]]
 name = "siphasher"
-version = "1.0.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2aa850e253778c88a04c3d7323b043aeda9d3e30d5971937c1855769763678e"
+checksum = "8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649"
 
 [[package]]
 name = "smallvec"
