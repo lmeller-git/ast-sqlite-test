@@ -13,6 +13,7 @@ pub trait CorpusHandler<T>: Sync + Send {
     fn get(&mut self, id: &ID) -> Option<CorpusEntry>;
     fn update(&mut self, id: &ID, s: T);
     fn insert(&mut self, entry: CorpusEntry, s: T);
+    fn resize(&mut self);
     fn ids(&self) -> Vec<ID>;
     fn clear(&mut self);
     fn size(&self) -> usize;
@@ -59,6 +60,10 @@ impl CorpusHandler<f64> for Corpus {
         self.diversity.hashes.clear();
     }
 
+    fn resize(&mut self) {
+        self.handler.resize();
+    }
+
     fn size(&self) -> usize {
         self.handler.size()
     }
@@ -91,6 +96,8 @@ impl<T> CorpusHandler<T> for InMemoryCorpus {
     fn insert(&mut self, entry: CorpusEntry, _s: T) {
         self.inner.insert(entry.id(), entry);
     }
+
+    fn resize(&mut self) {}
 
     fn clear(&mut self) {
         self.inner.clear();

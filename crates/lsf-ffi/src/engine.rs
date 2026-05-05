@@ -13,6 +13,7 @@ use lsf_engine::{
     ObtainSeed,
     ProbabilisticMABScheduler,
     Schedule,
+    SchedulerBatcher,
     SeedDirReader,
     WeightedRandomScheduler,
 };
@@ -108,8 +109,8 @@ impl Engine {
         self.0.add_strategy(strategy.0.take().unwrap());
     }
 
-    pub fn gc(&mut self) {
-        self.0.gc();
+    pub fn chore(&mut self) {
+        self.0.chore();
     }
 
     pub fn corpus_size(&self) -> usize {
@@ -216,6 +217,13 @@ impl SchedulerBuilder {
     pub fn weighted_ucb1(body: PyRef<MABBody>) -> Self {
         Self(Some(Box::new(ProbabilisticMABScheduler::new(
             body.0.clone(),
+        ))))
+    }
+
+    #[staticmethod]
+    pub fn batched(mut scheduler: PyRefMut<SchedulerBuilder>) -> Self {
+        Self(Some(Box::new(SchedulerBatcher::new(
+            scheduler.0.take().unwrap(),
         ))))
     }
 }

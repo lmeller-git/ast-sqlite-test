@@ -9,6 +9,7 @@ use lsf_feedback::{
 };
 use rand::{
     Rng,
+    RngExt,
     distr::{Distribution, weighted::WeightedIndex},
 };
 
@@ -27,6 +28,84 @@ pub trait Schedule: Send + Sync {
     }
 
     fn add_entry(&mut self, _entry: &CorpusEntry) {}
+}
+
+const MAX_REFILL: usize = 128;
+const BATCH_MULTIPLICATOR: usize = 4;
+const MIN_REFILL: usize = 32;
+const BASE_PERSISTENCE: usize = 50;
+const MAX_WEIGHT: f64 = 1e42;
+
+pub struct SchedulerBatcher {
+    inner_scheduler: Box<dyn Schedule>,
+    batch: Vec<(TestableEntry<RawEntry>, usize)>,
+}
+
+impl SchedulerBatcher {
+    pub fn new(schedule: Box<dyn Schedule>) -> Self {
+        Self {
+            inner_scheduler: schedule,
+            batch: Vec::with_capacity(MIN_REFILL),
+        }
+    }
+
+    fn refill(&mut self, from: &mut Corpus, size: usize, rng: &mut dyn Rng) {
+        let size = size.clamp(MIN_REFILL, MAX_REFILL);
+
+        let batch = self.inner_scheduler.next_batch(from, size, rng);
+        self.batch.extend(batch.into_iter().map(|item| {
+            let score = Self::calculate_persistence(&item);
+            (item, score)
+        }));
+    }
+
+    fn calculate_persistence(entry: &TestableEntry<RawEntry>) -> usize {
+        let mut base = BASE_PERSISTENCE;
+
+        // Hack: if the entry was scheduled by a "smart" scheduler, it will contain hooks pointing to the score
+        if let Some(hook) = entry.parent_stats.first() {
+            let score = hook.calculate_score().max(MAX_WEIGHT);
+            base *= (1. + score).ln().ceil() as usize;
+        }
+
+        base
+    }
+}
+
+impl Schedule for SchedulerBatcher {
+    fn next_batch(
+        &mut self,
+        from: &mut Corpus,
+        size: usize,
+        rng: &mut dyn Rng,
+    ) -> Vec<TestableEntry<RawEntry>> {
+        if self.batch.len() < size {
+            self.refill(from, size * BATCH_MULTIPLICATOR, rng);
+        }
+
+        let mut batch = Vec::with_capacity(size);
+
+        while batch.len() < size {
+            let window_size = self.batch.len().min(size);
+            let window_start = self.batch.len() - window_size;
+
+            let rd_index = rng.random_range(window_start..self.batch.len());
+
+            if let Some((entry, energy)) = self.batch.get_mut(rd_index) {
+                *energy -= 1;
+                batch.push(entry.clone());
+                if *energy == 0 {
+                    self.batch.swap_remove(rd_index);
+                }
+            }
+        }
+
+        batch
+    }
+
+    fn add_entry(&mut self, entry: &CorpusEntry) {
+        self.inner_scheduler.add_entry(entry);
+    }
 }
 
 #[derive(Default)]

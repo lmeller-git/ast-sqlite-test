@@ -34,7 +34,9 @@ async def main(args: Namespace):
         corpus_handler = engine.CorpusManagerBuilder.in_memory()
 
     mutation_engine = engine.Engine(
-        engine.SchedulerBuilder.weighted_ucb1(corpus_scheduler_body),
+        engine.SchedulerBuilder.batched(
+            engine.SchedulerBuilder.weighted_ucb1(corpus_scheduler_body)
+        ),
         corpus_handler,
         [engine.StrategyBuilder.table_guard()],
         ipc_queue,

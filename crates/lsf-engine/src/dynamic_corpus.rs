@@ -32,21 +32,28 @@ struct EntryData {
     cached: CacheLocation,
 }
 
-const CACHE_CAP: usize = 2_usize.pow(14);
+const CACHE_CAP: usize = 2_usize.pow(17);
 const IN_FLIGHT_CAP: usize = 2_usize.pow(11);
-const GRACE_PERIOD: u8 = 3;
+const GRACE_PERIOD: u8 = 1;
+const INIT_CACHE_CAP: usize = 2_usize.pow(14);
+const CACHE_ADJUSTMENT_TICK: usize = 500;
+const CACHE_MISS_THRESHHOLD: f64 = 0.05;
 
 pub struct DynamicCorpus {
     index: HashMap<ID, EntryData>,
     in_flight: IndexMap<ID, Arc<AST>>,
     hot: HashMap<ID, Arc<AST>>,
     hot_eviction: PriorityQueue<ID, Reverse<OrderedFloat<f64>>>,
+    hot_cap: usize,
     cache_dir: PathBuf,
+    cache_misses: usize,
+    requests: usize,
 }
 
 impl CorpusHandler<f64> for DynamicCorpus {
     fn get(&mut self, id: &ID) -> Option<CorpusEntry> {
         let data = self.index.get(id)?;
+        self.requests += 1;
         match data.cached {
             CacheLocation::InFlight(_) => self.in_flight.get(id).map(|ast| {
                 CorpusEntry::new(
@@ -61,6 +68,7 @@ impl CorpusHandler<f64> for DynamicCorpus {
                 )
             }),
             CacheLocation::Disk => self.retrieve_from_disk(id).map(|ast| {
+                self.cache_misses += 1;
                 CorpusEntry::new(
                     RawEntry::from_components(*id, ast, data.parents.clone()),
                     data.meta,
@@ -117,6 +125,24 @@ impl CorpusHandler<f64> for DynamicCorpus {
         );
     }
 
+    fn resize(&mut self) {
+        if self.requests < CACHE_ADJUSTMENT_TICK {
+            return;
+        }
+
+        let miss_rate = self.cache_misses as f64 / self.requests as f64;
+        if miss_rate > CACHE_MISS_THRESHHOLD && self.hot_cap < CACHE_CAP {
+            let new_cap = (self.hot_cap * 3 / 2).min(CACHE_CAP);
+            println!(
+                "Cache misses exceeded {CACHE_MISS_THRESHHOLD}: missed {miss_rate}% of requests\n Resizing cache from {} to {}.",
+                self.hot_cap, new_cap
+            );
+            self.hot_cap = new_cap
+        }
+        self.requests = 0;
+        self.cache_misses = 0;
+    }
+
     fn ids(&self) -> Vec<ID> {
         self.index.keys().copied().collect()
     }
@@ -140,9 +166,12 @@ impl DynamicCorpus {
         Self {
             index: HashMap::new(),
             in_flight: IndexMap::new(),
-            hot: HashMap::with_capacity(CACHE_CAP),
-            hot_eviction: PriorityQueue::with_capacity(CACHE_CAP),
+            hot: HashMap::with_capacity(INIT_CACHE_CAP),
+            hot_eviction: PriorityQueue::with_capacity(INIT_CACHE_CAP),
+            hot_cap: INIT_CACHE_CAP,
             cache_dir,
+            requests: 0,
+            cache_misses: 0,
         }
     }
 
@@ -164,7 +193,7 @@ impl DynamicCorpus {
     }
 
     fn move_to_cache(&mut self, id: &ID, ast: Arc<AST>) {
-        if self.hot.len() >= CACHE_CAP {
+        if self.hot.len() >= self.hot_cap {
             self.evict_cached_if(|_| true);
         }
 
@@ -202,7 +231,7 @@ impl DynamicCorpus {
     }
 
     fn evict_cached_if(&mut self, cond: impl Fn(f64) -> bool) -> bool {
-        if self.hot.len() < CACHE_CAP {
+        if self.hot.len() < self.hot_cap {
             return true;
         }
 

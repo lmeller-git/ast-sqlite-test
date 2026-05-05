@@ -193,15 +193,16 @@ impl Engine {
             .collect()
     }
 
-    pub fn gc(&mut self) {
-        let mut should_keep = self.corpus.entry_rating.get_best_entries();
-        should_keep.extend(&self.corpus.diversity.entries);
-        println!(
-            "keeping {} out of {} entries",
-            should_keep.len(),
-            self.corpus.size(),
-        );
-        todo!()
+    pub fn chore(&mut self) {
+        self.corpus.resize();
+        // let mut should_keep = self.corpus.entry_rating.get_best_entries();
+        // should_keep.extend(&self.corpus.diversity.entries);
+        // println!(
+        //     "keeping {} out of {} entries",
+        //     should_keep.len(),
+        //     self.corpus.size(),
+        // );
+        // todo!()
     }
 
     pub fn corpus_size(&self) -> usize {
