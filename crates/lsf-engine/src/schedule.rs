@@ -178,9 +178,19 @@ impl Schedule for WeightedRandomScheduler {
 
 #[derive(Default)]
 pub struct AdaptiveWeightedRandomScheduler {
-    stat_mapping: IndexMap<ID, Arc<MABArm>>,
+    stat_mapping: IndexMap<ID, Arc<MABArm>, rustc_hash::FxBuildHasher>,
     dist: Option<WeightedIndex<f64>>,
     body: Arc<MABBody>,
+}
+
+impl AdaptiveWeightedRandomScheduler {
+    pub fn new(body: Arc<MABBody>) -> Self {
+        Self {
+            stat_mapping: IndexMap::with_hasher(rustc_hash::FxBuildHasher),
+            dist: None,
+            body,
+        }
+    }
 }
 
 impl Schedule for AdaptiveWeightedRandomScheduler {

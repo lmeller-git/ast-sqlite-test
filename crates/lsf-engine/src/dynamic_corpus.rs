@@ -1,6 +1,5 @@
 use std::{
     cmp::Reverse,
-    collections::HashMap,
     fs::{OpenOptions, create_dir_all, remove_dir_all},
     io::{self, Read, Write},
     path::PathBuf,
@@ -9,6 +8,7 @@ use std::{
 
 use indexmap::IndexMap;
 use lsf_core::{
+    IDMAp,
     ast::AST,
     entry::{CorpusEntry, ID, Meta, RawEntry},
 };
@@ -40,9 +40,9 @@ const CACHE_ADJUSTMENT_TICK: usize = 500;
 const CACHE_MISS_THRESHHOLD: f64 = 0.05;
 
 pub struct DynamicCorpus {
-    index: HashMap<ID, EntryData>,
-    in_flight: IndexMap<ID, Arc<AST>>,
-    hot: HashMap<ID, Arc<AST>>,
+    index: IDMAp<EntryData>,
+    in_flight: IndexMap<ID, Arc<AST>, rustc_hash::FxBuildHasher>,
+    hot: IDMAp<Arc<AST>>,
     hot_eviction: PriorityQueue<ID, Reverse<OrderedFloat<f64>>>,
     hot_cap: usize,
     cache_dir: PathBuf,
@@ -161,12 +161,13 @@ impl CorpusHandler<f64> for DynamicCorpus {
 
 impl DynamicCorpus {
     pub fn new(cache_dir: PathBuf) -> Self {
+        println!("creating cache_dir in {}", cache_dir.display());
         create_dir_all(&cache_dir).unwrap();
 
         Self {
-            index: HashMap::new(),
-            in_flight: IndexMap::new(),
-            hot: HashMap::with_capacity(INIT_CACHE_CAP),
+            index: IDMAp::default(),
+            in_flight: IndexMap::with_hasher(rustc_hash::FxBuildHasher),
+            hot: IDMAp::with_capacity_and_hasher(INIT_CACHE_CAP, rustc_hash::FxBuildHasher),
             hot_eviction: PriorityQueue::with_capacity(INIT_CACHE_CAP),
             hot_cap: INIT_CACHE_CAP,
             cache_dir,

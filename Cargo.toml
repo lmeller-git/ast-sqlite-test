@@ -1,8 +1,9 @@
 [workspace]
 resolver = "3"
 members = [
-  "crates/*",
+  "crates/*", "perf/dry"
 ]
+
 default-members = [
   "crates/*"
 ]
@@ -25,6 +26,7 @@ lsf-mutate = { path = "crates/lsf-mutate" }
 lsf-cov = { path = "crates/lsf-cov" }
 lsf-feedback = { path = "crates/lsf-feedback" }
 smallvec = "1.15.1"
+rustc-hash = "2.1.2"
 
 [patch.crates-io]
 sqlparser = { path = "extern/sqlparser-rs" }
@@ -32,3 +34,4 @@ sqlparser = { path = "extern/sqlparser-rs" }
 [profile.release]
 lto = "fat"
 codegen-units = 1
+debug = true

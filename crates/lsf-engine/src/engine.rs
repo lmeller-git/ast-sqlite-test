@@ -132,7 +132,6 @@ impl Engine {
             .corpus
             .diversity
             .try_insert(raw_entry.id(), raw_entry.ast());
-
         if !is_diverse && new_edges.is_empty() {
             raw_entry.fire_rule_hooks(TestOutcome::Rejected(RejectionReason::Bad));
             return;

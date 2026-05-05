@@ -7,6 +7,10 @@ use smallvec::SmallVec;
 
 use crate::ast::AST;
 
+// TODO
+// May want to use twox-hash to create ID from a hash of AST. This would allow using nohash_hasher for Hashmaps and wautomatic deduplication based on AST.
+// However profiling shows that hashing the whole AST is quite slow evenb with twox-hash. May be worth it only if dedup is a bigger win
+
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct ID {
     raw: u32,

@@ -10,3 +10,4 @@ repository.workspace = true
 sqlparser = { workspace = true }
 serde = { workspace = true }
 smallvec = { workspace = true }
+rustc-hash = { workspace = true }

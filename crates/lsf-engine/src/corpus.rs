@@ -1,9 +1,10 @@
 use std::{
-    collections::HashMap,
+    collections::VecDeque,
     hash::{Hash, Hasher},
 };
 
 use lsf_core::{
+    IDMAp,
     ast::AST,
     entry::{CorpusEntry, ID},
 };
@@ -75,13 +76,13 @@ impl CorpusHandler<f64> for Corpus {
 
 #[derive(Default)]
 pub struct InMemoryCorpus {
-    inner: HashMap<ID, CorpusEntry>,
+    inner: IDMAp<CorpusEntry>,
 }
 
 impl InMemoryCorpus {
     pub fn new() -> Self {
         Self {
-            inner: HashMap::new(),
+            inner: IDMAp::default(),
         }
     }
 }
@@ -112,29 +113,38 @@ impl<T> CorpusHandler<T> for InMemoryCorpus {
     }
 }
 
-const MIN_DIST: u32 = 15;
+const MAX_DIVERSITY_WINDOW: usize = 2048;
+const MIN_DIST: u32 = 5;
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct DiversityEnsurance {
-    hashes: Vec<u64>,
-    pub entries: Vec<ID>,
+    hashes: VecDeque<u64>,
+    pub entries: VecDeque<ID>,
 }
 
 impl DiversityEnsurance {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            hashes: VecDeque::with_capacity(MAX_DIVERSITY_WINDOW),
+            entries: VecDeque::with_capacity(MAX_DIVERSITY_WINDOW),
+        }
     }
 
     pub fn try_insert(&mut self, id: ID, ast: &AST) -> bool {
-        let str = ast.iter().map(ToString::to_string).collect::<Vec<_>>();
-        let ast_hash = simhash_stream(str.iter().map(|s| s.as_str()));
-        if !self
+        let ast_hash = simhash_stream(ast.iter());
+
+        let is_too_similar = self
             .hashes
             .iter()
-            .any(|hash| hamming_distance(*hash, ast_hash) < MIN_DIST)
-        {
-            self.hashes.push(ast_hash);
-            self.entries.push(id);
+            .any(|&h| hamming_distance(h, ast_hash) < MIN_DIST);
+
+        if !is_too_similar {
+            if self.hashes.len() >= MAX_DIVERSITY_WINDOW {
+                self.hashes.pop_front();
+                self.entries.pop_front();
+            }
+            self.hashes.push_back(ast_hash);
+            self.entries.push_back(id);
             true
         } else {
             false
@@ -143,19 +153,17 @@ impl DiversityEnsurance {
 }
 
 /* Adapted from https://github.com/bartolsthoorn/simhash-rs, MIT License */
-
-use siphasher::sip::SipHasher;
-
+#[inline(always)]
 fn hash_feature<T: Hash>(t: &T) -> u64 {
-    let mut s = SipHasher::default();
+    let mut s = rustc_hash::FxHasher::default();
     t.hash(&mut s);
     s.finish()
 }
 
-/// Calculate `u64` simhash from stream of `&str` words
-fn simhash_stream<'w, W>(words: W) -> u64
+/// Calculate `u64` simhash from stream of hashable words
+fn simhash_stream<W, T: Hash>(words: W) -> u64
 where
-    W: Iterator<Item = &'w str>,
+    W: Iterator<Item = T>,
 {
     let mut v = [0i32; 64];
     let mut simhash: u64 = 0;
@@ -181,19 +189,8 @@ where
     simhash
 }
 
-// /// Calculate `u64` simhash from `&str` split by whitespace
-// fn simhash(text: &str) -> u64 {
-//     simhash_stream(text.split_whitespace())
-// }
-
 /// Bitwise hamming distance of two `u64` hashes
+#[inline(always)]
 fn hamming_distance(x: u64, y: u64) -> u32 {
     (x ^ y).count_ones()
 }
-
-// /// Calculate similarity as `f64` of two hashes
-// /// 0.0 means no similarity, 1.0 means identical
-// fn hash_similarity(hash1: u64, hash2: u64) -> f64 {
-//     let distance: f64 = hamming_distance(hash1, hash2) as f64;
-//     1.0 - (distance / 64.0)
-// }

@@ -1,0 +1,21 @@
+[package]
+name = "dry"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+dhat-heap = ["dhat"]
+
+[dependencies]
+lsf-engine = { workspace = true }
+lsf-core = { workspace = true }
+lsf-mutate = { workspace = true }
+lsf-feedback = { workspace = true }
+lsf-cov = { workspace = true }
+sqlparser = { workspace = true }
+rand = { workspace = true }
+
+dhat = { version = "0.3.3", optional = true }
