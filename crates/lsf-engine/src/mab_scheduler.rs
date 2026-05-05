@@ -7,7 +7,7 @@ use lsf_feedback::{
     mab::{MABBody, SchedueldItem},
 };
 
-use crate::Schedule;
+use crate::{CorpusHandler, Schedule};
 
 pub struct MABScheduler {
     queue: BinaryHeap<SchedueldItem<ID>>,
@@ -24,12 +24,12 @@ impl MABScheduler {
 }
 
 impl Schedule for MABScheduler {
-    fn next_batch<'a>(
+    fn next_batch(
         &mut self,
-        from: &'a crate::Corpus,
+        from: &mut crate::Corpus,
         size: usize,
         _rng: &mut dyn rand::Rng,
-    ) -> Vec<lsf_feedback::TestableEntry<&'a lsf_core::entry::RawEntry>> {
+    ) -> Vec<lsf_feedback::TestableEntry<lsf_core::entry::RawEntry>> {
         const ACCEPT_UNDER: u32 = 50;
 
         let current_epoch = self.mab.epoch.load(std::sync::atomic::Ordering::Relaxed);
@@ -46,9 +46,11 @@ impl Schedule for MABScheduler {
                 top.epoch = current_epoch;
                 self.queue.push(top);
             } else {
-                if let Some(parent) = from.entries.get(&top.item) {
-                    parents
-                        .push(TestableEntry::new(parent.raw()).with_build_hook(top.stats.clone()));
+                if let Some(parent) = from.get(&top.item) {
+                    from.update(&top.item, top.score);
+                    parents.push(
+                        TestableEntry::new(parent.raw().clone()).with_build_hook(top.stats.clone()),
+                    );
                 }
                 acc.push(top);
             }

@@ -3,8 +3,11 @@ use std::sync::Arc;
 use lsf_cov::ipc::{IPCToken, SharedMemHandle};
 use lsf_engine::{
     AdaptiveWeightedRandomScheduler,
+    CorpusHandler,
+    DynamicCorpus,
     Engine as RawEngine,
     Generation as RawGeneration,
+    InMemoryCorpus,
     LiteralSeeder,
     MABScheduler,
     ObtainSeed,
@@ -44,9 +47,10 @@ pub struct Engine(RawEngine);
 #[pymethods]
 impl Engine {
     #[new]
-    #[pyo3(signature = (scheduler, strategies, shmem_queue, mab_bodies = Vec::new(), rng_seed = 42))]
+    #[pyo3(signature = (scheduler, corpus_handler, strategies, shmem_queue, mab_bodies = Vec::new(), rng_seed = 42))]
     pub fn new(
         mut scheduler: PyRefMut<SchedulerBuilder>,
+        mut corpus_handler: PyRefMut<CorpusManagerBuilder>,
         mut strategies: Vec<PyRefMut<StrategyBuilder>>,
         shmem_queue: PyRef<IPCTokenQueue>,
         mab_bodies: Vec<PyRef<MABBody>>,
@@ -54,6 +58,7 @@ impl Engine {
     ) -> Self {
         Self(RawEngine::new(
             scheduler.0.take().unwrap(),
+            corpus_handler.0.take().unwrap(),
             strategies.iter_mut().map(|s| s.0.take().unwrap()).collect(),
             shmem_queue.0.clone(),
             mab_bodies.iter().map(|b| b.0.clone()).collect(),
@@ -91,7 +96,7 @@ impl Engine {
         self.0.return_token(token.0.take().unwrap());
     }
 
-    pub fn snapshot(&self) -> Vec<CorpusEntry> {
+    pub fn snapshot(&mut self) -> Vec<CorpusEntry> {
         self.0.snapshot().into_iter().map(CorpusEntry).collect()
     }
 
@@ -113,6 +118,22 @@ impl Engine {
 
     pub fn clear(&mut self) {
         self.0.clear();
+    }
+}
+
+#[pyclass]
+pub struct CorpusManagerBuilder(Option<Box<dyn CorpusHandler<f64>>>);
+
+#[pymethods]
+impl CorpusManagerBuilder {
+    #[staticmethod]
+    pub fn dynamic_cache(cache_dir: String) -> Self {
+        Self(Some(Box::new(DynamicCorpus::new(cache_dir.into()))))
+    }
+
+    #[staticmethod]
+    pub fn in_memory() -> Self {
+        Self(Some(Box::new(InMemoryCorpus::new())))
     }
 }
 

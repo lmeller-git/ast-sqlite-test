@@ -34,7 +34,7 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        parent_gen: &[TestableEntry<&RawEntry>],
+        parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<MutationState, MutationError> {
         self.strategy.breed(parent, parent_gen, rng)
@@ -43,7 +43,7 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
     fn breed(
         &self,
         parent: &TestableEntry<RawEntry>,
-        parent_gen: &[TestableEntry<&RawEntry>],
+        parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<MutationState, MutationError> {
         let score = self.arm.calculate_score();
@@ -104,7 +104,7 @@ impl MutationStrategy for MABScheduler {
     fn breed_inner(
         &self,
         _parent: &TestableEntry<RawEntry>,
-        _parent_gen: &[TestableEntry<&RawEntry>],
+        _parent_gen: &[TestableEntry<RawEntry>],
         _rng: &mut dyn rand::Rng,
     ) -> Result<MutationState, MutationError> {
         Err(MutationError::NOOP)
@@ -113,7 +113,7 @@ impl MutationStrategy for MABScheduler {
     fn breed(
         &self,
         parent: &TestableEntry<RawEntry>,
-        parent_gen: &[TestableEntry<&RawEntry>],
+        parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<MutationState, MutationError> {
         const ACCEPT_UNDER: u32 = 50;

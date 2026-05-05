@@ -1,6 +1,7 @@
 use lsf_core::entry::RawEntry;
 use lsf_feedback::TestableEntry;
 use rand::{Rng, RngExt};
+use smallvec::smallvec;
 use sqlparser::ast::{
     CreateTable,
     ObjectName,
@@ -21,7 +22,7 @@ impl MutationStrategy for TableNameScramble {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        _parent_gen: &[TestableEntry<&RawEntry>],
+        _parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut tables = Vec::new();
@@ -66,7 +67,7 @@ impl MutationStrategy for TableNameScramble {
 
         if child_is_mutated {
             Ok(crate::MutationState::Mutated(
-                RawEntry::new(child_ast, [parent.id()].into()).into(),
+                RawEntry::new(child_ast, smallvec![parent.id()]).into(),
             ))
         } else {
             Ok(crate::MutationState::Unchanged)
@@ -80,7 +81,7 @@ impl MutationStrategy for TableGuard {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        _parent_gen: &[TestableEntry<&RawEntry>],
+        _parent_gen: &[TestableEntry<RawEntry>],
         _rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut child_ast = parent.ast().clone();
@@ -98,7 +99,7 @@ impl MutationStrategy for TableGuard {
 
         if mutation_occured {
             Ok(crate::MutationState::Mutated(
-                RawEntry::new(child_ast, [parent.id()].into()).into(),
+                RawEntry::new(child_ast, smallvec![parent.id()]).into(),
             ))
         } else {
             Ok(crate::MutationState::Unchanged)

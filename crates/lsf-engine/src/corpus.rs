@@ -9,32 +9,99 @@ use lsf_core::{
 };
 use lsf_cov::bitmap::{EdgeMap, ScoredEdges};
 
-#[derive(Debug)]
+pub trait CorpusHandler<T>: Sync + Send {
+    fn get(&mut self, id: &ID) -> Option<CorpusEntry>;
+    fn update(&mut self, id: &ID, s: T);
+    fn insert(&mut self, entry: CorpusEntry, s: T);
+    fn ids(&self) -> Vec<ID>;
+    fn clear(&mut self);
+    fn size(&self) -> usize;
+}
+
 pub struct Corpus {
-    pub entries: HashMap<ID, CorpusEntry>,
     pub edge_map: EdgeMap,
     pub entry_rating: ScoredEdges,
     pub diversity: DiversityEnsurance,
+    handler: Box<dyn CorpusHandler<f64>>,
 }
 
 impl Corpus {
-    pub fn new(max_edges: usize) -> Self {
+    pub fn new(max_edges: usize, handler: Box<dyn CorpusHandler<f64>>) -> Self {
         Self {
-            entries: HashMap::default(),
             edge_map: EdgeMap::new(max_edges),
             entry_rating: ScoredEdges::new(max_edges),
             diversity: DiversityEnsurance::new(),
+            handler,
         }
     }
+}
 
-    pub fn clear(&mut self) {
-        self.entries.clear();
+impl CorpusHandler<f64> for Corpus {
+    fn get(&mut self, id: &ID) -> Option<CorpusEntry> {
+        self.handler.get(id)
+    }
+
+    fn update(&mut self, id: &ID, s: f64) {
+        self.handler.update(id, s);
+    }
+
+    fn insert(&mut self, entry: CorpusEntry, s: f64) {
+        self.handler.insert(entry, s);
+    }
+
+    fn clear(&mut self) {
+        self.handler.clear();
         self.entry_rating
             .best_entries
             .iter_mut()
             .for_each(|item| *item = None);
         self.diversity.entries.clear();
         self.diversity.hashes.clear();
+    }
+
+    fn size(&self) -> usize {
+        self.handler.size()
+    }
+
+    fn ids(&self) -> Vec<ID> {
+        self.handler.ids()
+    }
+}
+
+#[derive(Default)]
+pub struct InMemoryCorpus {
+    inner: HashMap<ID, CorpusEntry>,
+}
+
+impl InMemoryCorpus {
+    pub fn new() -> Self {
+        Self {
+            inner: HashMap::new(),
+        }
+    }
+}
+
+impl<T> CorpusHandler<T> for InMemoryCorpus {
+    fn get(&mut self, id: &ID) -> Option<CorpusEntry> {
+        self.inner.get(id).cloned()
+    }
+
+    fn update(&mut self, _id: &ID, _s: T) {}
+
+    fn insert(&mut self, entry: CorpusEntry, _s: T) {
+        self.inner.insert(entry.id(), entry);
+    }
+
+    fn clear(&mut self) {
+        self.inner.clear();
+    }
+
+    fn size(&self) -> usize {
+        self.inner.len()
+    }
+
+    fn ids(&self) -> Vec<ID> {
+        self.inner.keys().copied().collect()
     }
 }
 

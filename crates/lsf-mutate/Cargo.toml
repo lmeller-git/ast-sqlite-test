@@ -15,3 +15,4 @@ portable-atomic = { workspace = true }
 lsf-feedback = { workspace = true }
 serde_json = "1.0.149"
 thiserror = "2.0.18"
+smallvec = { workspace = true }

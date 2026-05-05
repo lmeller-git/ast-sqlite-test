@@ -32,14 +32,14 @@ pub trait MutationStrategy: Send + Sync {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        parent_gen: &[TestableEntry<&RawEntry>],
+        parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<MutationState, MutationError>;
 
     fn breed(
         &self,
         parent: &TestableEntry<RawEntry>,
-        parent_gen: &[TestableEntry<&RawEntry>],
+        parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<MutationState, MutationError> {
         let r = self.breed_inner(parent, parent_gen, rng);
@@ -91,7 +91,7 @@ pub(crate) fn test_single_mutation(sql: &str, expected: &str, strategy: Box<dyn 
     let res = strategy
         .breed(
             &entry_,
-            &[TestableEntry::new(&entry)],
+            &[TestableEntry::new(entry)],
             &mut SmallRng::seed_from_u64(42),
         )
         .unwrap();

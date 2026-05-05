@@ -18,6 +18,7 @@ use visitor::{
 };
 
 use crate::engine::{
+    CorpusManagerBuilder,
     IPCTokenHandle,
     IPCTokenQueue,
     MABBody,
@@ -238,6 +239,7 @@ fn lib_sf(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     engine.add_class::<TestResult>()?;
     engine.add_class::<TreeMutatorOperation>()?;
     engine.add_class::<MABBody>()?;
+    engine.add_class::<CorpusManagerBuilder>()?;
     m.add_submodule(&engine)?;
 
     let visitor = PyModule::new(py, "visitor")?;

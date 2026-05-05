@@ -1,8 +1,9 @@
 use std::{
-    collections::BTreeSet,
     ops::{Deref, DerefMut},
-    sync::atomic::AtomicU32,
+    sync::{Arc, atomic::AtomicU32},
 };
+
+use smallvec::SmallVec;
 
 use crate::ast::AST;
 
@@ -19,9 +20,13 @@ impl ID {
             raw: CURRENT_ID.fetch_add(1, std::sync::atomic::Ordering::AcqRel),
         }
     }
+
+    pub fn as_raw(&self) -> u32 {
+        self.raw
+    }
 }
 
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct Meta {
     pub triggers_bug: bool,
     pub is_valid_syntax: bool,
@@ -31,18 +36,22 @@ pub struct Meta {
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct RawEntry {
-    id: ID,
-    parents: BTreeSet<ID>,
-    ast: AST,
+    pub id: ID,
+    pub parents: SmallVec<[ID; 2]>,
+    pub ast: Arc<AST>,
 }
 
 impl RawEntry {
-    pub fn new(ast: AST, parents: BTreeSet<ID>) -> Self {
+    pub fn new(ast: AST, parents: SmallVec<[ID; 2]>) -> Self {
         Self {
             id: ID::next(),
             parents,
-            ast,
+            ast: ast.into(),
         }
+    }
+
+    pub fn from_components(id: ID, ast: Arc<AST>, parents: SmallVec<[ID; 2]>) -> Self {
+        Self { id, parents, ast }
     }
 
     pub fn into_corpus_entry(self, meta: Meta) -> CorpusEntry {
@@ -61,18 +70,22 @@ impl RawEntry {
         self.parents.iter()
     }
 
-    pub fn parents_mut(&mut self) -> &mut BTreeSet<ID> {
+    pub fn parents_mut(&mut self) -> &mut SmallVec<[ID; 2]> {
         &mut self.parents
     }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct CorpusEntry {
-    raw: RawEntry,
-    meta: Meta,
+    pub raw: RawEntry,
+    pub meta: Meta,
 }
 
 impl CorpusEntry {
+    pub fn new(raw: RawEntry, meta: Meta) -> Self {
+        Self { raw, meta }
+    }
+
     pub fn raw(&self) -> &RawEntry {
         &self.raw
     }
@@ -112,16 +125,16 @@ mod tests {
         let id2 = ID::next();
         assert!(id2 > id1);
 
-        let raw = RawEntry::new(vec![], [].into());
-        let raw2 = RawEntry::new(vec![], [].into());
+        let raw = RawEntry::new(vec![], Default::default());
+        let raw2 = RawEntry::new(vec![], Default::default());
         assert!(raw.id() > id2);
         assert!(raw2.id() > raw.id());
     }
 
     #[test]
     fn entry() {
-        let raw = RawEntry::new(vec![], [].into());
-        let raw2 = RawEntry::new(vec![], [raw.id()].into());
+        let raw = RawEntry::new(vec![], Default::default());
+        let raw2 = RawEntry::new(vec![], vec![raw.id()].into());
         assert_ne!(raw, raw2);
         assert!(raw.parents().next().is_none());
         assert_eq!(*raw2.parents().next().unwrap(), raw.id());

@@ -30,7 +30,7 @@ impl MutationStrategy for RandomMutationSampler {
     fn breed_inner(
         &self,
         _parent: &TestableEntry<RawEntry>,
-        _parent_gen: &[TestableEntry<&RawEntry>],
+        _parent_gen: &[TestableEntry<RawEntry>],
         _rng: &mut dyn Rng,
     ) -> Result<MutationState, crate::MutationError> {
         Err(crate::MutationError::NOOP)
@@ -39,7 +39,7 @@ impl MutationStrategy for RandomMutationSampler {
     fn breed(
         &self,
         parent: &TestableEntry<RawEntry>,
-        parent_gen: &[TestableEntry<&RawEntry>],
+        parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<MutationState, crate::MutationError> {
         let n_chosen = rng.random_range(self.choose_min..=self.choose_max);
@@ -59,7 +59,7 @@ impl MutationStrategy for RandomMutationSampler {
                 self.choices[chosen_strategy].breed(current_parent, parent_gen, rng)
             {
                 if i > 0 && status != MutationState::Unchanged {
-                    next.parents_mut().extend(current_parent.parents());
+                    next.parents_mut().extend(current_parent.parents().copied());
                 }
 
                 hooks.append(&mut next.applied_rule_stats);
@@ -103,7 +103,7 @@ impl MutationStrategy for Randomly {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        parent_gen: &[TestableEntry<&RawEntry>],
+        parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<MutationState, crate::MutationError> {
         self.over.breed(parent, parent_gen, rng)
@@ -112,7 +112,7 @@ impl MutationStrategy for Randomly {
     fn breed(
         &self,
         parent: &TestableEntry<RawEntry>,
-        parent_gen: &[TestableEntry<&RawEntry>],
+        parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<MutationState, crate::MutationError> {
         if rng.random_bool(self.prob) {
