@@ -195,6 +195,7 @@ impl Engine {
 
     pub fn chore(&mut self) {
         self.corpus.resize();
+        self.scheduler.chore();
         // let mut should_keep = self.corpus.entry_rating.get_best_entries();
         // should_keep.extend(&self.corpus.diversity.entries);
         // println!(

@@ -43,6 +43,7 @@ async def run_single_mutation(
 
         is_syntax_err = b"syntax error" in capture.stderr or b"Parse error" in capture.stderr
 
+        # may want to return crashes and syntax errors also. They will quicly be moved to cold cache anyway, as they likely will not create good children
         if is_crash or is_hang:
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.crash()))
             mutation_engine.return_token(token)

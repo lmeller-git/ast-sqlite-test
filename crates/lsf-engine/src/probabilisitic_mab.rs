@@ -11,7 +11,7 @@ use rand::RngExt;
 use crate::{CorpusHandler, Schedule};
 
 const ZERO_WEIGHT: f64 = 0.001;
-const MAX_WEIGHT: f64 = 1e42;
+const MAX_WEIGHT: f64 = 1e20;
 
 pub fn align_up(n: usize, alignment: usize) -> usize {
     (n + alignment - 1) & !(alignment - 1)
@@ -94,6 +94,21 @@ impl BlockSumTable {
         }
     }
 
+    pub fn resum(&mut self) {
+        self.total_sum = 0.;
+        for block_sum in self.blocks.iter_mut() {
+            *block_sum = 0.
+        }
+
+        for (leave_idx, leave) in self.leaves.iter().enumerate() {
+            if let Some(block) = self.blocks.get_mut(leave_idx / self.block_size) {
+                *block += leave
+            }
+        }
+
+        self.total_sum = self.blocks.iter().sum();
+    }
+
     pub fn sample(&self, rng: &mut dyn rand::Rng) -> Option<usize> {
         if self.leaves.is_empty() {
             return None;
@@ -161,7 +176,9 @@ impl Schedule for ProbabilisticMABScheduler {
                     item.epoch = current_epoch;
                     self.queue.update(top, item.stats.calculate_score());
                 } else if let Some(entry) = from.get(&item.item) {
-                    parents.push(TestableEntry::new(entry.raw().clone()));
+                    parents.push(
+                        TestableEntry::new(entry.raw().clone()).with_build_hook(item.stats.clone()),
+                    );
                 }
             }
         }
@@ -174,6 +191,11 @@ impl Schedule for ProbabilisticMABScheduler {
         let idx = self.queue.push(item.stats.calculate_score());
         debug_assert_eq!(idx, self.id_mapping.len());
         self.id_mapping.push(item);
+    }
+
+    fn chore(&mut self) {
+        // O(N), maybe not do this very often/at all
+        self.queue.resum();
     }
 }
 

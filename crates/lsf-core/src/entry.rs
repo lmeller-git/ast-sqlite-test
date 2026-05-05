@@ -30,8 +30,8 @@ impl ID {
 pub struct Meta {
     pub triggers_bug: bool,
     pub is_valid_syntax: bool,
-    pub new_cov_nodes: usize,
     pub exec_time: u32,
+    pub new_cov_nodes: usize,
 }
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone)]

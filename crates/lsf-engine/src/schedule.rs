@@ -28,13 +28,15 @@ pub trait Schedule: Send + Sync {
     }
 
     fn add_entry(&mut self, _entry: &CorpusEntry) {}
+
+    fn chore(&mut self) {}
 }
 
 const MAX_REFILL: usize = 128;
 const BATCH_MULTIPLICATOR: usize = 4;
 const MIN_REFILL: usize = 32;
-const BASE_PERSISTENCE: usize = 50;
-const MAX_WEIGHT: f64 = 1e42;
+const BASE_PERSISTENCE: usize = 5;
+const MAX_WEIGHT: f64 = 1e20;
 
 pub struct SchedulerBatcher {
     inner_scheduler: Box<dyn Schedule>,
@@ -64,8 +66,8 @@ impl SchedulerBatcher {
 
         // Hack: if the entry was scheduled by a "smart" scheduler, it will contain hooks pointing to the score
         if let Some(hook) = entry.parent_stats.first() {
-            let score = hook.calculate_score().max(MAX_WEIGHT);
-            base *= (1. + score).ln().ceil() as usize;
+            let score = hook.calculate_score().min(MAX_WEIGHT);
+            base *= (1. + score).log10().ceil() as usize;
         }
 
         base
@@ -106,6 +108,10 @@ impl Schedule for SchedulerBatcher {
     fn add_entry(&mut self, entry: &CorpusEntry) {
         self.inner_scheduler.add_entry(entry);
     }
+
+    fn chore(&mut self) {
+        self.inner_scheduler.chore();
+    }
 }
 
 #[derive(Default)]
@@ -131,6 +137,7 @@ impl WeightedRandomScheduler {
         weight
     }
 }
+
 // DO NOT USE. VERY INEFFICIENT TODO IMPROVE
 impl Schedule for WeightedRandomScheduler {
     fn next_batch(
