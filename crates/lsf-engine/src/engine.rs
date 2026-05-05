@@ -1,5 +1,4 @@
 use std::{
-    collections::BTreeSet,
     fmt::Debug,
     fs,
     io::{self, Read},
@@ -13,9 +12,10 @@ use lsf_cov::ipc::{IPCToken, SharedMemHandle};
 use lsf_feedback::{AcceptanceReason, RejectionReason, TestOutcome, TestableEntry, mab::MABBody};
 use lsf_mutate::{MutationState, MutationStrategy};
 use rand::{SeedableRng, rngs::SmallRng};
+use smallvec::smallvec;
 use sqlparser::{dialect::SQLiteDialect, parser::Parser};
 
-use crate::{Corpus, schedule::Schedule};
+use crate::{Corpus, CorpusHandler, schedule::Schedule};
 
 pub const GRANULARITY: usize = 50;
 
@@ -31,7 +31,6 @@ pub struct Engine {
 impl Debug for Engine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Fuzing Engine")
-            .field("corpus", &self.corpus)
             .field("n strategies", &self.strategies.len())
             .finish()
     }
@@ -40,6 +39,7 @@ impl Debug for Engine {
 impl Engine {
     pub fn new(
         scheduler: Box<dyn Schedule>,
+        corpus_handler: Box<dyn CorpusHandler<f64>>,
         strategies: Vec<Box<dyn MutationStrategy>>,
         shmem_queue: Arc<SharedMemHandle>,
         mab_bodies: Vec<Arc<MABBody>>,
@@ -48,7 +48,7 @@ impl Engine {
         Self {
             scheduler,
             strategies,
-            corpus: Corpus::new(shmem_queue.shmem_size),
+            corpus: Corpus::new(shmem_queue.shmem_size, corpus_handler),
             shmem_queue,
             rng: SmallRng::seed_from_u64(rng_seed),
             mab_bodies,
@@ -78,7 +78,7 @@ impl Engine {
         }
         let next_batch = self
             .scheduler
-            .next_batch(&self.corpus, batch_size, &mut self.rng);
+            .next_batch(&mut self.corpus, batch_size, &mut self.rng);
 
         let generation: Generation = next_batch
             .iter()
@@ -166,12 +166,10 @@ impl Engine {
     }
 
     pub fn commit_generation(&mut self, generation: SelectedGeneration) {
-        self.corpus
-            .entries
-            .extend(generation.members.into_iter().map(|entry| {
-                self.scheduler.add_entry(&entry);
-                (entry.id(), entry)
-            }));
+        generation.members.into_iter().for_each(|entry| {
+            self.scheduler.add_entry(&entry);
+            self.corpus.insert(entry, f64::INFINITY);
+        });
     }
 
     pub fn return_token(&mut self, token: Box<IPCToken>) {
@@ -181,18 +179,18 @@ impl Engine {
     pub fn populate(&mut self, seed_gens: Vec<Box<dyn ObtainSeed>>) {
         for generator in seed_gens {
             let seeds = generator.obtain();
-            self.corpus
-                .entries
-                .extend(seeds.into_iter().map(|seed| (seed.id(), seed)));
+            seeds
+                .into_iter()
+                .for_each(|seed| self.corpus.insert(seed, f64::INFINITY))
         }
     }
 
-    pub fn snapshot(&self) -> Vec<CorpusEntry> {
-        let mut snapshot: Vec<CorpusEntry> = self.corpus.entries.values().cloned().collect();
-        // sort snapshot, to ensure same output across runs/snapshots, as this is created from std::collections::HashMap.
-        // This may actually be necessary if a snapshot could at some point be fed back into the engine
-        snapshot.sort_by_key(|item| item.id());
-        snapshot
+    pub fn snapshot(&mut self) -> Vec<CorpusEntry> {
+        self.corpus
+            .ids()
+            .into_iter()
+            .filter_map(|id| self.corpus.get(&id))
+            .collect()
     }
 
     pub fn gc(&mut self) {
@@ -201,13 +199,13 @@ impl Engine {
         println!(
             "keeping {} out of {} entries",
             should_keep.len(),
-            self.corpus.entries.len(),
+            self.corpus.size(),
         );
-        self.corpus.entries.retain(|id, _| should_keep.contains(id));
+        todo!()
     }
 
     pub fn corpus_size(&self) -> usize {
-        self.corpus.entries.len()
+        self.corpus.size()
     }
 
     pub fn clear(&mut self) {
@@ -320,7 +318,7 @@ impl SeedDirReader {
                     )
                 }) {
                     contents.push(
-                        RawEntry::new(ast, [].into())
+                        RawEntry::new(ast, smallvec![])
                             .into_corpus_entry(lsf_core::entry::Meta::default()),
                     );
                 }
@@ -362,7 +360,7 @@ impl ObtainSeed for LiteralSeeder {
             .inspect_err(|e| eprintln!("could not parse sql \n{}\n due to {:?}\n", self.lit, e))
         {
             v.push(
-                RawEntry::new(ast, BTreeSet::new())
+                RawEntry::new(ast, Default::default())
                     .into_corpus_entry(lsf_core::entry::Meta::default()),
             );
         }
@@ -375,12 +373,13 @@ mod tests {
     use lsf_mutate::SpliceIn;
 
     use super::*;
-    use crate::WeightedRandomScheduler;
+    use crate::{InMemoryCorpus, WeightedRandomScheduler};
 
     #[test]
     fn engine_functionality() {
         let mut engine = Engine::new(
             Box::new(WeightedRandomScheduler {}),
+            Box::new(InMemoryCorpus::new()),
             vec![Box::new(SpliceIn {})],
             Arc::new(SharedMemHandle::new(1, 1)),
             vec![],

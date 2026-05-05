@@ -9,3 +9,4 @@ repository.workspace = true
 [dependencies]
 sqlparser = { workspace = true }
 serde = { workspace = true }
+smallvec = { workspace = true }

@@ -8,7 +8,7 @@ use lsf_feedback::{
 };
 use rand::RngExt;
 
-use crate::Schedule;
+use crate::{CorpusHandler, Schedule};
 
 const ZERO_WEIGHT: f64 = 0.001;
 const MAX_WEIGHT: f64 = 1e42;
@@ -141,12 +141,12 @@ impl ProbabilisticMABScheduler {
 }
 
 impl Schedule for ProbabilisticMABScheduler {
-    fn next_batch<'a>(
+    fn next_batch(
         &mut self,
-        from: &'a crate::Corpus,
+        from: &mut crate::Corpus,
         size: usize,
         rng: &mut dyn rand::Rng,
-    ) -> Vec<lsf_feedback::TestableEntry<&'a lsf_core::entry::RawEntry>> {
+    ) -> Vec<lsf_feedback::TestableEntry<lsf_core::entry::RawEntry>> {
         const ACCEPT_UNDER: u32 = 50;
 
         let current_epoch = self.mab.epoch.load(std::sync::atomic::Ordering::Relaxed);
@@ -160,8 +160,8 @@ impl Schedule for ProbabilisticMABScheduler {
                 if item.epoch.abs_diff(current_epoch) > ACCEPT_UNDER {
                     item.epoch = current_epoch;
                     self.queue.update(top, item.stats.calculate_score());
-                } else if let Some(entry) = from.entries.get(&item.item) {
-                    parents.push(TestableEntry::new(entry.raw()));
+                } else if let Some(entry) = from.get(&item.item) {
+                    parents.push(TestableEntry::new(entry.raw().clone()));
                 }
             }
         }

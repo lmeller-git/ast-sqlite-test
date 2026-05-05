@@ -1,6 +1,7 @@
 use lsf_core::entry::RawEntry;
 use lsf_feedback::TestableEntry;
 use rand::{Rng, RngExt};
+use smallvec::smallvec;
 use sqlparser::ast::{
     Expr,
     Query,
@@ -22,7 +23,7 @@ impl MutationStrategy for SpliceIn {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        parent_gen: &[TestableEntry<&RawEntry>],
+        parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let other_idx = rng.random_range(..parent_gen.len());
@@ -50,7 +51,7 @@ impl MutationStrategy for SubQuery {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        parent_gen: &[TestableEntry<&RawEntry>],
+        parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut child_ast = parent.ast().clone();
@@ -76,7 +77,7 @@ impl MutationStrategy for SubQuery {
 
         if child_is_mutated {
             Ok(crate::MutationState::Mutated(
-                RawEntry::new(child_ast, [parent.id()].into()).into(),
+                RawEntry::new(child_ast, smallvec![parent.id()]).into(),
             ))
         } else {
             Ok(crate::MutationState::Unchanged)
@@ -90,7 +91,7 @@ impl MutationStrategy for SetOps {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        parent_gen: &[TestableEntry<&RawEntry>],
+        parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let other_idx = rng.random_range(..parent_gen.len());

@@ -6,6 +6,7 @@ use std::{
 use lsf_core::entry::RawEntry;
 use lsf_feedback::TestableEntry;
 use rand::RngExt;
+use smallvec::smallvec;
 use sqlparser::ast::{
     Expr,
     ObjectName,
@@ -25,7 +26,7 @@ impl MutationStrategy for ExprShuffle {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        parent_gen: &[TestableEntry<&RawEntry>],
+        parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut parent_exprs: HashMap<std::mem::Discriminant<Expr>, Vec<Expr>> = HashMap::new();
@@ -86,7 +87,7 @@ impl MutationStrategy for RelShuffle {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        _parent_gen: &[TestableEntry<&RawEntry>],
+        _parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut parent_rels: HashSet<ObjectName> = HashSet::new();
@@ -120,7 +121,7 @@ impl MutationStrategy for RelShuffle {
 
         if is_mutated {
             Ok(crate::MutationState::Mutated(
-                RawEntry::new(child_ast, [parent.id()].into()).into(),
+                RawEntry::new(child_ast, smallvec![parent.id()]).into(),
             ))
         } else {
             Ok(crate::MutationState::Unchanged)

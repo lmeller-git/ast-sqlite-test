@@ -1,6 +1,7 @@
 use lsf_core::entry::RawEntry;
 use lsf_feedback::TestableEntry;
 use rand::{Rng, RngExt};
+use smallvec::smallvec;
 use sqlparser::{
     ast::{
         BinaryOperator,
@@ -35,7 +36,7 @@ impl MutationStrategy for NumericBounds {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        _parent_gen: &[TestableEntry<&RawEntry>],
+        _parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut child_ast = parent.ast().clone();
@@ -60,7 +61,7 @@ impl MutationStrategy for NumericBounds {
 
         if child_is_mutated {
             Ok(crate::MutationState::Mutated(
-                RawEntry::new(child_ast, [parent.id()].into()).into(),
+                RawEntry::new(child_ast, smallvec![parent.id()]).into(),
             ))
         } else {
             Ok(crate::MutationState::Unchanged)
@@ -76,7 +77,7 @@ impl MutationStrategy for OperatorFlip {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        _parent_gen: &[TestableEntry<&RawEntry>],
+        _parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut child_ast = parent.ast().clone();
@@ -112,7 +113,7 @@ impl MutationStrategy for OperatorFlip {
 
         if child_is_mutated {
             Ok(crate::MutationState::Mutated(
-                RawEntry::new(child_ast, [parent.id()].into()).into(),
+                RawEntry::new(child_ast, smallvec![parent.id()]).into(),
             ))
         } else {
             Ok(crate::MutationState::Unchanged)
@@ -128,7 +129,7 @@ impl MutationStrategy for NullInject {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        _parent_gen: &[TestableEntry<&RawEntry>],
+        _parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         let mut child_ast = parent.ast().clone();
@@ -149,7 +150,7 @@ impl MutationStrategy for NullInject {
 
         if child_is_mutated {
             Ok(crate::MutationState::Mutated(
-                RawEntry::new(child_ast, [parent.id()].into()).into(),
+                RawEntry::new(child_ast, smallvec![parent.id()]).into(),
             ))
         } else {
             Ok(crate::MutationState::Unchanged)
@@ -165,7 +166,7 @@ impl MutationStrategy for TypeCast {
     fn breed_inner(
         &self,
         parent: &TestableEntry<RawEntry>,
-        _parent_gen: &[TestableEntry<&RawEntry>],
+        _parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
         const TYPES: &[&str] = &["INTEGER", "TEXT", "REAL", "BLOB", "NUMERIC", "BOOLEAN"];
@@ -196,7 +197,7 @@ impl MutationStrategy for TypeCast {
 
         if child_is_mutated {
             Ok(crate::MutationState::Mutated(
-                RawEntry::new(child_ast, [parent.id()].into()).into(),
+                RawEntry::new(child_ast, smallvec![parent.id()]).into(),
             ))
         } else {
             Ok(crate::MutationState::Unchanged)
