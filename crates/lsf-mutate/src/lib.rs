@@ -31,41 +31,45 @@ pub use values::*;
 pub trait MutationStrategy: Send + Sync {
     fn breed_inner(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        child: &mut TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<MutationState, MutationError>;
 
     fn breed(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        child: &mut TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<MutationState, MutationError> {
-        let r = self.breed_inner(parent, parent_gen, rng);
+        let r = self.breed_inner(child, parent_gen, rng);
         match r {
-            Ok(MutationState::Mutated(_)) => {
-                parent.fire_parent_hooks(lsf_feedback::TestOutcome::Mutated)
+            Ok(MutationState::Mutated) => {
+                child.fire_parent_hooks(lsf_feedback::TestOutcome::Mutated)
             }
-            _ => parent.fire_parent_hooks(lsf_feedback::TestOutcome::NOOP),
+            _ => child.fire_parent_hooks(lsf_feedback::TestOutcome::NOOP),
         }
 
         r
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum MutationState {
-    Mutated(TestableEntry<RawEntry>),
+    Mutated,
     Unchanged,
 }
 
 impl MutationState {
-    pub fn into_option(self) -> Option<TestableEntry<RawEntry>> {
+    pub fn into_option(self) -> Option<()> {
         match self {
-            Self::Mutated(some) => Some(some),
+            Self::Mutated => Some(()),
             Self::Unchanged => None,
         }
+    }
+
+    pub fn into_bool(self) -> bool {
+        self.into_option().is_some()
     }
 }
 
@@ -77,31 +81,34 @@ pub enum MutationError {
     INVALIDAST(ID),
     #[error("No mutation was done")]
     NOOP,
+    #[error("Could not acquire mut ref of ast")]
+    ASTSHARED,
 }
 
 #[cfg(test)]
 pub(crate) fn test_single_mutation(sql: &str, expected: &str, strategy: Box<dyn MutationStrategy>) {
     use rand::{SeedableRng, rngs::SmallRng};
+    use smallvec::smallvec;
     use sqlparser::{dialect::SQLiteDialect, parser::Parser};
 
     let parsed = Parser::parse_sql(&SQLiteDialect {}, sql).unwrap();
     let entry = RawEntry::new(parsed, Default::default());
-    let entry_ = TestableEntry::new(entry.clone());
+    let mut entry_ = TestableEntry::new(RawEntry::new(entry.ast().clone(), smallvec![entry.id()]));
 
     let res = strategy
         .breed(
-            &entry_,
+            &mut entry_,
             &[TestableEntry::new(entry)],
             &mut SmallRng::seed_from_u64(42),
         )
         .unwrap();
-    let MutationState::Mutated(child) = res else {
+    let MutationState::Mutated = res else {
         return;
     };
 
     assert_eq!(
         expected,
-        child
+        entry_
             .ast()
             .iter()
             .map(|s| s.to_string())

@@ -136,6 +136,7 @@ fn fuzz_loop(engine: &mut Engine, token_queue: &SharedMemHandle) {
         }
 
         if i.is_multiple_of(200) {
+            engine.chore();
             println!("{}% done", i as f64 / 2_usize.pow(12) as f64 * 100.);
         }
     }

@@ -77,6 +77,14 @@ impl RawEntry {
         &self.ast
     }
 
+    pub fn ast_mut(&mut self) -> Option<&mut AST> {
+        Arc::get_mut(&mut self.ast)
+    }
+
+    pub fn make_mut_ast(&mut self) -> &mut AST {
+        Arc::make_mut(&mut self.ast)
+    }
+
     pub fn parents(&self) -> impl Iterator<Item = &ID> {
         self.parents.iter()
     }

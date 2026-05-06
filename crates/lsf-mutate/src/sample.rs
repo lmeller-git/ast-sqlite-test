@@ -29,7 +29,7 @@ impl RandomMutationSampler {
 impl MutationStrategy for RandomMutationSampler {
     fn breed_inner(
         &self,
-        _parent: &TestableEntry<RawEntry>,
+        _parent: &mut TestableEntry<RawEntry>,
         _parent_gen: &[TestableEntry<RawEntry>],
         _rng: &mut dyn Rng,
     ) -> Result<MutationState, crate::MutationError> {
@@ -38,7 +38,7 @@ impl MutationStrategy for RandomMutationSampler {
 
     fn breed(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        parent: &mut TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<MutationState, crate::MutationError> {
@@ -47,37 +47,15 @@ impl MutationStrategy for RandomMutationSampler {
             return Ok(MutationState::Unchanged);
         }
 
-        // we can assume that parent.hooks is empty, since it is part of the selected parents
-        debug_assert!(parent.applied_rule_stats.is_empty());
         let mut status = MutationState::Unchanged;
-        let mut hooks = parent.applied_rule_stats.clone();
-        let mut current_parent: &TestableEntry<RawEntry> = parent;
 
-        for i in 0..n_chosen {
+        for _ in 0..n_chosen {
             let chosen_strategy = rng.random_range(..self.choices.len());
-            if let Ok(MutationState::Mutated(mut next)) =
-                self.choices[chosen_strategy].breed(current_parent, parent_gen, rng)
-            {
-                if i > 0 && status != MutationState::Unchanged {
-                    next.parents_mut().extend(current_parent.parents().copied());
-                }
+            let r = self.choices[chosen_strategy].breed(parent, parent_gen, rng);
 
-                hooks.append(&mut next.applied_rule_stats);
-                // we can further assume that the childs build hooks are empty, since consumers "use but not add" build hooks
-                debug_assert!(next.parent_stats.is_empty());
-                next.parent_stats.extend(parent.parent_stats.clone());
-
-                status = MutationState::Mutated(next);
-                current_parent = if let MutationState::Mutated(next) = &status {
-                    next
-                } else {
-                    unreachable!()
-                };
+            if let Ok(MutationState::Mutated) = r {
+                status = MutationState::Mutated;
             }
-        }
-
-        if let MutationState::Mutated(ref mut next) = status {
-            next.applied_rule_stats.append(&mut hooks);
         }
 
         Ok(status)
@@ -102,7 +80,7 @@ impl Randomly {
 impl MutationStrategy for Randomly {
     fn breed_inner(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        parent: &mut TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<MutationState, crate::MutationError> {
@@ -111,7 +89,7 @@ impl MutationStrategy for Randomly {
 
     fn breed(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        parent: &mut TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<MutationState, crate::MutationError> {

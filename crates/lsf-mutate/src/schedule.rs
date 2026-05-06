@@ -33,7 +33,7 @@ impl AdaptiveStrategyScheduler {
 impl MutationStrategy for AdaptiveStrategyScheduler {
     fn breed_inner(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        parent: &mut TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<MutationState, MutationError> {
@@ -42,7 +42,7 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
 
     fn breed(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        parent: &mut TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<MutationState, MutationError> {
@@ -53,10 +53,10 @@ impl MutationStrategy for AdaptiveStrategyScheduler {
             return Ok(MutationState::Unchanged);
         }
 
-        let mut r = self.breed_inner(parent, parent_gen, rng);
+        let r = self.breed_inner(parent, parent_gen, rng);
 
-        if let Ok(MutationState::Mutated(result)) = &mut r {
-            result.attach_hook(self.arm.clone());
+        if let Ok(MutationState::Mutated) = r {
+            parent.attach_hook(self.arm.clone());
             // this should optimally sit in update, as now probability is updated WITHIN one epoch, even though no stats are collected.
             // It is here right now, since we also need to updated this even if we do not insert a hook, i.e. if r != MutationState::Mutated.
             // This would require some kind of NullHook (TODO add later)
@@ -103,7 +103,7 @@ impl MABScheduler {
 impl MutationStrategy for MABScheduler {
     fn breed_inner(
         &self,
-        _parent: &TestableEntry<RawEntry>,
+        _parent: &mut TestableEntry<RawEntry>,
         _parent_gen: &[TestableEntry<RawEntry>],
         _rng: &mut dyn rand::Rng,
     ) -> Result<MutationState, MutationError> {
@@ -112,7 +112,7 @@ impl MutationStrategy for MABScheduler {
 
     fn breed(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        parent: &mut TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<MutationState, MutationError> {
@@ -134,23 +134,28 @@ impl MutationStrategy for MABScheduler {
             }
         }
 
-        if let Some(chosen) = acc.first() {
-            let mut r = chosen.item.breed(parent, parent_gen, rng);
-            if let Ok(MutationState::Mutated(result)) = &mut r {
-                result.attach_hook(chosen.stats.clone());
+        let mut is_mutated = false;
+
+        for rule in acc.iter() {
+            let r = rule.item.breed(parent, parent_gen, rng);
+            if let Ok(MutationState::Mutated) = r {
+                is_mutated = true;
+                parent.attach_hook(rule.stats.clone());
                 // this should optimally sit in update, as now probability is updated WITHIN one epoch, even though no stats are collected.
                 // It is here right now, since we also need to updated this even if we do not insert a hook, i.e. if r != MutationState::Mutated.
                 // This would require some kind of NullHook (TODO add later)
-                chosen.stats.on_mutate(TestOutcome::Mutated);
+                rule.stats.on_mutate(TestOutcome::Mutated);
             } else {
-                chosen.stats.on_mutate(TestOutcome::NOOP);
+                rule.stats.on_mutate(TestOutcome::NOOP);
             }
+        }
 
-            lock.extend(acc.drain(..));
+        lock.extend(acc.drain(..));
 
-            r
+        if is_mutated {
+            Ok(MutationState::Mutated)
         } else {
-            Err(MutationError::NOOP)
+            Ok(MutationState::Unchanged)
         }
     }
 }

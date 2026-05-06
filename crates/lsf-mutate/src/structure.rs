@@ -6,7 +6,6 @@ use std::{
 use lsf_core::entry::RawEntry;
 use lsf_feedback::TestableEntry;
 use rand::RngExt;
-use smallvec::smallvec;
 use sqlparser::ast::{
     Expr,
     ObjectName,
@@ -25,10 +24,13 @@ pub struct ExprShuffle {
 impl MutationStrategy for ExprShuffle {
     fn breed_inner(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        parent: &mut TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
+        let Some(child_ast) = parent.ast_mut() else {
+            return Err(crate::MutationError::ASTSHARED);
+        };
         let mut parent_exprs: HashMap<std::mem::Discriminant<Expr>, Vec<Expr>> = HashMap::new();
 
         let rd_donor = &parent_gen[rng.random_range(..parent_gen.len())];
@@ -41,7 +43,7 @@ impl MutationStrategy for ExprShuffle {
             ControlFlow::Continue::<()>(())
         });
 
-        _ = visit_expressions(parent.ast(), |expr| {
+        _ = visit_expressions(child_ast, |expr| {
             parent_exprs
                 .entry(std::mem::discriminant(expr))
                 .and_modify(|entry| entry.push(expr.clone()))
@@ -53,10 +55,9 @@ impl MutationStrategy for ExprShuffle {
             return Ok(crate::MutationState::Unchanged);
         }
 
-        let mut child_ast = parent.ast().clone();
         let mut is_mutated = false;
 
-        _ = visit_expressions_mut(&mut child_ast, |expr| {
+        _ = visit_expressions_mut(child_ast, |expr| {
             if let Some(targets) = parent_exprs.get(&std::mem::discriminant(expr))
                 && rng.random_bool(self.chance_per_node)
             {
@@ -70,9 +71,8 @@ impl MutationStrategy for ExprShuffle {
         });
 
         if is_mutated {
-            Ok(crate::MutationState::Mutated(
-                RawEntry::new(child_ast, [parent.id(), rd_donor.id()].into()).into(),
-            ))
+            parent.parents.push(rd_donor.id());
+            Ok(crate::MutationState::Mutated)
         } else {
             Ok(crate::MutationState::Unchanged)
         }
@@ -86,13 +86,16 @@ pub struct RelShuffle {
 impl MutationStrategy for RelShuffle {
     fn breed_inner(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        parent: &mut TestableEntry<RawEntry>,
         _parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
+        let Some(child_ast) = parent.ast_mut() else {
+            return Err(crate::MutationError::ASTSHARED);
+        };
         let mut parent_rels: HashSet<ObjectName> = HashSet::new();
 
-        _ = visit_relations(parent.ast(), |rel| {
+        _ = visit_relations(child_ast, |rel| {
             parent_rels.insert(rel.clone());
             ControlFlow::Continue::<()>(())
         });
@@ -101,11 +104,10 @@ impl MutationStrategy for RelShuffle {
             return Ok(crate::MutationState::Unchanged);
         }
 
-        let mut child_ast = parent.ast().clone();
         let mut is_mutated = false;
         let n_targets = parent_rels.len();
 
-        _ = visit_relations_mut(&mut child_ast, |rel| {
+        _ = visit_relations_mut(child_ast, |rel| {
             if rng.random_bool(self.chance_per_node) {
                 let random_target = parent_rels
                     .iter()
@@ -120,9 +122,7 @@ impl MutationStrategy for RelShuffle {
         });
 
         if is_mutated {
-            Ok(crate::MutationState::Mutated(
-                RawEntry::new(child_ast, smallvec![parent.id()]).into(),
-            ))
+            Ok(crate::MutationState::Mutated)
         } else {
             Ok(crate::MutationState::Unchanged)
         }

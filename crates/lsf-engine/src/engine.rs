@@ -84,31 +84,19 @@ impl Engine {
             .iter()
             .filter_map(|entry| {
                 let mut state = MutationState::Unchanged;
-                let mut hooks = entry.applied_rule_stats.clone();
-                let build_hooks = entry.parent_stats.clone();
-                let mut current_parent: &mut TestableEntry<RawEntry> =
-                    &mut TestableEntry::new((*entry.as_ref()).clone());
+                let mut child: TestableEntry<RawEntry> =
+                    TestableEntry::new(RawEntry::new(entry.ast().clone(), smallvec![entry.id()]));
+                child.parent_stats.extend(entry.applied_rule_stats.clone());
 
                 for strategy in &self.strategies {
-                    current_parent.parent_stats = build_hooks.clone();
-                    if let Ok(MutationState::Mutated(next)) =
-                        strategy.breed(current_parent, &next_batch, &mut self.rng)
+                    if let Ok(MutationState::Mutated) =
+                        strategy.breed(&mut child, &next_batch, &mut self.rng)
                     {
-                        state = MutationState::Mutated(next);
-                        current_parent = if let MutationState::Mutated(next_parent) = &mut state {
-                            hooks.append(&mut next_parent.applied_rule_stats);
-                            next_parent
-                        } else {
-                            unreachable!()
-                        }
+                        state = MutationState::Mutated;
                     }
                 }
 
-                if let MutationState::Mutated(state) = &mut state {
-                    state.applied_rule_stats.append(&mut hooks);
-                }
-
-                state.into_option()
+                state.into_option().map(|_| child)
             })
             .collect();
 

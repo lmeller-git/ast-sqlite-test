@@ -1,7 +1,6 @@
 use lsf_core::entry::RawEntry;
 use lsf_feedback::TestableEntry;
 use rand::{Rng, RngExt};
-use smallvec::smallvec;
 use sqlparser::ast::{
     CreateTable,
     ObjectName,
@@ -21,13 +20,17 @@ impl TableNameScramble {}
 impl MutationStrategy for TableNameScramble {
     fn breed_inner(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        parent: &mut TestableEntry<RawEntry>,
         _parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
+        let Some(child_ast) = parent.ast_mut() else {
+            return Err(crate::MutationError::ASTSHARED);
+        };
+
         let mut tables = Vec::new();
 
-        _ = visit_statements(parent.ast(), |stmt| {
+        _ = visit_statements(child_ast, |stmt| {
             if let Statement::CreateTable(CreateTable { name, .. })
             | Statement::CreateVirtualTable { name, .. } = stmt
                 && let Some(ident) = name.0[0].as_ident()
@@ -41,10 +44,9 @@ impl MutationStrategy for TableNameScramble {
             return Ok(crate::MutationState::Unchanged);
         }
 
-        let mut child_ast = parent.ast().clone();
         let mut child_is_mutated = false;
 
-        for stmt in &mut child_ast {
+        for stmt in child_ast {
             if matches!(
                 stmt,
                 Statement::CreateTable { .. } | Statement::CreateVirtualTable { .. }
@@ -66,9 +68,7 @@ impl MutationStrategy for TableNameScramble {
         }
 
         if child_is_mutated {
-            Ok(crate::MutationState::Mutated(
-                RawEntry::new(child_ast, smallvec![parent.id()]).into(),
-            ))
+            Ok(crate::MutationState::Mutated)
         } else {
             Ok(crate::MutationState::Unchanged)
         }
@@ -80,14 +80,16 @@ pub struct TableGuard {}
 impl MutationStrategy for TableGuard {
     fn breed_inner(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        parent: &mut TestableEntry<RawEntry>,
         _parent_gen: &[TestableEntry<RawEntry>],
         _rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
-        let mut child_ast = parent.ast().clone();
+        let Some(child_ast) = parent.ast_mut() else {
+            return Err(crate::MutationError::ASTSHARED);
+        };
         let mut mutation_occured = false;
 
-        _ = visit_statements_mut(&mut child_ast, |stmt| {
+        _ = visit_statements_mut(child_ast, |stmt| {
             if let Statement::CreateTable(CreateTable { if_not_exists, .. })
             | Statement::CreateVirtualTable { if_not_exists, .. } = stmt
             {
@@ -98,9 +100,7 @@ impl MutationStrategy for TableGuard {
         });
 
         if mutation_occured {
-            Ok(crate::MutationState::Mutated(
-                RawEntry::new(child_ast, smallvec![parent.id()]).into(),
-            ))
+            Ok(crate::MutationState::Mutated)
         } else {
             Ok(crate::MutationState::Unchanged)
         }

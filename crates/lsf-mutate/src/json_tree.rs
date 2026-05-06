@@ -4,7 +4,6 @@ use lsf_core::{ast::AST, entry::RawEntry};
 use lsf_feedback::TestableEntry;
 use rand::RngExt;
 use serde::{Serialize, de::DeserializeOwned};
-use smallvec::smallvec;
 use sqlparser::ast::{
     Expr,
     Statement,
@@ -39,7 +38,7 @@ pub struct TreeMutator<T> {
 impl<T: AstNode + Send + Sync + Clone> MutationStrategy for TreeMutator<T> {
     fn breed_inner(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        parent: &mut TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
@@ -54,18 +53,23 @@ impl<T: AstNode + Send + Sync + Clone> MutationStrategy for TreeMutator<T> {
                     self.chance_per_field,
                 )
             }
-            FieldOperation::ShuffleSelf => shuffle_across::<T>(
-                parent,
-                parent,
-                rng,
-                self.chance_per_node,
-                self.chance_per_field,
-            ),
+            FieldOperation::ShuffleSelf => {
+                let parent_clone = parent.clone();
+                shuffle_across::<T>(
+                    parent,
+                    &parent_clone,
+                    rng,
+                    self.chance_per_node,
+                    self.chance_per_field,
+                )
+            }
             FieldOperation::NullRandom => {
+                let Some(child_ast) = parent.ast_mut() else {
+                    return Err(crate::MutationError::ASTSHARED);
+                };
                 let mut is_mutated = false;
-                let mut child_ast = parent.ast().clone();
 
-                _ = T::visit_mut(&mut child_ast, |node| {
+                _ = T::visit_mut(child_ast, |node| {
                     if rng.random_bool(self.chance_per_node)
                         && let Ok(mut json_node) = serde_json::to_value(&node)
                     {
@@ -79,7 +83,7 @@ impl<T: AstNode + Send + Sync + Clone> MutationStrategy for TreeMutator<T> {
                 });
 
                 if is_mutated {
-                    MutationState::Mutated(RawEntry::new(child_ast, smallvec![parent.id()]).into())
+                    MutationState::Mutated
                 } else {
                     MutationState::Unchanged
                 }
@@ -97,14 +101,16 @@ pub struct RecursiveExpandExpr {
 impl MutationStrategy for RecursiveExpandExpr {
     fn breed_inner(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        parent: &mut TestableEntry<RawEntry>,
         _parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<MutationState, crate::MutationError> {
+        let Some(child_ast) = parent.ast_mut() else {
+            return Err(crate::MutationError::ASTSHARED);
+        };
         let mut is_mutated = false;
-        let mut child_ast = parent.ast().clone();
 
-        _ = visit_expressions_mut(&mut child_ast, |expr| {
+        _ = visit_expressions_mut(child_ast, |expr| {
             if rng.random_bool(self.chance_per_node)
                 && let Ok(mut json_node) = serde_json::to_value(&expr)
             {
@@ -147,9 +153,7 @@ impl MutationStrategy for RecursiveExpandExpr {
         });
 
         if is_mutated {
-            Ok(MutationState::Mutated(
-                RawEntry::new(child_ast, smallvec![parent.id()]).into(),
-            ))
+            Ok(MutationState::Mutated)
         } else {
             Ok(MutationState::Unchanged)
         }
@@ -184,12 +188,15 @@ fn expand_recursive(
 }
 
 fn shuffle_across<T: AstNode + Send + Sync + Clone>(
-    parent: &RawEntry,
+    parent: &mut RawEntry,
     donor: &RawEntry,
     rng: &mut dyn rand::Rng,
     chance_per_node: f64,
     chance_per_field: f64,
 ) -> MutationState {
+    let Some(child_ast) = parent.ast_mut() else {
+        return crate::MutationState::Unchanged;
+    };
     let mut is_mutated = false;
     let mut donor_nodes: HashMap<std::mem::Discriminant<T>, Vec<T>> = HashMap::new();
 
@@ -205,9 +212,7 @@ fn shuffle_across<T: AstNode + Send + Sync + Clone>(
         return MutationState::Unchanged;
     }
 
-    let mut child_ast = parent.ast().clone();
-
-    _ = T::visit_mut(&mut child_ast, |node| {
+    _ = T::visit_mut(child_ast, |node| {
         if rng.random_bool(chance_per_node)
             && let Some(donor) = donor_nodes
                 .get(&T::discriminant(node))
@@ -226,7 +231,8 @@ fn shuffle_across<T: AstNode + Send + Sync + Clone>(
     });
 
     if is_mutated {
-        MutationState::Mutated(RawEntry::new(child_ast, [donor.id(), parent.id()].into()).into())
+        parent.parents.push(donor.id());
+        MutationState::Mutated
     } else {
         MutationState::Unchanged
     }

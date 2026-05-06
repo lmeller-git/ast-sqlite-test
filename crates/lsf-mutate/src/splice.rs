@@ -1,7 +1,6 @@
 use lsf_core::entry::RawEntry;
 use lsf_feedback::TestableEntry;
 use rand::{Rng, RngExt};
-use smallvec::smallvec;
 use sqlparser::ast::{
     Expr,
     Query,
@@ -22,24 +21,27 @@ impl SpliceIn {}
 impl MutationStrategy for SpliceIn {
     fn breed_inner(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        parent: &mut TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
+        let Some(child_ast) = parent.ast_mut() else {
+            return Err(crate::MutationError::ASTSHARED);
+        };
         let other_idx = rng.random_range(..parent_gen.len());
         let other = &parent_gen[other_idx];
         let random_start = rng.random_range(..other.ast().len());
         let random_end = rng.random_range(random_start + 1..=other.ast().len());
-        let random_insert = rng.random_range(..parent.ast().len());
+        let random_insert = rng.random_range(..child_ast.len());
 
-        let mut child_ast = parent.ast().clone();
         _ = child_ast.splice(
             random_insert..random_insert,
             other.ast()[random_start..random_end].iter().cloned(),
         );
-        Ok(crate::MutationState::Mutated(
-            RawEntry::new(child_ast, [parent.id(), other.id()].into()).into(),
-        ))
+
+        parent.parents.push(other.id());
+
+        Ok(crate::MutationState::Mutated)
     }
 }
 
@@ -50,14 +52,16 @@ pub struct SubQuery {
 impl MutationStrategy for SubQuery {
     fn breed_inner(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        parent: &mut TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
-        let mut child_ast = parent.ast().clone();
+        let Some(child_ast) = parent.ast_mut() else {
+            return Err(crate::MutationError::ASTSHARED);
+        };
         let mut child_is_mutated = false;
 
-        _ = visit_expressions_mut(&mut child_ast, |expr| {
+        _ = visit_expressions_mut(child_ast, |expr| {
             if let Expr::BinaryOp { right, .. } = expr
                 && matches!(**right, Expr::Value(_))
                 && rng.random_bool(self.mutation_chance)
@@ -76,9 +80,7 @@ impl MutationStrategy for SubQuery {
         });
 
         if child_is_mutated {
-            Ok(crate::MutationState::Mutated(
-                RawEntry::new(child_ast, smallvec![parent.id()]).into(),
-            ))
+            Ok(crate::MutationState::Mutated)
         } else {
             Ok(crate::MutationState::Unchanged)
         }
@@ -90,15 +92,17 @@ pub struct SetOps {}
 impl MutationStrategy for SetOps {
     fn breed_inner(
         &self,
-        parent: &TestableEntry<RawEntry>,
+        parent: &mut TestableEntry<RawEntry>,
         parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn Rng,
     ) -> Result<crate::MutationState, crate::MutationError> {
+        let Some(child_ast) = parent.ast_mut() else {
+            return Err(crate::MutationError::ASTSHARED);
+        };
         let other_idx = rng.random_range(..parent_gen.len());
         let other = &parent_gen[other_idx];
 
-        let left = parent
-            .ast()
+        let left = child_ast
             .iter()
             .enumerate()
             .filter_map(|(i, stmt)| {
@@ -143,8 +147,7 @@ impl MutationStrategy for SetOps {
             .ast()
             .get(*right.get(rng.random_range(..right.len())).unwrap())
             .unwrap();
-        let left = parent
-            .ast()
+        let left = child_ast
             .get(*left.get(rng.random_range(..left.len())).unwrap())
             .unwrap();
 
@@ -174,9 +177,12 @@ impl MutationStrategy for SetOps {
             pipe_operators: vec![],
         }));
 
-        Ok(crate::MutationState::Mutated(
-            RawEntry::new(vec![combined], [parent.id(), other.id()].into()).into(),
-        ))
+        let rd = rng.random_range(..child_ast.len());
+        child_ast[rd] = combined;
+
+        parent.parents.push(other.id());
+
+        Ok(crate::MutationState::Mutated)
     }
 }
 
