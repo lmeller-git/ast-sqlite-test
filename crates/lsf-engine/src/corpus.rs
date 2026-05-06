@@ -4,7 +4,6 @@ use std::{
 };
 
 use lsf_core::{
-    IDMAp,
     ast::AST,
     entry::{CorpusEntry, ID},
 };
@@ -71,45 +70,6 @@ impl CorpusHandler<f64> for Corpus {
 
     fn ids(&self) -> Vec<ID> {
         self.handler.ids()
-    }
-}
-
-#[derive(Default)]
-pub struct InMemoryCorpus {
-    inner: IDMAp<CorpusEntry>,
-}
-
-impl InMemoryCorpus {
-    pub fn new() -> Self {
-        Self {
-            inner: IDMAp::default(),
-        }
-    }
-}
-
-impl<T> CorpusHandler<T> for InMemoryCorpus {
-    fn get(&mut self, id: &ID) -> Option<CorpusEntry> {
-        self.inner.get(id).cloned()
-    }
-
-    fn update(&mut self, _id: &ID, _s: T) {}
-
-    fn insert(&mut self, entry: CorpusEntry, _s: T) {
-        self.inner.insert(entry.id(), entry);
-    }
-
-    fn resize(&mut self) {}
-
-    fn clear(&mut self) {
-        self.inner.clear();
-    }
-
-    fn size(&self) -> usize {
-        self.inner.len()
-    }
-
-    fn ids(&self) -> Vec<ID> {
-        self.inner.keys().copied().collect()
     }
 }
 

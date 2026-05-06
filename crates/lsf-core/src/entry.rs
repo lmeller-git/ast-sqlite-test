@@ -1,4 +1,5 @@
 use std::{
+    fmt::Display,
     ops::{Deref, DerefMut},
     sync::{Arc, atomic::AtomicU32},
 };
@@ -27,6 +28,12 @@ impl ID {
 
     pub fn as_raw(&self) -> u32 {
         self.raw
+    }
+}
+
+impl Display for ID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.raw)
     }
 }
 

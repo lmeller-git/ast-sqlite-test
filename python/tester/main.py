@@ -29,7 +29,9 @@ async def main(args: Namespace):
     sem_rule_scheduler_body = engine.MABBody()
 
     if args.save_to is not None:
-        corpus_handler = engine.CorpusManagerBuilder.dynamic_cache(args.save_to)
+        corpus_handler = engine.CorpusManagerBuilder.dynamic_cache(
+            engine.DiskCacheBuilder.sharded(args.save_to)
+        )
     else:
         corpus_handler = engine.CorpusManagerBuilder.in_memory()
 

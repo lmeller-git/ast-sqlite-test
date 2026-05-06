@@ -2,7 +2,15 @@ use std::sync::Arc;
 
 use lsf_core::entry::{Meta, RawEntry};
 use lsf_cov::ipc::SharedMemHandle;
-use lsf_engine::{DynamicCorpus, Engine, InMemoryCorpus, ProbabilisticMABScheduler, SeedDirReader};
+use lsf_engine::{
+    BinaryBlob,
+    DynamicCorpus,
+    Engine,
+    InMemory,
+    ProbabilisticMABScheduler,
+    SeedDirReader,
+    ShardedDiskCache,
+};
 use lsf_feedback::{TestableEntry, mab::MABBody};
 use lsf_mutate::{
     ExprShuffle,
@@ -27,7 +35,7 @@ fn main() {
     let scheduler_body = Arc::new(MABBody::new());
     let scheduler = ProbabilisticMABScheduler::new(scheduler_body.clone());
 
-    let corpus_handler = InMemoryCorpus::new(); //DynamicCorpus::new("../temp_out".into());
+    let corpus_handler = DynamicCorpus::new(Box::new(BinaryBlob::new("../temp_out".into())));
 
     let shmem_queue = Arc::new(SharedMemHandle::new(8, 2_usize.pow(14)));
 
@@ -114,6 +122,8 @@ fn main() {
 
     println!("entering loop");
     fuzz_loop(&mut engine, &shmem_queue);
+
+    println!("corpus size: {}", engine.corpus_size())
 }
 
 fn fuzz_loop(engine: &mut Engine, token_queue: &SharedMemHandle) {
@@ -144,7 +154,15 @@ fn virtual_run_test(
             panic!("cannot happen in sequential case")
         }
     };
-    engine.commit_test_result(test, random_meta(rng), token);
+    let meta = random_meta(rng);
+    test.fire_rule_hooks(if meta.new_cov_nodes > 0 {
+        lsf_feedback::TestOutcome::Accepted(lsf_feedback::AcceptanceReason::CovIncrease(
+            meta.new_cov_nodes,
+        ))
+    } else {
+        lsf_feedback::TestOutcome::Accepted(lsf_feedback::AcceptanceReason::IsDiverse)
+    });
+    engine.commit_test_result(test, meta, token);
 }
 
 fn random_meta(rng: &mut dyn rand::Rng) -> Meta {

@@ -3,18 +3,22 @@ use std::sync::Arc;
 use lsf_cov::ipc::{IPCToken, SharedMemHandle};
 use lsf_engine::{
     AdaptiveWeightedRandomScheduler,
+    BinaryBlob,
     CorpusHandler,
     DynamicCorpus,
     Engine as RawEngine,
     Generation as RawGeneration,
-    InMemoryCorpus,
+    InMemory,
     LiteralSeeder,
     MABScheduler,
     ObtainSeed,
     ProbabilisticMABScheduler,
+    SQLSaver,
     Schedule,
     SchedulerBatcher,
     SeedDirReader,
+    ShardedDiskCache,
+    StorageBackend,
     WeightedRandomScheduler,
 };
 use lsf_mutate::{
@@ -128,13 +132,39 @@ pub struct CorpusManagerBuilder(Option<Box<dyn CorpusHandler<f64>>>);
 #[pymethods]
 impl CorpusManagerBuilder {
     #[staticmethod]
-    pub fn dynamic_cache(cache_dir: String) -> Self {
-        Self(Some(Box::new(DynamicCorpus::new(cache_dir.into()))))
+    pub fn dynamic_cache(mut disk_cache: PyRefMut<DiskCacheBuilder>) -> Self {
+        Self(Some(Box::new(DynamicCorpus::new(
+            disk_cache.0.take().unwrap(),
+        ))))
     }
 
     #[staticmethod]
     pub fn in_memory() -> Self {
-        Self(Some(Box::new(InMemoryCorpus::new())))
+        Self(Some(Box::new(InMemory::new())))
+    }
+}
+
+#[pyclass]
+pub struct DiskCacheBuilder(Option<Box<dyn StorageBackend>>);
+
+#[pymethods]
+impl DiskCacheBuilder {
+    #[staticmethod]
+    pub fn sharded(cache_dir: String) -> Self {
+        Self(Some(Box::new(ShardedDiskCache::new(cache_dir.into()))))
+    }
+
+    #[staticmethod]
+    pub fn blob(cache_dir: String) -> Self {
+        Self(Some(Box::new(BinaryBlob::new(cache_dir.into()))))
+    }
+
+    #[staticmethod]
+    pub fn sql_saver(mut backend: PyRefMut<DiskCacheBuilder>, save_dir: String) -> Self {
+        Self(Some(Box::new(SQLSaver::new(
+            backend.0.take().unwrap(),
+            save_dir.into(),
+        ))))
     }
 }
 
