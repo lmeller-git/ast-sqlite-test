@@ -71,6 +71,7 @@ class SQLiteWorker:
     async def _read_until_sentinel(
         self, stream: asyncio.StreamReader, sentinel: bytes
     ) -> tuple[bytes, bool]:
+        # TODO: use readuntil instead
         chunks: list[bytes] = []
         while True:
             # TODO: handle StreamOverrunError
@@ -91,7 +92,7 @@ class SQLiteWorker:
         stderr_stream: asyncio.StreamReader = self.proc.stderr
 
         start_time = time.perf_counter_ns()
-        full_command = f"{query};\n.shell echo {self.STDERR_SENTINEL.decode()} >&2\n.print {self.STDOUT_SENTINEL.decode()}\n"
+        full_command = f"{query};\n.output stderr\n.print {self.STDERR_SENTINEL.decode()}\n.output stdout\n.print {self.STDOUT_SENTINEL.decode()}\n"
 
         try:
             self.proc.stdin.write(full_command.encode())

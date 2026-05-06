@@ -14,11 +14,9 @@ async def run_single_mutation(
     workers: dict[int, SQLiteWorker],
     test_path: str,
 ):
-    backoff = 0.01
     token = ipc_queue.pop()
     while token is None:
-        await asyncio.sleep(backoff)
-        backoff = min(backoff * 2, 0.5)
+        await asyncio.sleep(0)
         token = ipc_queue.pop()
 
     try:
