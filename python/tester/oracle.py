@@ -106,6 +106,8 @@ async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]
         bug_type: str | None = None
         notes: str = ""
         ref: TestCapture | None = None
+        
+        normalized_item_stderr = normalize_output(item.stderr)
 
         if is_unconditional_bug(item):
             bug_type = "MEMSAFETY"
@@ -129,7 +131,7 @@ async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]
             else:
                 if is_expected_error(item) and is_expected_error(ref):
                     pass
-                elif normalize_output(item.stderr.split(b"\n")[0]) != normalize_output(ref.stderr.split(b"\n")[0]):
+                elif normalized_item_stderr.split(b"\n")[0] != normalize_output(ref.stderr).split(b"\n")[0]:
                     bug_type = "DIVERGENCE"
                     notes = "Both errored, but with different messages (after normalization)."
 
@@ -149,7 +151,7 @@ async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]
         if bug_type is not None:
             # Create a signature that includes normalized stderr and a hash of the query for better deduplication
             query_hash = hashlib.md5(item.query.encode()).hexdigest().encode()
-            signature = normalize_output(item.stderr) + b"|" + query_hash
+            signature = normalized_item_stderr + b"|" + query_hash
             if signature in seen_signatures:
                 incoming.task_done()
                 continue
