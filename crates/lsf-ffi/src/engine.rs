@@ -5,9 +5,11 @@ use lsf_engine::{
     AdaptiveWeightedRandomScheduler,
     BinaryBlob,
     CorpusHandler,
+    CorpusMinimizer,
     DynamicCorpus,
     Engine as RawEngine,
     Generation as RawGeneration,
+    GreedyCoverage,
     InMemory,
     LiteralSeeder,
     MABScheduler,
@@ -52,10 +54,11 @@ pub struct Engine(RawEngine);
 #[pymethods]
 impl Engine {
     #[new]
-    #[pyo3(signature = (scheduler, corpus_handler, strategies, shmem_queue, mab_bodies = Vec::new(), rng_seed = 42))]
+    #[pyo3(signature = (scheduler, corpus_handler, corpus_minimzer, strategies, shmem_queue, mab_bodies = Vec::new(), rng_seed = 42))]
     pub fn new(
         mut scheduler: PyRefMut<SchedulerBuilder>,
         mut corpus_handler: PyRefMut<CorpusManagerBuilder>,
+        mut corpus_minimzer: PyRefMut<CorpusMinimizerBuilder>,
         mut strategies: Vec<PyRefMut<StrategyBuilder>>,
         shmem_queue: PyRef<IPCTokenQueue>,
         mab_bodies: Vec<PyRef<MABBody>>,
@@ -64,6 +67,7 @@ impl Engine {
         Self(RawEngine::new(
             scheduler.0.take().unwrap(),
             corpus_handler.0.take().unwrap(),
+            corpus_minimzer.0.take().unwrap(),
             strategies.iter_mut().map(|s| s.0.take().unwrap()).collect(),
             shmem_queue.0.clone(),
             mab_bodies.iter().map(|b| b.0.clone()).collect(),
@@ -123,6 +127,17 @@ impl Engine {
 
     pub fn clear(&mut self) {
         self.0.clear();
+    }
+}
+
+#[pyclass]
+pub struct CorpusMinimizerBuilder(Option<Box<dyn CorpusMinimizer<f64>>>);
+
+#[pymethods]
+impl CorpusMinimizerBuilder {
+    #[staticmethod]
+    pub fn greedy_coverage(max_edges: usize) -> Self {
+        Self(Some(Box::new(GreedyCoverage::new(max_edges))))
     }
 }
 

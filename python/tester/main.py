@@ -40,6 +40,7 @@ async def main(args: Namespace):
             engine.SchedulerBuilder.weighted_ucb1(corpus_scheduler_body)
         ),
         corpus_handler,
+        engine.CorpusMinimizerBuilder.greedy_coverage(max_edges),
         [engine.StrategyBuilder.table_guard()],
         ipc_queue,
         [

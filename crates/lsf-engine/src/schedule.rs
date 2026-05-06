@@ -13,23 +13,29 @@ use rand::{
     distr::{Distribution, weighted::WeightedIndex},
 };
 
-use crate::{Corpus, CorpusHandler, GRANULARITY};
+use crate::{CorpusHandler, GRANULARITY};
 
 pub trait Schedule: Send + Sync {
     fn next_batch(
         &mut self,
-        from: &mut Corpus,
+        from: &mut dyn CorpusHandler<f64>,
         size: usize,
         rng: &mut dyn Rng,
     ) -> Vec<TestableEntry<RawEntry>>;
 
-    fn next(&mut self, from: &mut Corpus, rng: &mut dyn Rng) -> Option<TestableEntry<RawEntry>> {
+    fn next(
+        &mut self,
+        from: &mut dyn CorpusHandler<f64>,
+        rng: &mut dyn Rng,
+    ) -> Option<TestableEntry<RawEntry>> {
         self.next_batch(from, 1, rng).into_iter().next()
     }
 
-    fn add_entry(&mut self, _entry: &CorpusEntry) -> f64 {
+    fn on_add(&mut self, _entry: &CorpusEntry) -> f64 {
         f64::INFINITY
     }
+
+    fn on_remove(&mut self, _id: ID) {}
 
     fn chore(&mut self) {}
 }
@@ -53,7 +59,7 @@ impl SchedulerBatcher {
         }
     }
 
-    fn refill(&mut self, from: &mut Corpus, size: usize, rng: &mut dyn Rng) {
+    fn refill(&mut self, from: &mut dyn CorpusHandler<f64>, size: usize, rng: &mut dyn Rng) {
         let size = size.clamp(MIN_REFILL, MAX_REFILL);
 
         let batch = self.inner_scheduler.next_batch(from, size, rng);
@@ -79,7 +85,7 @@ impl SchedulerBatcher {
 impl Schedule for SchedulerBatcher {
     fn next_batch(
         &mut self,
-        from: &mut Corpus,
+        from: &mut dyn CorpusHandler<f64>,
         size: usize,
         rng: &mut dyn Rng,
     ) -> Vec<TestableEntry<RawEntry>> {
@@ -107,8 +113,12 @@ impl Schedule for SchedulerBatcher {
         batch
     }
 
-    fn add_entry(&mut self, entry: &CorpusEntry) -> f64 {
-        self.inner_scheduler.add_entry(entry)
+    fn on_add(&mut self, entry: &CorpusEntry) -> f64 {
+        self.inner_scheduler.on_add(entry)
+    }
+
+    fn on_remove(&mut self, id: ID) {
+        self.inner_scheduler.on_remove(id);
     }
 
     fn chore(&mut self) {
@@ -144,7 +154,7 @@ impl WeightedRandomScheduler {
 impl Schedule for WeightedRandomScheduler {
     fn next_batch(
         &mut self,
-        from: &mut Corpus,
+        from: &mut dyn CorpusHandler<f64>,
         size: usize,
         rng: &mut dyn Rng,
     ) -> Vec<TestableEntry<RawEntry>> {
@@ -198,7 +208,7 @@ impl AdaptiveWeightedRandomScheduler {
 impl Schedule for AdaptiveWeightedRandomScheduler {
     fn next_batch(
         &mut self,
-        from: &mut Corpus,
+        from: &mut dyn CorpusHandler<f64>,
         size: usize,
         rng: &mut dyn Rng,
     ) -> Vec<TestableEntry<RawEntry>> {

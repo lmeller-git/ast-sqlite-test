@@ -1,14 +1,13 @@
 // TODO maybe change this to bitvec/bitslice later to save memory
 
-use std::{collections::HashSet, fmt::Debug};
+use std::fmt::Debug;
 
 use lsf_core::entry::ID;
-
-static mut TOTAL_FOUND: usize = 0;
 
 #[derive(Debug)]
 pub struct EdgeMap {
     raw_map: Vec<u8>,
+    total_found: usize,
 }
 
 impl EdgeMap {
@@ -16,6 +15,7 @@ impl EdgeMap {
         // one byte per edge
         Self {
             raw_map: vec![0; max_edges],
+            total_found: 0,
         }
     }
 
@@ -61,18 +61,17 @@ impl EdgeMap {
             }
         }
 
-        unsafe {
-            TOTAL_FOUND += new_edges.len();
-        }
-
         if !new_edges.is_empty() {
-            println!(
-                "Total coverage so far: {:.3}%",
-                unsafe { TOTAL_FOUND } as f64 / self.raw_map.len() as f64 * 100.0
-            )
+            self.total_found += new_edges.len();
+
+            println!("Total coverage so far: {:.3}%", self.current_cov() * 100.)
         }
 
         new_edges
+    }
+
+    pub fn current_cov(&self) -> f64 {
+        self.total_found as f64 / self.raw_map.len() as f64
     }
 }
 
@@ -105,7 +104,7 @@ impl ScoredEdges {
         }
     }
 
-    pub fn get_best_entries(&self) -> HashSet<ID> {
+    pub fn get_best_entries(&self) -> rustc_hash::FxHashSet<ID> {
         self.best_entries
             .iter()
             .flatten()
@@ -120,7 +119,7 @@ impl ScoredEdges {
         exec_time_ns: u32,
         hit_edges: impl Iterator<Item = usize>,
     ) -> bool {
-        let score = exec_time_ns.saturating_mul(query_len as u32);
+        let score = exec_time_ns.ilog10().saturating_mul(query_len as u32);
         let mut is_best_anywhere = false;
 
         for edge_id in hit_edges {

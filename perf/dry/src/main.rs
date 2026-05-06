@@ -6,6 +6,7 @@ use lsf_engine::{
     BinaryBlob,
     DynamicCorpus,
     Engine,
+    GreedyCoverage,
     ProbabilisticMABScheduler,
     SchedulerBatcher,
     SeedDirReader,
@@ -98,6 +99,7 @@ fn main() {
     let mut engine = Engine::new(
         Box::new(scheduler),
         Box::new(corpus_handler),
+        Box::new(GreedyCoverage::new(2_usize.pow(14))),
         vec![Box::new(ruleset)],
         shmem_queue.clone(),
         vec![scheduler_body, top_level_strategy, scheduler1, scheduler2],

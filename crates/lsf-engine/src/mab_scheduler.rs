@@ -26,7 +26,7 @@ impl MABScheduler {
 impl Schedule for MABScheduler {
     fn next_batch(
         &mut self,
-        from: &mut crate::Corpus,
+        from: &mut dyn CorpusHandler<f64>,
         size: usize,
         _rng: &mut dyn rand::Rng,
     ) -> Vec<lsf_feedback::TestableEntry<lsf_core::entry::RawEntry>> {
@@ -51,8 +51,8 @@ impl Schedule for MABScheduler {
                     parents.push(
                         TestableEntry::new(parent.raw().clone()).with_build_hook(top.stats.clone()),
                     );
+                    acc.push(top);
                 }
-                acc.push(top);
             }
         }
 
@@ -61,7 +61,7 @@ impl Schedule for MABScheduler {
         parents
     }
 
-    fn add_entry(&mut self, entry: &lsf_core::entry::CorpusEntry) -> f64 {
+    fn on_add(&mut self, entry: &lsf_core::entry::CorpusEntry) -> f64 {
         let item = SchedueldItem::new_with_prior(self.mab.clone(), entry.id(), entry.meta());
         let score = item.score;
         self.queue.push(item);

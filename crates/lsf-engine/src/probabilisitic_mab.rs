@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use indexmap::IndexMap;
 use lsf_core::entry::{ID, Meta};
 use lsf_feedback::{
     AdaptiveStatistics,
@@ -151,15 +152,17 @@ impl BlockSumTable {
 
 pub struct ProbabilisticMABScheduler {
     queue: BlockSumTable,
-    id_mapping: Vec<SmallSchedueldItem<ID>>,
+    id_mapping: IndexMap<ID, SmallSchedueldItem<()>, rustc_hash::FxBuildHasher>,
     mab: Arc<MABBody>,
 }
+
+const DEFAULT_CAP: usize = 10000;
 
 impl ProbabilisticMABScheduler {
     pub fn new(body: Arc<MABBody>) -> Self {
         Self {
-            queue: BlockSumTable::new(10000),
-            id_mapping: Vec::with_capacity(10000),
+            queue: BlockSumTable::new(DEFAULT_CAP),
+            id_mapping: IndexMap::with_capacity_and_hasher(DEFAULT_CAP, rustc_hash::FxBuildHasher),
             mab: body,
         }
     }
@@ -168,7 +171,7 @@ impl ProbabilisticMABScheduler {
 impl Schedule for ProbabilisticMABScheduler {
     fn next_batch(
         &mut self,
-        from: &mut crate::Corpus,
+        from: &mut dyn CorpusHandler<f64>,
         size: usize,
         rng: &mut dyn rand::Rng,
     ) -> Vec<lsf_feedback::TestableEntry<lsf_core::entry::RawEntry>> {
@@ -181,11 +184,11 @@ impl Schedule for ProbabilisticMABScheduler {
         while parents.len() < size
             && let Some(top) = self.queue.sample(rng)
         {
-            if let Some(item) = self.id_mapping.get_mut(top) {
+            if let Some((id, item)) = self.id_mapping.get_index_mut(top) {
                 if item.epoch.abs_diff(current_epoch) > ACCEPT_UNDER {
                     item.epoch = current_epoch;
                     self.queue.update(top, item.stats.calculate_score());
-                } else if let Some(entry) = from.get(&item.item) {
+                } else if let Some(entry) = from.get(id) {
                     parents.push(
                         TestableEntry::new(entry.raw().clone()).with_build_hook(item.stats.clone()),
                     );
@@ -196,13 +199,19 @@ impl Schedule for ProbabilisticMABScheduler {
         parents
     }
 
-    fn add_entry(&mut self, entry: &lsf_core::entry::CorpusEntry) -> f64 {
-        let item = SmallSchedueldItem::new_with_prior(self.mab.clone(), entry.id(), &entry.meta);
+    fn on_add(&mut self, entry: &lsf_core::entry::CorpusEntry) -> f64 {
+        let item = SmallSchedueldItem::new_with_prior(self.mab.clone(), (), &entry.meta);
         let score = item.stats.calculate_score();
         let idx = self.queue.push(score);
-        debug_assert_eq!(idx, self.id_mapping.len());
-        self.id_mapping.push(item);
+        let (idx_map, _) = self.id_mapping.insert_full(entry.id(), item);
+        debug_assert_eq!(idx, idx_map);
         score
+    }
+
+    fn on_remove(&mut self, id: ID) {
+        if let Some((idx, _, _entry)) = self.id_mapping.get_full(&id) {
+            self.queue.remove(idx);
+        }
     }
 
     fn chore(&mut self) {
