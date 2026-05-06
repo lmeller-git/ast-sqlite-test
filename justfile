@@ -33,8 +33,8 @@ lint:
 
 run-docker:
     docker build --build-arg USE_ASAN=true -t ast-sqlite-fuzzer .
-    docker run --security-opt seccomp=unconfined -v $(pwd)/docker_out:/app/docker_out -u $(id -u):$(id -g) --init -it --rm ast-sqlite-fuzzer /usr/bin/test-db-internal
+    docker run --security-opt seccomp=unconfined -v "$(pwd -W)/docker_out:/app/docker_out" --init -it --rm ast-sqlite-fuzzer //usr/bin/test-db-internal
 
 run-docker-it:
-    docker build --build-arg USE_ASAN==true -t ast-sqlite-fuzzer .
+    docker build --build-arg USE_ASAN=true -t ast-sqlite-fuzzer .
     docker run --security-opt seccomp=unconfined -v $(pwd)/docker_out:/app/docker_out -u $(id -u):$(id -g) --init -it --rm ast-sqlite-fuzzer /bin/bash

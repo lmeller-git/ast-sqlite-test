@@ -1,6 +1,6 @@
 import asyncio
 import os
-
+import hashlib
 from tester.persistent_worker import SQLiteWorker, TestCapture
 
 
@@ -58,7 +58,20 @@ INTERESTING_UNILATERAL_PATTERNS: list[bytes] = [
     b"database disk image is malformed",  # SQLITE_CORRUPT (11) — suspicious in fuzz
     b"misuse of aggregate",
     b"misuse of window function",
+    b"database corruption",
+    b"index corruption",
 ]
+
+
+def normalize_output(output: bytes) -> bytes:
+    """Normalize output for comparison: strip whitespace, lowercase, normalize newlines."""
+    # Strip leading/trailing whitespace
+    normalized = output.strip()
+    # Lowercase for case-insensitive comparison
+    normalized = normalized.lower()
+    # Normalize newlines to \n
+    normalized = normalized.replace(b'\r\n', b'\n').replace(b'\r', b'\n')
+    return normalized
 
 
 def stderr_matches_any(stderr: bytes, patterns: list[bytes]) -> bool:
@@ -116,9 +129,9 @@ async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]
             else:
                 if is_expected_error(item) and is_expected_error(ref):
                     pass
-                elif item.stderr.split(b"\n")[0] != ref.stderr.split(b"\n")[0]:
+                elif normalize_output(item.stderr.split(b"\n")[0]) != normalize_output(ref.stderr.split(b"\n")[0]):
                     bug_type = "DIVERGENCE"
-                    notes = "Both errored, but with different messages."
+                    notes = "Both errored, but with different messages (after normalization)."
 
         elif item.exit_code == 0:
             ref = await oracle_worker.execute(item.query)
@@ -126,15 +139,21 @@ async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]
             if ref.exit_code != 0:
                 bug_type = "DIVERGENCE"
                 notes = f"Target exited 0 but reference exited {ref.exit_code}."
+            elif normalize_output(ref.stdout) != normalize_output(item.stdout):
+                bug_type = "LOGIC_BUG"
+                notes = "Same exit code (0) but stdout differs (after normalization)."
             elif ref.stdout != item.stdout:
                 bug_type = "LOGIC_BUG"
                 notes = "Same exit code (0) but stdout differs."
 
         if bug_type is not None:
-            if item.stderr in seen_signatures:
+            # Create a signature that includes normalized stderr and a hash of the query for better deduplication
+            query_hash = hashlib.md5(item.query.encode()).hexdigest().encode()
+            signature = normalize_output(item.stderr) + b"|" + query_hash
+            if signature in seen_signatures:
                 incoming.task_done()
                 continue
-            seen_signatures.add(item.stderr)
+            seen_signatures.add(signature)
 
             filename = f"docker_out/crashes/bug_{crash_counter:04d}_{bug_type}.txt"
             print(f"[!] {bug_type} — saving to {filename}", flush=True)
@@ -155,3 +174,4 @@ async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]
             crash_counter += 1
 
         incoming.task_done()
+
