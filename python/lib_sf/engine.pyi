@@ -9,11 +9,17 @@ class MABBody:
     def __init__(self) -> None: ...
 
 
+class CorpusMinimizerBuilder:
+    @staticmethod
+    def greedy_coverage(max_edges: int) -> CorpusMinimizerBuilder: ...
+
+
 class CorpusManagerBuilder:
     @staticmethod
     def dynamic_cache(disk_cache: DiskCacheBuilder) -> CorpusManagerBuilder: ...
     @staticmethod
     def in_memory() -> CorpusManagerBuilder: ...
+
 
 class DiskCacheBuilder:
     @staticmethod
@@ -22,6 +28,7 @@ class DiskCacheBuilder:
     def blob(cache_dir: str) -> DiskCacheBuilder: ...
     @staticmethod
     def sql_saver(backend: DiskCacheBuilder, save_dir: str) -> DiskCacheBuilder: ...
+
 
 class SchedulerBuilder:
     @staticmethod
@@ -80,7 +87,9 @@ class StrategyBuilder:
         max_depth: int = 3, chance_per_node: float = 0.1, chance_per_level: float = 0.5
     ) -> StrategyBuilder: ...
     @staticmethod
-    def ucb1(body: MABBody, strategies: list[StrategyBuilder], choose: int = 1) -> StrategyBuilder: ...
+    def ucb1(
+        body: MABBody, strategies: list[StrategyBuilder], choose: int = 1
+    ) -> StrategyBuilder: ...
 
 
 class TreeMutatorOperation:
@@ -104,6 +113,7 @@ class Engine:
         self,
         scheduler: SchedulerBuilder,
         corpus_handler: CorpusManagerBuilder,
+        corpus_minimzer: CorpusMinimizerBuilder,
         strategies: list[StrategyBuilder],
         shmem_queue: IPCTokenQueue,
         mab_bodies: list[MABBody] = [],

@@ -148,6 +148,16 @@ impl CorpusHandler<f64> for DynamicCorpus {
         );
     }
 
+    fn remove(&mut self, id: &ID) {
+        if let Some(data) = self.index.remove(id) {
+            match data.cached {
+                CacheLocation::InFlight(_) => {}
+                CacheLocation::Hot => _ = self.hot.remove(id),
+                _ => {}
+            }
+        }
+    }
+
     fn resize(&mut self) {
         if self.requests < CACHE_ADJUSTMENT_TICK {
             return;
@@ -169,7 +179,7 @@ impl CorpusHandler<f64> for DynamicCorpus {
         self.cache_misses = 0;
     }
 
-    fn ids(&self) -> Vec<ID> {
+    fn ids(&self) -> rustc_hash::FxHashSet<ID> {
         self.index.keys().copied().collect()
     }
 
@@ -288,6 +298,10 @@ impl<T> CorpusHandler<T> for InMemory<CorpusEntry> {
         self.inner.insert(entry.id(), entry);
     }
 
+    fn remove(&mut self, id: &ID) {
+        _ = self.inner.remove(id)
+    }
+
     fn resize(&mut self) {}
 
     fn clear(&mut self) {
@@ -298,7 +312,7 @@ impl<T> CorpusHandler<T> for InMemory<CorpusEntry> {
         self.inner.len()
     }
 
-    fn ids(&self) -> Vec<ID> {
+    fn ids(&self) -> rustc_hash::FxHashSet<ID> {
         self.inner.keys().copied().collect()
     }
 }

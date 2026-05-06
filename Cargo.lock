@@ -472,6 +472,7 @@ dependencies = [
  "bitvec",
  "lsf-core",
  "nblf-queue",
+ "rustc-hash 2.1.2",
  "shared_memory",
 ]
 

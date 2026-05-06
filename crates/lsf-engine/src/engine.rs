@@ -8,24 +8,29 @@ use std::{
 };
 
 use lsf_core::entry::{CorpusEntry, Meta, RawEntry};
-use lsf_cov::ipc::{IPCToken, SharedMemHandle};
-use lsf_feedback::{AcceptanceReason, RejectionReason, TestOutcome, TestableEntry, mab::MABBody};
+use lsf_cov::{
+    bitmap::EdgeMap,
+    ipc::{IPCToken, SharedMemHandle},
+};
+use lsf_feedback::{TestOutcome, TestableEntry, mab::MABBody};
 use lsf_mutate::{MutationState, MutationStrategy};
 use rand::{SeedableRng, rngs::SmallRng};
 use smallvec::smallvec;
 use sqlparser::{dialect::SQLiteDialect, parser::Parser};
 
-use crate::{Corpus, CorpusHandler, schedule::Schedule};
+use crate::{CorpusHandler, CorpusMinimizer, schedule::Schedule};
 
 pub const GRANULARITY: usize = 50;
 
 pub struct Engine {
-    corpus: Corpus,
+    corpus: Box<dyn CorpusHandler<f64>>,
     shmem_queue: Arc<SharedMemHandle>,
     scheduler: Box<dyn Schedule>,
     strategies: Vec<Box<dyn MutationStrategy>>,
+    minimizer: Box<dyn CorpusMinimizer<f64>>,
     rng: SmallRng,
     mab_bodies: Vec<Arc<MABBody>>,
+    edge_map: EdgeMap,
 }
 
 impl Debug for Engine {
@@ -40,6 +45,7 @@ impl Engine {
     pub fn new(
         scheduler: Box<dyn Schedule>,
         corpus_handler: Box<dyn CorpusHandler<f64>>,
+        minimizer: Box<dyn CorpusMinimizer<f64>>,
         strategies: Vec<Box<dyn MutationStrategy>>,
         shmem_queue: Arc<SharedMemHandle>,
         mab_bodies: Vec<Arc<MABBody>>,
@@ -48,7 +54,9 @@ impl Engine {
         Self {
             scheduler,
             strategies,
-            corpus: Corpus::new(shmem_queue.shmem_size, corpus_handler),
+            corpus: corpus_handler,
+            minimizer,
+            edge_map: EdgeMap::new(shmem_queue.shmem_size),
             shmem_queue,
             rng: SmallRng::seed_from_u64(rng_seed),
             mab_bodies,
@@ -78,7 +86,7 @@ impl Engine {
         }
         let next_batch = self
             .scheduler
-            .next_batch(&mut self.corpus, batch_size, &mut self.rng);
+            .next_batch(self.corpus.as_mut(), batch_size, &mut self.rng);
 
         let generation: Generation = next_batch
             .iter()
@@ -113,37 +121,16 @@ impl Engine {
         mut meta: Meta,
         shmem: Box<IPCToken>,
     ) {
-        let new_edges = self.corpus.edge_map.update(shmem.as_edge_map());
+        let new_edges = self.edge_map.update(shmem.as_edge_map());
         self.shmem_queue.push(shmem).expect("token was duplicated");
-
-        let is_diverse = self
-            .corpus
-            .diversity
-            .try_insert(raw_entry.id(), raw_entry.ast());
-        if !is_diverse && new_edges.is_empty() {
-            raw_entry.fire_rule_hooks(TestOutcome::Rejected(RejectionReason::Bad));
-            return;
-        }
-
         meta.new_cov_nodes = new_edges.len();
 
-        if !new_edges.is_empty() {
-            let is_best = self.corpus.entry_rating.update_if_best(
-                raw_entry.id(),
-                raw_entry.ast().len(),
-                meta.exec_time,
-                new_edges.into_iter(),
-            );
+        let accepted = self.minimizer.on_add(&raw_entry, &meta, new_edges);
 
-            if !is_best && !is_diverse {
-                raw_entry.fire_rule_hooks(TestOutcome::Rejected(RejectionReason::Bad));
-                return;
-            }
-            raw_entry.fire_rule_hooks(TestOutcome::Accepted(AcceptanceReason::CovIncrease(
-                meta.new_cov_nodes,
-            )));
-        } else {
-            raw_entry.fire_rule_hooks(TestOutcome::Accepted(AcceptanceReason::IsDiverse));
+        raw_entry.fire_rule_hooks(accepted);
+
+        if let TestOutcome::Rejected(_) = accepted {
+            return;
         }
 
         let entry = Into::<RawEntry>::into(raw_entry).into_corpus_entry(meta);
@@ -154,7 +141,7 @@ impl Engine {
 
     pub fn commit_generation(&mut self, generation: SelectedGeneration) {
         generation.members.into_iter().for_each(|entry| {
-            let score = self.scheduler.add_entry(&entry);
+            let score = self.scheduler.on_add(&entry);
             self.corpus.insert(entry, score);
         });
     }
@@ -181,16 +168,10 @@ impl Engine {
     }
 
     pub fn chore(&mut self) {
+        self.minimizer
+            .minimize(self.corpus.as_mut(), self.scheduler.as_mut());
         self.corpus.resize();
         self.scheduler.chore();
-        // let mut should_keep = self.corpus.entry_rating.get_best_entries();
-        // should_keep.extend(&self.corpus.diversity.entries);
-        // println!(
-        //     "keeping {} out of {} entries",
-        //     should_keep.len(),
-        //     self.corpus.size(),
-        // );
-        // todo!()
     }
 
     pub fn corpus_size(&self) -> usize {
@@ -362,13 +343,14 @@ mod tests {
     use lsf_mutate::SpliceIn;
 
     use super::*;
-    use crate::{InMemory, WeightedRandomScheduler};
+    use crate::{GreedyCoverage, InMemory, WeightedRandomScheduler};
 
     #[test]
     fn engine_functionality() {
         let mut engine = Engine::new(
             Box::new(WeightedRandomScheduler {}),
             Box::new(InMemory::new()),
+            Box::new(GreedyCoverage::new(1)),
             vec![Box::new(SpliceIn {})],
             Arc::new(SharedMemHandle::new(1, 1)),
             vec![],

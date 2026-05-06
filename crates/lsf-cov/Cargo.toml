@@ -11,3 +11,4 @@ bitvec = "1.0.1"
 shared_memory = "0.12.4"
 nblf-queue = { git = "https://github.com/lmeller-git/nblf-queue.git", features = ["std"], default-features = false }
 lsf-core = { workspace = true  }
+rustc-hash = { workspace = true }

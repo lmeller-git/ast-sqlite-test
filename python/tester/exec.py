@@ -44,12 +44,12 @@ async def run_single_mutation(
         # may want to return crashes and syntax errors also. They will quicly be moved to cold cache anyway, as they likely will not create good children
         if is_crash or is_hang:
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.crash()))
-            mutation_engine.return_token(token)
+            # mutation_engine.return_token(token)
         elif is_syntax_err:
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()))
-            mutation_engine.return_token(token)
-        else:
-            mutation_engine.commit_test_result(entry, engine.TestResult(capture.exec_time, token))
+            # mutation_engine.return_token(token)
+        # else:
+        mutation_engine.commit_test_result(entry, engine.TestResult(capture.exec_time, token))
 
         if is_crash:
             capture.is_hang_or_crash = "CRASH"
