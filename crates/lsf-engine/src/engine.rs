@@ -166,8 +166,8 @@ impl Engine {
 
     pub fn commit_generation(&mut self, generation: SelectedGeneration) {
         generation.members.into_iter().for_each(|entry| {
-            self.scheduler.add_entry(&entry);
-            self.corpus.insert(entry, f64::INFINITY);
+            let score = self.scheduler.add_entry(&entry);
+            self.corpus.insert(entry, score);
         });
     }
 
@@ -374,13 +374,13 @@ mod tests {
     use lsf_mutate::SpliceIn;
 
     use super::*;
-    use crate::{InMemoryCorpus, WeightedRandomScheduler};
+    use crate::{InMemory, WeightedRandomScheduler};
 
     #[test]
     fn engine_functionality() {
         let mut engine = Engine::new(
             Box::new(WeightedRandomScheduler {}),
-            Box::new(InMemoryCorpus::new()),
+            Box::new(InMemory::new()),
             vec![Box::new(SpliceIn {})],
             Arc::new(SharedMemHandle::new(1, 1)),
             vec![],

@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicU32, Ordering},
 };
 
+use lsf_core::entry::Meta;
 use portable_atomic::AtomicF64;
 
 use crate::{AcceptanceReason, AdaptiveStatistics, FeedbackHook, RejectionReason, TestOutcome};
@@ -63,48 +64,83 @@ pub struct MABArm {
     cov_increases: AtomicF64,
     syntax_err: AtomicF64,
     crash: AtomicF64,
-    local_epoch: AtomicU32,
+    pub local_epoch: AtomicU32,
     ctx: Arc<MABBody>,
 }
 
 impl MABArm {
     pub fn new(body: Arc<MABBody>) -> Self {
+        let norm_epoch = body.normalization_epoch.load(Ordering::Relaxed);
         Self {
             ctx: body,
+            local_epoch: AtomicU32::new(norm_epoch),
             ..Default::default()
+        }
+    }
+
+    pub fn new_with_prior(body: Arc<MABBody>, meta: &Meta) -> Self {
+        let inflation = body.current_inflation.load(Ordering::Relaxed);
+        let norm_epoch = body.normalization_epoch.load(Ordering::Relaxed);
+
+        let base_attempts = 1. * inflation;
+        body.total_attempts
+            .fetch_add(base_attempts, Ordering::Relaxed);
+
+        let base_cov = meta.new_cov_nodes as f64 * inflation;
+
+        Self {
+            attempts: AtomicF64::new(base_attempts),
+            cov_increases: AtomicF64::new(base_cov),
+            accepted: AtomicF64::new(if meta.is_valid_syntax {
+                1. * inflation
+            } else {
+                0.
+            }),
+            syntax_err: AtomicF64::new(if meta.is_valid_syntax {
+                0.
+            } else {
+                1. * inflation
+            }),
+            crash: AtomicF64::new(if meta.triggers_bug {
+                1. * inflation
+            } else {
+                0.
+            }),
+            local_epoch: AtomicU32::new(norm_epoch),
+            ctx: body,
         }
     }
 
     fn normalize(&self) {
         let norm_epoch = self.ctx.normalization_epoch.load(Ordering::Relaxed);
         let local_epoch = self.local_epoch.load(Ordering::Relaxed);
-        let diff = norm_epoch - local_epoch;
+        let diff = norm_epoch as i32 - local_epoch as i32;
 
         if diff != 0 {
             _ = self
                 .attempts
                 .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old| {
-                    Some(old / RESCALE_FACTOR.powi(diff as i32))
+                    Some(old / RESCALE_FACTOR.powi(diff))
                 });
             _ = self
                 .cov_increases
                 .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old| {
-                    Some(old / RESCALE_FACTOR.powi(diff as i32))
+                    Some(old / RESCALE_FACTOR.powi(diff))
                 });
             _ = self
                 .accepted
                 .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old| {
-                    Some(old / RESCALE_FACTOR.powi(diff as i32))
+                    Some(old / RESCALE_FACTOR.powi(diff))
                 });
             _ = self
                 .syntax_err
                 .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old| {
-                    Some(old / RESCALE_FACTOR.powi(diff as i32))
+                    Some(old / RESCALE_FACTOR.powi(diff))
                 });
             _ = self
                 .crash
                 .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old| {
-                    Some(old / RESCALE_FACTOR.powi(diff as i32))
+                    Some(old / RESCALE_FACTOR.powi(diff))
                 });
 
             self.local_epoch.store(norm_epoch, Ordering::Relaxed);
@@ -192,6 +228,17 @@ impl<T> SchedueldItem<T> {
     pub fn new(body: Arc<MABBody>, item: T) -> Self {
         let epoch = body.epoch.load(std::sync::atomic::Ordering::Relaxed);
         let stats = MABArm::new(body);
+        Self {
+            score: stats.calculate_score(),
+            epoch,
+            stats: stats.into(),
+            item,
+        }
+    }
+
+    pub fn new_with_prior(body: Arc<MABBody>, item: T, meta: &Meta) -> Self {
+        let epoch = body.epoch.load(std::sync::atomic::Ordering::Relaxed);
+        let stats = MABArm::new_with_prior(body, meta);
         Self {
             score: stats.calculate_score(),
             epoch,

@@ -27,7 +27,9 @@ pub trait Schedule: Send + Sync {
         self.next_batch(from, 1, rng).into_iter().next()
     }
 
-    fn add_entry(&mut self, _entry: &CorpusEntry) {}
+    fn add_entry(&mut self, _entry: &CorpusEntry) -> f64 {
+        f64::INFINITY
+    }
 
     fn chore(&mut self) {}
 }
@@ -105,8 +107,8 @@ impl Schedule for SchedulerBatcher {
         batch
     }
 
-    fn add_entry(&mut self, entry: &CorpusEntry) {
-        self.inner_scheduler.add_entry(entry);
+    fn add_entry(&mut self, entry: &CorpusEntry) -> f64 {
+        self.inner_scheduler.add_entry(entry)
     }
 
     fn chore(&mut self) {

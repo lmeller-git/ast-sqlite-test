@@ -6,10 +6,9 @@ use lsf_engine::{
     BinaryBlob,
     DynamicCorpus,
     Engine,
-    InMemory,
     ProbabilisticMABScheduler,
+    SchedulerBatcher,
     SeedDirReader,
-    ShardedDiskCache,
 };
 use lsf_feedback::{TestableEntry, mab::MABBody};
 use lsf_mutate::{
@@ -33,11 +32,13 @@ fn main() {
     let _profiler = dhat::Profiler::new_heap();
 
     let scheduler_body = Arc::new(MABBody::new());
-    let scheduler = ProbabilisticMABScheduler::new(scheduler_body.clone());
+    let scheduler = SchedulerBatcher::new(Box::new(ProbabilisticMABScheduler::new(
+        scheduler_body.clone(),
+    )));
 
     let corpus_handler = DynamicCorpus::new(Box::new(BinaryBlob::new("../temp_out".into())));
 
-    let shmem_queue = Arc::new(SharedMemHandle::new(8, 2_usize.pow(14)));
+    let shmem_queue = Arc::new(SharedMemHandle::new(4, 2_usize.pow(14)));
 
     let top_level_strategy = Arc::new(MABBody::new());
     let scheduler1 = Arc::new(MABBody::new());
@@ -128,14 +129,14 @@ fn main() {
 
 fn fuzz_loop(engine: &mut Engine, token_queue: &SharedMemHandle) {
     let mut rng = SmallRng::seed_from_u64(42);
-    for i in 0..2_usize.pow(11) {
+    for i in 0..2_usize.pow(12) {
         let mut batch = engine.mutate_batch(16);
         for item in batch.drain(..) {
             virtual_run_test(item, engine, token_queue, &mut rng);
         }
 
         if i.is_multiple_of(200) {
-            println!("{}% done", i as f64 / 2_usize.pow(11) as f64 * 100.);
+            println!("{}% done", i as f64 / 2_usize.pow(12) as f64 * 100.);
         }
     }
 }

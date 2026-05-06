@@ -61,9 +61,11 @@ impl Schedule for MABScheduler {
         parents
     }
 
-    fn add_entry(&mut self, entry: &lsf_core::entry::CorpusEntry) {
-        let item = SchedueldItem::new(self.mab.clone(), entry.id());
+    fn add_entry(&mut self, entry: &lsf_core::entry::CorpusEntry) -> f64 {
+        let item = SchedueldItem::new_with_prior(self.mab.clone(), entry.id(), entry.meta());
+        let score = item.score;
         self.queue.push(item);
+        score
     }
 }
 

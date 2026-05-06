@@ -538,12 +538,12 @@ impl StorageBackend for SQLSaver {
     }
 }
 
-struct CleanUp<T> {
+pub struct CleanUp<T> {
     tx: Sender<T>,
 }
 
 impl<T: Send + Sync + 'static> CleanUp<T> {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let (tx, rx) = mpsc::channel();
 
         thread::spawn(move || {
@@ -555,7 +555,13 @@ impl<T: Send + Sync + 'static> CleanUp<T> {
         Self { tx }
     }
 
-    fn do_drop(&self, item: T) {
+    pub fn do_drop(&self, item: T) {
         _ = self.tx.send(item);
+    }
+}
+
+impl<T: Send + Sync + 'static> Default for CleanUp<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }

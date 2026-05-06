@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use lsf_core::entry::ID;
+use lsf_core::entry::{ID, Meta};
 use lsf_feedback::{
     AdaptiveStatistics,
     TestableEntry,
@@ -27,6 +27,16 @@ impl<T> SmallSchedueldItem<T> {
     pub fn new(body: Arc<MABBody>, item: T) -> Self {
         let epoch = body.epoch.load(std::sync::atomic::Ordering::Relaxed);
         let stats = MABArm::new(body);
+        Self {
+            epoch,
+            stats: stats.into(),
+            item,
+        }
+    }
+
+    pub fn new_with_prior(body: Arc<MABBody>, item: T, meta: &Meta) -> Self {
+        let epoch = body.epoch.load(std::sync::atomic::Ordering::Relaxed);
+        let stats = MABArm::new_with_prior(body, meta);
         Self {
             epoch,
             stats: stats.into(),
@@ -186,11 +196,13 @@ impl Schedule for ProbabilisticMABScheduler {
         parents
     }
 
-    fn add_entry(&mut self, entry: &lsf_core::entry::CorpusEntry) {
-        let item = SmallSchedueldItem::new(self.mab.clone(), entry.id());
-        let idx = self.queue.push(item.stats.calculate_score());
+    fn add_entry(&mut self, entry: &lsf_core::entry::CorpusEntry) -> f64 {
+        let item = SmallSchedueldItem::new_with_prior(self.mab.clone(), entry.id(), &entry.meta);
+        let score = item.stats.calculate_score();
+        let idx = self.queue.push(score);
         debug_assert_eq!(idx, self.id_mapping.len());
         self.id_mapping.push(item);
+        score
     }
 
     fn chore(&mut self) {
