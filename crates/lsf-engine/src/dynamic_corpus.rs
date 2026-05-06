@@ -49,7 +49,7 @@ const IN_FLIGHT_CAP: usize = 2_usize.pow(11);
 const GRACE_PERIOD: u8 = 1;
 const INIT_CACHE_CAP: usize = 2_usize.pow(14);
 const CACHE_ADJUSTMENT_TICK: usize = 500;
-const CACHE_MISS_THRESHHOLD: f64 = 0.05;
+const CACHE_MISS_THRESHHOLD: f64 = 0.15;
 
 pub struct DynamicCorpus {
     index: IDMAp<EntryData>,
@@ -80,13 +80,23 @@ impl CorpusHandler<f64> for DynamicCorpus {
                     data.meta,
                 )
             }),
-            CacheLocation::Disk => self.disk_cache.retrieve(*id).ok().map(|ast| {
-                self.cache_misses += 1;
-                CorpusEntry::new(
-                    RawEntry::from_components(*id, ast, data.parents.clone()),
+            CacheLocation::Disk => {
+                let ast = self.disk_cache.retrieve(*id).ok()?;
+
+                let entry = CorpusEntry::new(
+                    RawEntry::from_components(*id, ast.clone(), data.parents.clone()),
                     data.meta,
-                )
-            }),
+                );
+
+                if self.hot.len() < self.hot_cap {
+                    self.move_to_cache(id, ast);
+                } else {
+                    // signal that cache may be too small
+                    self.cache_misses += 1;
+                }
+
+                Some(entry)
+            }
         }
     }
 
@@ -147,8 +157,11 @@ impl CorpusHandler<f64> for DynamicCorpus {
         if miss_rate > CACHE_MISS_THRESHHOLD && self.hot_cap < CACHE_CAP {
             let new_cap = (self.hot_cap * 3 / 2).min(CACHE_CAP);
             println!(
-                "Cache misses exceeded {CACHE_MISS_THRESHHOLD}: missed {miss_rate}% of requests\n Resizing cache from {} to {}.",
-                self.hot_cap, new_cap
+                "Cache misses exceeded {}%: missed {}% of requests\n Resizing cache from {} to {}.",
+                CACHE_MISS_THRESHHOLD * 100.,
+                miss_rate * 100.,
+                self.hot_cap,
+                new_cap
             );
             self.hot_cap = new_cap
         }

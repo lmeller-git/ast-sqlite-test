@@ -74,7 +74,7 @@ impl CorpusHandler<f64> for Corpus {
 }
 
 const MAX_DIVERSITY_WINDOW: usize = 2048;
-const MIN_DIST: u32 = 5;
+const MIN_DIST: u32 = 15;
 
 #[derive(Default)]
 pub struct DiversityEnsurance {

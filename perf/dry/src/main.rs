@@ -129,16 +129,27 @@ fn main() {
 
 fn fuzz_loop(engine: &mut Engine, token_queue: &SharedMemHandle) {
     let mut rng = SmallRng::seed_from_u64(42);
-    for i in 0..2_usize.pow(12) {
+    let mut epoch: i32 = 0;
+    loop {
         let mut batch = engine.mutate_batch(16);
         for item in batch.drain(..) {
             virtual_run_test(item, engine, token_queue, &mut rng);
         }
 
-        if i.is_multiple_of(200) {
+        let size = engine.corpus_size();
+        if epoch % 1000 == 0 {
             engine.chore();
-            println!("{}% done", i as f64 / 2_usize.pow(12) as f64 * 100.);
+            println!(
+                "corpus size: {}, {}% done",
+                size,
+                size as f64 / 80000. * 100.
+            );
         }
+
+        if size >= 80000 {
+            break;
+        }
+        epoch += 1;
     }
 }
 

@@ -30,7 +30,7 @@ async def main(args: Namespace):
 
     if args.save_to is not None:
         corpus_handler = engine.CorpusManagerBuilder.dynamic_cache(
-            engine.DiskCacheBuilder.sharded(args.save_to)
+            engine.DiskCacheBuilder.blob(args.save_to)
         )
     else:
         corpus_handler = engine.CorpusManagerBuilder.in_memory()
