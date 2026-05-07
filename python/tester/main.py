@@ -2,6 +2,7 @@ from lib_sf import engine
 from argparse import ArgumentParser, Namespace
 import asyncio
 import platform
+import uvloop
 
 from lib_sf.lib_sf import TestableEntry
 from tester.event_loop import CONCURRENCY_LIMIT, fuzzing_loop, N_ORACLES
@@ -30,7 +31,9 @@ async def main(args: Namespace):
 
     if args.save_to is not None:
         corpus_handler = engine.CorpusManagerBuilder.dynamic_cache(
-            engine.DiskCacheBuilder.blob(args.save_to)
+            engine.DiskCacheBuilder.sql_saver(
+                engine.DiskCacheBuilder.blob(args.save_to), args.save_to
+            )
         )
     else:
         corpus_handler = engine.CorpusManagerBuilder.in_memory()
@@ -139,7 +142,7 @@ async def main(args: Namespace):
 
     # print(f"Done executing {r.__len__()} setup queries", flush=True)
 
-    # mutation_engine.gc()
+    # mutation_engine.chore()
 
     print("\n===========\ninit done, entering loop\n==================\n")
 
@@ -162,4 +165,4 @@ if __name__ == "__main__":
     _ = parser.add_argument("--oracle_path", default="/usr/bin/sqlite3-3.39.4")
     _ = parser.add_argument("--disable-addr-randomization", default=False, type=bool)
     args = parser.parse_args()
-    asyncio.run(main(args))
+    uvloop.run(main(args))

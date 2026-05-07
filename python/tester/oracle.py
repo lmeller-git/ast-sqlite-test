@@ -140,7 +140,10 @@ async def oracle_worker(incoming: asyncio.Queue[TestCapture | None], oracle_path
 
         # annotated by exec
         elif item.exit_code == 42:
-            bug_type = "HANG"
+            ref = await oracle_worker.execute(item.query)
+            if ref.exit_code != 42:
+                bug_type = "HANG"
+                notes = "Reference completed the query without timeout"
 
         elif is_interesting_unilateral(item):
             ref = await oracle_worker.execute(item.query)

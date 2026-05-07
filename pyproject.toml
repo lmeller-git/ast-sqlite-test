@@ -3,10 +3,12 @@ name = "lib_sf"
 version = "0.1.0"
 license = "MIT"
 license-files = ["LICENSE", "crates/lsf-ffi/LICENSE-sqloxide"]
-requires-python = ">=3.7"
+requires-python = ">=3.14"
 readme = "README.md"
 description = "Project 1 for course Automated Software Testing ETH"
-dependencies = []
+dependencies = [
+    "uvloop>=0.22.1",
+]
 
 [dependency-groups]
 dev = [

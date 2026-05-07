@@ -111,7 +111,7 @@ RUN --mount=type=cache,target=/root/.cargo/registry \
 
 WORKDIR /home/test/sqlite3-src/build
 
-RUN clang -O3 $EXTRA_FLAGS -fsanitize-coverage=trace-pc-guard -o ./sqlite3 sqlite3.o shell.o -Wl,--whole-archive /tmp/liblsf_hooks.a -Wl,--no-whole-archive
+RUN clang -O3 $SQLITE_FLAGS $EXTRA_FLAGS -fsanitize-coverage=trace-pc-guard -o ./sqlite3 sqlite3.o shell.o -Wl,--whole-archive /tmp/liblsf_hooks.a -Wl,--no-whole-archive
 
 WORKDIR /app
 

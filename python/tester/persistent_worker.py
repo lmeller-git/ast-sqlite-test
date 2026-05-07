@@ -4,6 +4,7 @@ import time
 import os
 import tempfile
 import shutil
+from typing import override
 
 
 PLATFORM = None
@@ -18,6 +19,7 @@ class TestCapture:
     exec_time: int
     is_hang_or_crash: None | str = field(compare=False)
 
+    @override
     def __format__(self, format_spec: str) -> str:
         return f"TestCapture {{\nstdout: {self.stdout.decode(errors='replace')}\nstdserr: {self.stderr.decode(errors='replace')}\nexit_code: {self.exit_code}\nexec_time:{self.exec_time}\nquery: {self.query}\n}}"
 
@@ -75,12 +77,14 @@ class SQLiteWorker:
         chunks: list[bytes] = []
         while True:
             # TODO: handle StreamOverrunError
-            line = await stream.readline()
+            line = await stream.read(65535)
             if not line:
                 return b"".join(chunks), False
-            if line.strip() == sentinel:
+            if sentinel in line:
+                chunks.append(line)
                 return b"".join(chunks), True
-            chunks.append(line)
+            else:
+                chunks.append(line)
 
     async def execute(self, query: str, timeout_sec: float = 0.75) -> TestCapture:
         if self.proc is None or self.proc.returncode is not None:
