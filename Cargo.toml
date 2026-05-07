@@ -19,7 +19,7 @@ repository = "https://github.com/lmeller-git/ast-sqlite-test"
 rand = "0.10.0"
 serde = "1.0.228"
 portable-atomic = { version = "1.13.1", features = ["float", "std"] }
-sqlparser = { path = "extern/sqlparser-rs", features = ["serde", "visitor"] }
+sqlparser = { path = "extern/sqlparser-rs", features = ["serde", "visitor", "arbitrary-derive"] }
 lsf-core = { path = "crates/lsf-core" }
 lsf-engine = { path = "crates/lsf-engine" }
 lsf-mutate = { path = "crates/lsf-mutate" }

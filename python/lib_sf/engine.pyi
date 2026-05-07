@@ -90,6 +90,10 @@ class StrategyBuilder:
     def ucb1(
         body: MABBody, strategies: list[StrategyBuilder], choose: int = 1
     ) -> StrategyBuilder: ...
+    @staticmethod
+    def arbitrary_stmt_generator() -> StrategyBuilder: ...
+    @staticmethod
+    def arbitrary_expr_generator() -> StrategyBuilder: ...
 
 
 class TreeMutatorOperation:

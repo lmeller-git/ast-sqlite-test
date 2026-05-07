@@ -104,22 +104,29 @@ async def main(args: Namespace):
     mutation_engine.clear_strategies()
 
     [
-        mutation_engine.add_strategy(strat)
-        for strat in [
-            engine.StrategyBuilder.ucb1(
-                rule_scheduler_body,
-                [
-                    engine.StrategyBuilder.splice_in(),
-                    make_ruleset_havoc(havoc_rule_scheduler_body),
-                    make_ruleset_semantic(sem_rule_scheduler_body),
-                    make_ruleset_structural(struct_rule_scheduler_body),
-                ],
-                2,
-            ),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.7),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_name_guard(), 0.7),
+        mutation_engine.add_strategy(strat) for strat in [
+            engine.StrategyBuilder.arbitrary_expr_generator(),
+            engine.StrategyBuilder.arbitrary_stmt_generator()
         ]
     ]
+
+    # [
+    #     mutation_engine.add_strategy(strat)
+    #     for strat in [
+    #         engine.StrategyBuilder.ucb1(
+    #             rule_scheduler_body,
+    #             [
+    #                 engine.StrategyBuilder.splice_in(),
+    #                 make_ruleset_havoc(havoc_rule_scheduler_body),
+    #                 make_ruleset_semantic(sem_rule_scheduler_body),
+    #                 make_ruleset_structural(struct_rule_scheduler_body),
+    #             ],
+    #             2,
+    #         ),
+    #         engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.7),
+    #         engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_name_guard(), 0.7),
+    #     ]
+    # ]
 
     # snapshot = mutation_engine.snapshot()
 

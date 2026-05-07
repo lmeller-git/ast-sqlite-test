@@ -47,16 +47,15 @@ async def run_single_mutation(
         # would need to acocunt for this in mab stats though
         if is_crash:
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.crash()), test_result)
-            mutation_engine.return_token(test_result.token)
+            # mutation_engine.return_token(test_result.token)
         elif is_hang:
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.timeout()), test_result)
-            mutation_engine.return_token(test_result.token)
+            # mutation_engine.return_token(test_result.token)
         elif is_syntax_err:
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()), test_result)
-            mutation_engine.return_token(test_result.token)
-        else:
-            mutation_engine.commit_test_result(entry, test_result)
-
+            # mutation_engine.return_token(test_result.token)
+        # else:
+        mutation_engine.commit_test_result(entry, test_result)
         if is_crash:
             capture.is_hang_or_crash = "CRASH"
 

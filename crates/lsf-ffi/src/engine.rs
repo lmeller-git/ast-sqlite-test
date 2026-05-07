@@ -25,6 +25,7 @@ use lsf_engine::{
 };
 use lsf_mutate::{
     AdaptiveStrategyScheduler,
+    ArbitraryGenerator,
     ExprShuffle,
     FieldOperation,
     MutationStrategy,
@@ -442,6 +443,16 @@ impl StrategyBuilder {
             strategies.iter_mut().map(|s| s.0.take().unwrap()),
             choose,
         ))))
+    }
+
+    #[staticmethod]
+    pub fn arbitrary_stmt_generator() -> Self {
+        Self(Some(Box::new(ArbitraryGenerator::<Statement>::new())))
+    }
+
+    #[staticmethod]
+    pub fn arbitrary_expr_generator() -> Self {
+        Self(Some(Box::new(ArbitraryGenerator::<Expr>::new())))
     }
 }
 
