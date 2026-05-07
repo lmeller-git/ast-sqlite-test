@@ -52,6 +52,8 @@ pub struct BlockSumTable {
     total_sum: f64,
     block_size: usize,
     free_slots: Vec<usize>,
+    requests: usize,
+    fall_through: usize,
 }
 
 impl BlockSumTable {
@@ -65,6 +67,8 @@ impl BlockSumTable {
             total_sum: 0.0,
             free_slots: Vec::new(),
             block_size,
+            requests: 0,
+            fall_through: 0,
         }
     }
 
@@ -123,12 +127,16 @@ impl BlockSumTable {
         }
 
         self.total_sum = self.blocks.iter().sum();
+        self.requests = 0;
+        self.fall_through = 0;
     }
 
-    pub fn sample(&self, rng: &mut dyn rand::Rng) -> Option<usize> {
+    pub fn sample(&mut self, rng: &mut dyn rand::Rng) -> Option<usize> {
         if self.leaves.is_empty() {
             return None;
         }
+
+        self.requests += 1;
 
         let mut target = rng.random_range(0.0..self.total_sum);
 
@@ -151,7 +159,12 @@ impl BlockSumTable {
             target -= weight;
         }
 
+        self.fall_through += 1;
         Some(self.leaves.len() - 1)
+    }
+
+    pub fn fall_through_rate(&self) -> f64 {
+        self.fall_through as f64 / self.requests as f64
     }
 }
 
@@ -195,7 +208,9 @@ impl Schedule for ProbabilisticMABScheduler {
                     self.queue.update(top, item.stats.calculate_score());
                 } else if let Some(entry) = from.get(id) {
                     parents.push(
-                        TestableEntry::new(entry.raw().clone()).with_build_hook(item.stats.clone()),
+                        TestableEntry::new(entry.raw().clone())
+                            .with_build_hook(item.stats.clone())
+                            .with_hook(item.stats.clone()),
                     );
                 }
             }
@@ -226,7 +241,11 @@ impl Schedule for ProbabilisticMABScheduler {
 
     fn chore(&mut self) {
         // O(N), maybe not do this very often/at all
-        self.queue.resum();
+        const DO_RESUM_OVER: f64 = 0.1;
+        let fall_through_rate = self.queue.fall_through_rate();
+        if fall_through_rate >= DO_RESUM_OVER {
+            self.queue.resum();
+        }
     }
 
     fn reset(&mut self) {

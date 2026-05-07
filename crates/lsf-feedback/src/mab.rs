@@ -202,10 +202,11 @@ impl FeedbackHook for MABArm {
         }
     }
 
-    fn on_mutate(&self, _mutation_outcome: TestOutcome) {
+    // TODO use MutationState here and remove Mutation arms from TestOutcome -> requires moving MutationState into lsf-feedback
+    fn on_mutate(&self, mutation_outcome: TestOutcome) {
         let inflation = self.ctx.current_inflation.load(Ordering::Relaxed);
 
-        match _mutation_outcome {
+        match mutation_outcome {
             TestOutcome::Mutated | TestOutcome::NOOP => {
                 self.ctx
                     .total_attempts

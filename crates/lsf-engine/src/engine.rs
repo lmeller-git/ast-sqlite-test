@@ -171,10 +171,11 @@ impl Engine {
     }
 
     pub fn chore(&mut self) {
-        const GC_AT: f64 = 0.1;
+        const GC_AT: f64 = 0.05;
         const GC_MIN_ABSOLUTE: usize = 100;
 
         self.corpus.resize();
+        self.scheduler.chore();
         let corpus_size = self.corpus_size();
 
         let new_entries = corpus_size.saturating_sub(self.size_at_last_reset);
@@ -183,7 +184,6 @@ impl Engine {
         if growth_rate >= GC_AT && new_entries >= GC_MIN_ABSOLUTE {
             self.minimizer
                 .minimize(self.corpus.as_mut(), self.scheduler.as_mut());
-            self.scheduler.chore();
             self.size_at_last_reset = self.corpus_size();
         }
     }
