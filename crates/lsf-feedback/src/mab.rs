@@ -263,13 +263,16 @@ impl AdaptiveStatistics for MABArm {
         let cov_inc_rate = self.cov_increases.load(Ordering::Relaxed) / inflated_attempts;
         // if we feed syntax errs, hangs, ... back we need to discourage them. We migth even want to discourage them anyways
 
-        // let time_out_rate = self.child_timeout.load(Ordering::Relaxed) / inflated_attempts;
-        // let syntax_err_rate = self.syntax_err.load(Ordering::Relaxed) / inflated_attempts;
+        let time_out_rate = self.child_timeout.load(Ordering::Relaxed) / inflated_attempts;
+        let syntax_err_rate = self.syntax_err.load(Ordering::Relaxed) / inflated_attempts;
+        let avg_t_exec = self.total_exec_ns.load(Ordering::Relaxed) / inflated_attempts;
+        let avg_size = self.total_query_size.load(Ordering::Relaxed) / inflated_attempts;
 
-        // let penalty = time_out_rate + syntax_err_rate * 0.5;
-        // let health_factor = (1. - penalty).max(0.001);
+        let penalty =
+            time_out_rate * 0.16 + syntax_err_rate * 0.16 + avg_size * 0.33 + avg_t_exec * 0.33;
+        let health_factor = (1. - penalty).max(0.001);
 
-        let health_factor = 1.;
+        // let health_factor = 1.;
 
         let exploitation = cov_inc_rate * health_factor;
 
