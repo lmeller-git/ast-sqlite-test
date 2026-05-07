@@ -4,6 +4,11 @@ use std::fmt::Debug;
 
 use lsf_core::entry::ID;
 
+pub struct EdgesFound {
+    pub new: Vec<usize>,
+    pub all: Vec<usize>,
+}
+
 #[derive(Debug)]
 pub struct EdgeMap {
     raw_map: Vec<u8>,
@@ -19,7 +24,7 @@ impl EdgeMap {
         }
     }
 
-    pub fn update<'a>(&mut self, other: EdgeMapView<'a>) -> Vec<usize> {
+    pub fn update<'a>(&mut self, other: EdgeMapView<'a>) -> EdgesFound {
         debug_assert_eq!(
             self.raw_map.len(),
             other.raw_view.len(),
@@ -27,6 +32,7 @@ impl EdgeMap {
         );
 
         let mut new_edges = Vec::new();
+        let mut all_edges = Vec::new();
 
         // we can look at 8 bytes == 1 qword at a time
         let their_chunks = other.raw_view.chunks_exact(8);
@@ -40,24 +46,31 @@ impl EdgeMap {
                 continue;
             }
 
-            let our_val = u64::from_ne_bytes(our_chunk.try_into().unwrap());
+            // we iterate over all non 0 words in order to collect all_edges. These are used in the corpus minimizer to find a good set of entries spanning all edges
+            // let our_val = u64::from_ne_bytes(our_chunk.try_into().unwrap());
 
-            if (their_val & !our_val) > 0 {
-                // new edge
-                for i in 0..8 {
-                    if their_chunk[i] > 0 && our_chunk[i] == 0 {
+            // if (their_val & !our_val) > 0 {
+            //     // new edge
+            for i in 0..8 {
+                if their_chunk[i] > 0 {
+                    if our_chunk[i] == 0 {
                         new_edges.push(chunk_idx * 8 + i);
                         our_chunk[i] = 1;
                     }
+                    all_edges.push(chunk_idx * 8 + i);
                 }
             }
+            // }
         }
 
         let chunk_len = self.raw_map.len() / 8 * 8;
         for i in chunk_len..self.raw_map.len() {
-            if other.raw_view[i] > 0 && self.raw_map[i] == 0 {
-                new_edges.push(i);
-                self.raw_map[i] = 1;
+            if other.raw_view[i] > 0 {
+                if self.raw_map[i] == 0 {
+                    new_edges.push(i);
+                    self.raw_map[i] = 1;
+                }
+                all_edges.push(i);
             }
         }
 
@@ -67,7 +80,10 @@ impl EdgeMap {
             println!("Total coverage so far: {:.3}%", self.current_cov() * 100.)
         }
 
-        new_edges
+        EdgesFound {
+            new: new_edges,
+            all: all_edges,
+        }
     }
 
     pub fn current_cov(&self) -> f64 {

@@ -72,6 +72,8 @@ pub struct MABArm {
     syntax_err: AtomicF64,
     crash: AtomicF64,
     child_timeout: AtomicF64,
+    total_exec_ns: AtomicF64,
+    total_query_size: AtomicF64,
     pub local_epoch: AtomicU32,
     ctx: Arc<MABBody>,
 }
@@ -114,6 +116,8 @@ impl MABArm {
             } else {
                 0.
             }),
+            total_exec_ns: AtomicF64::new(meta.exec_time as f64 * inflation),
+            total_query_size: AtomicF64::new(meta.query_size as f64 * inflation),
             local_epoch: AtomicU32::new(norm_epoch),
             child_timeout: AtomicF64::new(0.),
             ctx: body,
@@ -128,6 +132,8 @@ impl MABArm {
         self.crash.store(0., Ordering::Relaxed);
         self.child_timeout.store(0., Ordering::Relaxed);
         self.local_epoch.store(0, Ordering::Relaxed);
+        self.total_exec_ns.store(0., Ordering::Relaxed);
+        self.total_query_size.store(0., Ordering::Relaxed);
     }
 
     fn normalize(&self) {
@@ -161,6 +167,21 @@ impl MABArm {
                 .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old| {
                     Some(old / RESCALE_FACTOR.powi(diff))
                 });
+            _ = self
+                .total_exec_ns
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old| {
+                    Some(old / RESCALE_FACTOR.powi(diff))
+                });
+            _ = self
+                .child_timeout
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old| {
+                    Some(old / RESCALE_FACTOR.powi(diff))
+                });
+            _ = self
+                .total_query_size
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old| {
+                    Some(old / RESCALE_FACTOR.powi(diff))
+                });
 
             self.local_epoch.store(norm_epoch, Ordering::Relaxed);
         }
@@ -168,8 +189,13 @@ impl MABArm {
 }
 
 impl FeedbackHook for MABArm {
-    fn on_exec(&self, test_outcome: crate::TestOutcome) {
+    fn on_exec(&self, test_outcome: crate::TestOutcome, meta: &Meta) {
         let inflation = self.ctx.current_inflation.load(Ordering::Relaxed);
+
+        self.total_exec_ns
+            .fetch_add(meta.exec_time as f64 * inflation, Ordering::Relaxed);
+        self.total_query_size
+            .fetch_add(meta.query_size as f64 * inflation, Ordering::Relaxed);
 
         match test_outcome {
             TestOutcome::Rejected(r) => match r {
@@ -202,10 +228,11 @@ impl FeedbackHook for MABArm {
         }
     }
 
-    fn on_mutate(&self, _mutation_outcome: TestOutcome) {
+    // TODO use MutationState here and remove Mutation arms from TestOutcome -> requires moving MutationState into lsf-feedback
+    fn on_mutate(&self, mutation_outcome: TestOutcome) {
         let inflation = self.ctx.current_inflation.load(Ordering::Relaxed);
 
-        match _mutation_outcome {
+        match mutation_outcome {
             TestOutcome::Mutated | TestOutcome::NOOP => {
                 self.ctx
                     .total_attempts
@@ -236,13 +263,16 @@ impl AdaptiveStatistics for MABArm {
         let cov_inc_rate = self.cov_increases.load(Ordering::Relaxed) / inflated_attempts;
         // if we feed syntax errs, hangs, ... back we need to discourage them. We migth even want to discourage them anyways
 
-        // let time_out_rate = self.child_timeout.load(Ordering::Relaxed) / inflated_attempts;
-        // let syntax_err_rate = self.syntax_err.load(Ordering::Relaxed) / inflated_attempts;
+        let time_out_rate = self.child_timeout.load(Ordering::Relaxed) / inflated_attempts;
+        let syntax_err_rate = self.syntax_err.load(Ordering::Relaxed) / inflated_attempts;
+        let avg_t_exec = self.total_exec_ns.load(Ordering::Relaxed) / inflated_attempts;
+        let avg_size = self.total_query_size.load(Ordering::Relaxed) / inflated_attempts;
 
-        // let penalty = time_out_rate + syntax_err_rate * 0.5;
-        // let health_factor = (1. - penalty).max(0.001);
+        let penalty =
+            time_out_rate * 0.16 + syntax_err_rate * 0.16 + avg_size * 0.33 + avg_t_exec * 0.33;
+        let health_factor = (1. - penalty).max(0.001);
 
-        let health_factor = 1.;
+        // let health_factor = 1.;
 
         let exploitation = cov_inc_rate * health_factor;
 

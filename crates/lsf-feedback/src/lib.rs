@@ -8,7 +8,7 @@ mod hooks;
 pub mod mab;
 mod stats;
 pub use hooks::*;
-use lsf_core::entry::RawEntry;
+use lsf_core::entry::{Meta, RawEntry};
 pub use stats::*;
 
 use crate::mab::MABArm;
@@ -69,9 +69,9 @@ impl<T> TestableEntry<T> {
         self
     }
 
-    pub fn fire_rule_hooks(&self, outcome: TestOutcome) {
+    pub fn fire_rule_hooks(&self, outcome: TestOutcome, meta: &Meta) {
         for hook in &self.applied_rule_stats {
-            hook.on_exec(outcome);
+            hook.on_exec(outcome, meta);
         }
     }
 

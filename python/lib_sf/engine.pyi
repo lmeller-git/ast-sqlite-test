@@ -146,11 +146,13 @@ class TestResult:
     triggers_bug: bool
     is_valid_syntax: bool
     exec_time: int
+    query_size: int
     token: IPCTokenHandle
 
     def __init__(
         self,
         exec_time: int,
+        query_size: int,
         token: IPCTokenHandle,
         is_valid_syntax: bool = True,
         triggers_bug: bool = False,

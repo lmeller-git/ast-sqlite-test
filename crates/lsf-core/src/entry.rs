@@ -43,6 +43,7 @@ pub struct Meta {
     pub is_valid_syntax: bool,
     pub exec_time: u32,
     pub new_cov_nodes: usize,
+    pub query_size: usize,
 }
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone)]
