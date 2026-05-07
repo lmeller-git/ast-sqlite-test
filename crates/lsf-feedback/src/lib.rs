@@ -33,6 +33,7 @@ pub enum RejectionReason {
 pub enum AcceptanceReason {
     CovIncrease(usize),
     IsDiverse,
+    Unspecified,
 }
 
 #[derive(Clone)]

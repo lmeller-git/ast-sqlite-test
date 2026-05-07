@@ -33,7 +33,7 @@ impl MutationStrategy for TableNameScramble {
         _ = visit_statements(child_ast, |stmt| {
             if let Statement::CreateTable(CreateTable { name, .. })
             | Statement::CreateVirtualTable { name, .. } = stmt
-                && let Some(ident) = name.0[0].as_ident()
+                && let Some(ident) = name.0.first().and_then(|i| i.as_ident())
             {
                 tables.push(ident.value.clone())
             }

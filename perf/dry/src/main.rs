@@ -13,6 +13,7 @@ use lsf_engine::{
 };
 use lsf_feedback::{TestableEntry, mab::MABBody};
 use lsf_mutate::{
+    ArbitraryGenerator,
     ExprShuffle,
     MutationStrategy,
     NullInject,
@@ -67,6 +68,8 @@ fn main() {
                         operation: lsf_mutate::FieldOperation::ShuffleTwo,
                         _phantom: std::marker::PhantomData::<Expr>,
                     }),
+                    Box::new(ArbitraryGenerator::<Statement>::new()),
+                    Box::new(ArbitraryGenerator::<Expr>::new()),
                 ]
                 .into_iter(),
                 2,

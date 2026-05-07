@@ -9,7 +9,12 @@ from tester.event_loop import CONCURRENCY_LIMIT, fuzzing_loop, N_ORACLES
 from tester.exec import init, run_single_mutation
 from tester.oracle import oracle_worker
 from tester.persistent_worker import SQLiteWorker, PLATFORM
-from tester.rules import make_ruleset_havoc, make_ruleset_semantic, make_ruleset_structural
+from tester.rules import (
+    make_ruleset_generate,
+    make_ruleset_havoc,
+    make_ruleset_semantic,
+    make_ruleset_structural,
+)
 
 RNG = 42
 
@@ -28,6 +33,7 @@ async def main(args: Namespace):
     havoc_rule_scheduler_body = engine.MABBody()
     struct_rule_scheduler_body = engine.MABBody()
     sem_rule_scheduler_body = engine.MABBody()
+    generator_body = engine.MABBody()
 
     if args.save_to is not None:
         corpus_handler = engine.CorpusManagerBuilder.dynamic_cache(
@@ -52,6 +58,7 @@ async def main(args: Namespace):
             havoc_rule_scheduler_body,
             sem_rule_scheduler_body,
             struct_rule_scheduler_body,
+            generator_body,
         ],
         RNG,
     )
@@ -104,29 +111,23 @@ async def main(args: Namespace):
     mutation_engine.clear_strategies()
 
     [
-        mutation_engine.add_strategy(strat) for strat in [
-            engine.StrategyBuilder.arbitrary_expr_generator(),
-            engine.StrategyBuilder.arbitrary_stmt_generator()
+        mutation_engine.add_strategy(strat)
+        for strat in [
+            engine.StrategyBuilder.ucb1(
+                rule_scheduler_body,
+                [
+                    engine.StrategyBuilder.splice_in(),
+                    # make_ruleset_generate(generator_body),
+                    make_ruleset_havoc(havoc_rule_scheduler_body, generator_body),
+                    make_ruleset_semantic(sem_rule_scheduler_body),
+                    make_ruleset_structural(struct_rule_scheduler_body),
+                ],
+                2,
+            ),
+            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_name_guard(), 0.7),
+            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.7),
         ]
     ]
-
-    # [
-    #     mutation_engine.add_strategy(strat)
-    #     for strat in [
-    #         engine.StrategyBuilder.ucb1(
-    #             rule_scheduler_body,
-    #             [
-    #                 engine.StrategyBuilder.splice_in(),
-    #                 make_ruleset_havoc(havoc_rule_scheduler_body),
-    #                 make_ruleset_semantic(sem_rule_scheduler_body),
-    #                 make_ruleset_structural(struct_rule_scheduler_body),
-    #             ],
-    #             2,
-    #         ),
-    #         engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.7),
-    #         engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_name_guard(), 0.7),
-    #     ]
-    # ]
 
     # snapshot = mutation_engine.snapshot()
 

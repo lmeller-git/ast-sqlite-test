@@ -208,6 +208,8 @@ impl FeedbackHook for MABArm {
                     self.accepted.fetch_add(1. * inflation, Ordering::Relaxed);
                 }
                 RejectionReason::TimeOut => {
+                    // at least it has valid syntax
+                    self.accepted.fetch_add(0.5 * inflation, Ordering::Relaxed);
                     self.child_timeout
                         .fetch_add(1. * inflation, Ordering::Relaxed);
                 }
@@ -220,7 +222,7 @@ impl FeedbackHook for MABArm {
                     self.cov_increases
                         .fetch_add(n_found as f64 * inflation, Ordering::Relaxed);
                 }
-                AcceptanceReason::IsDiverse => {
+                AcceptanceReason::IsDiverse | AcceptanceReason::Unspecified => {
                     self.accepted.fetch_add(1. * inflation, Ordering::Relaxed);
                 }
             },
@@ -248,6 +250,7 @@ impl AdaptiveStatistics for MABArm {
     fn update(&self, _test_result: TestOutcome) {}
 
     fn calculate_score(&self) -> f64 {
+        const MAX_ACCEPTED_SYNTAX_ERR: f64 = 0.5;
         self.normalize();
 
         let inflated_attempts = self.attempts.load(Ordering::Relaxed);
@@ -261,6 +264,10 @@ impl AdaptiveStatistics for MABArm {
         // we want to
         // increase score for accepted ratio, coverage increase and crashes (likely a bug) and reduce it for syntax errors, as they are somewhat uninteresting
         let cov_inc_rate = self.cov_increases.load(Ordering::Relaxed) / inflated_attempts;
+        let accepted_rate = self.accepted.load(Ordering::Relaxed) / inflated_attempts;
+
+        let pros = accepted_rate * 0.1 + cov_inc_rate * 0.9;
+
         // if we feed syntax errs, hangs, ... back we need to discourage them. We migth even want to discourage them anyways
 
         let time_out_rate = self.child_timeout.load(Ordering::Relaxed) / inflated_attempts;
@@ -268,13 +275,18 @@ impl AdaptiveStatistics for MABArm {
         let avg_t_exec = self.total_exec_ns.load(Ordering::Relaxed) / inflated_attempts;
         let avg_size = self.total_query_size.load(Ordering::Relaxed) / inflated_attempts;
 
-        let penalty =
-            time_out_rate * 0.16 + syntax_err_rate * 0.16 + avg_size * 0.33 + avg_t_exec * 0.33;
-        let health_factor = (1. - penalty).max(0.001);
+        let syntax_penalty = if syntax_err_rate > MAX_ACCEPTED_SYNTAX_ERR {
+            (syntax_err_rate - MAX_ACCEPTED_SYNTAX_ERR) * 0.33
+        } else {
+            0.
+        };
+
+        let penalty = time_out_rate * 0.33 + syntax_penalty + avg_size * 0.16 + avg_t_exec * 0.16;
+        let cons = (1. - penalty).max(0.001);
 
         // let health_factor = 1.;
 
-        let exploitation = cov_inc_rate * health_factor;
+        let exploitation = pros * cons;
 
         let effective_attempts = inflated_attempts / inflation;
         let effective_total_attempts = self.ctx.total_attempts.load(Ordering::Relaxed) / inflation;

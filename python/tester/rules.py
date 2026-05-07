@@ -1,16 +1,28 @@
 from lib_sf import engine
 
 
-def make_ruleset_havoc(body: engine.MABBody):
+def make_ruleset_generate(body: engine.MABBody):
     return engine.StrategyBuilder.ucb1(
         body,
         [
+            engine.StrategyBuilder.arbitrary_expr_generator(),
+            engine.StrategyBuilder.arbitrary_stmt_generator(),
+        ],
+        1,
+    )
+
+
+def make_ruleset_havoc(body: engine.MABBody, generator_body: engine.MABBody):
+    return engine.StrategyBuilder.ucb1(
+        body,
+        [
+            make_ruleset_generate(generator_body),
             engine.StrategyBuilder.tree_mutate_stmt(engine.TreeMutatorOperation.null_random()),
             engine.StrategyBuilder.tree_mutate_expr(engine.TreeMutatorOperation.null_random()),
             engine.StrategyBuilder.type_cast(),
             engine.StrategyBuilder.sub_query(),
         ],
-        2
+        2,
     )
 
 
@@ -25,7 +37,7 @@ def make_ruleset_semantic(body: engine.MABBody):
             engine.StrategyBuilder.relation_shuffle(),
             engine.StrategyBuilder.expr_shuffle(),
         ],
-        2
+        2,
     )
 
 
@@ -38,5 +50,5 @@ def make_ruleset_structural(body: engine.MABBody):
             engine.StrategyBuilder.set_ops(),
             engine.StrategyBuilder.recursive_expand_expr(),
         ],
-        2
+        2,
     )

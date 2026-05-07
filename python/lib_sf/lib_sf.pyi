@@ -36,6 +36,13 @@ class RawEntry:
 class TestOutcome:
     @staticmethod
     def rejected(because: RejectionReason) -> TestOutcome: ...
+    @staticmethod
+    def accepted(because: AcceptanceReason) -> TestOutcome: ...
+
+
+class AcceptanceReason:
+    @staticmethod
+    def unspecified() -> AcceptanceReason: ...
 
 
 class RejectionReason:
@@ -45,6 +52,8 @@ class RejectionReason:
     def crash() -> RejectionReason: ...
     @staticmethod
     def timeout() -> RejectionReason: ...
+    @staticmethod
+    def bad() -> RejectionReason: ...
 
 
 class TestableEntry:

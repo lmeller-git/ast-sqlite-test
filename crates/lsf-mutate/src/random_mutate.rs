@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 
 use arbitrary::{Arbitrary, Unstructured};
+use rand::RngExt;
 
 use crate::{AstNode, MutationState, MutationStrategy};
 
@@ -30,9 +31,12 @@ impl<T: Send + Sync + for<'a> Arbitrary<'a> + AstNode> MutationStrategy for Arbi
 
         let mut is_mutated = MutationState::Unchanged;
 
-        let mut data = vec![0u8; size_of::<T>() * 2];
+        let mut data = vec![0u8; 128];
 
         _ = T::visit_mut(child_ast, |node| {
+            if !rng.random_bool(0.2) {
+                return std::ops::ControlFlow::Continue::<()>(());
+            }
             rng.fill_bytes(&mut data);
 
             let mut unstructured = Unstructured::new(&data);
@@ -40,6 +44,7 @@ impl<T: Send + Sync + for<'a> Arbitrary<'a> + AstNode> MutationStrategy for Arbi
             if let Ok(new_node) = unstructured.arbitrary() {
                 *node = new_node;
                 is_mutated = MutationState::Mutated;
+                return std::ops::ControlFlow::Break::<()>(());
             }
 
             std::ops::ControlFlow::Continue::<()>(())

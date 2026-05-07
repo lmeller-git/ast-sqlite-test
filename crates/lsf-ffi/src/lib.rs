@@ -160,6 +160,23 @@ impl TestOutcome {
     pub fn rejected(because: RejectionReason) -> Self {
         Self(lsf_feedback::TestOutcome::Rejected(because.0))
     }
+
+    #[staticmethod]
+    pub fn accepted(because: AcceptanceReason) -> Self {
+        Self(lsf_feedback::TestOutcome::Accepted(because.0))
+    }
+}
+
+#[pyclass(from_py_object)]
+#[derive(Clone, Debug)]
+pub struct AcceptanceReason(lsf_feedback::AcceptanceReason);
+
+#[pymethods]
+impl AcceptanceReason {
+    #[staticmethod]
+    pub fn unspecified() -> Self {
+        Self(lsf_feedback::AcceptanceReason::Unspecified)
+    }
 }
 
 #[pyclass(from_py_object)]
@@ -181,6 +198,11 @@ impl RejectionReason {
     #[staticmethod]
     pub fn timeout() -> Self {
         Self(lsf_feedback::RejectionReason::TimeOut)
+    }
+
+    #[staticmethod]
+    pub fn bad() -> Self {
+        Self(lsf_feedback::RejectionReason::Bad)
     }
 }
 
@@ -244,6 +266,7 @@ fn lib_sf(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<TestableEntry>()?;
     m.add_class::<TestOutcome>()?;
     m.add_class::<RejectionReason>()?;
+    m.add_class::<AcceptanceReason>()?;
 
     let engine = PyModule::new(py, "engine")?;
     engine.add_class::<Engine>()?;
