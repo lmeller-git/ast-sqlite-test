@@ -125,11 +125,11 @@ impl Engine {
     ) {
         let new_edges = self.edge_map.update(shmem.as_edge_map());
         self.shmem_queue.push(shmem).expect("token was duplicated");
-        meta.new_cov_nodes = new_edges.len();
+        meta.new_cov_nodes = new_edges.new.len();
 
         let accepted = self.minimizer.on_add(&raw_entry, &meta, new_edges);
 
-        raw_entry.fire_rule_hooks(accepted);
+        raw_entry.fire_rule_hooks(accepted, &meta);
 
         if let TestOutcome::Rejected(_) = accepted {
             return;

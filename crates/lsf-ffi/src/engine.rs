@@ -96,6 +96,7 @@ impl Engine {
                 is_valid_syntax: data.is_valid_syntax,
                 new_cov_nodes: 0,
                 exec_time: data.exec_time,
+                query_size: data.query_size,
             },
             data.token.take().unwrap(),
         );
@@ -205,15 +206,18 @@ pub struct TestResult {
     pub is_valid_syntax: bool,
     #[pyo3(get, set)]
     pub exec_time: u32,
+    #[pyo3(get, set)]
+    pub query_size: usize,
     token: Option<Box<IPCToken>>,
 }
 
 #[pymethods]
 impl TestResult {
     #[new]
-    #[pyo3(signature = (exec_time, token, is_valid_syntax = false, triggers_bug = false))]
+    #[pyo3(signature = (exec_time, query_size, token, is_valid_syntax = false, triggers_bug = false))]
     pub fn new(
         exec_time: u32,
+        query_size: usize,
         mut token: PyRefMut<IPCTokenHandle>,
         is_valid_syntax: bool,
         triggers_bug: bool,
@@ -223,7 +227,13 @@ impl TestResult {
             is_valid_syntax,
             exec_time,
             token: token.0.take(),
+            query_size,
         }
+    }
+
+    #[getter]
+    pub fn token(&mut self) -> IPCTokenHandle {
+        self.token.take().map(|t| IPCTokenHandle(Some(t))).unwrap()
     }
 }
 

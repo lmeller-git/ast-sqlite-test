@@ -41,19 +41,21 @@ async def run_single_mutation(
 
         is_syntax_err = b"syntax error" in capture.stderr or b"Parse error" in capture.stderr
 
+        test_result = engine.TestResult(capture.exec_time, len(capture.query), token)
+
         # may want to return crashes and syntax errors also. They will quicly be moved to cold cache anyway, as they likely will not create good children
         # would need to acocunt for this in mab stats though
         if is_crash:
-            entry.fire_hooks(TestOutcome.rejected(RejectionReason.crash()))
-            mutation_engine.return_token(token)
+            entry.fire_hooks(TestOutcome.rejected(RejectionReason.crash()), test_result)
+            mutation_engine.return_token(test_result.token)
         elif is_hang:
-            entry.fire_hooks(TestOutcome.rejected(RejectionReason.timeout()))
-            mutation_engine.return_token(token)
+            entry.fire_hooks(TestOutcome.rejected(RejectionReason.timeout()), test_result)
+            mutation_engine.return_token(test_result.token)
         elif is_syntax_err:
-            entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()))
-            mutation_engine.return_token(token)
+            entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()), test_result)
+            mutation_engine.return_token(test_result.token)
         else:
-            mutation_engine.commit_test_result(entry, engine.TestResult(capture.exec_time, token))
+            mutation_engine.commit_test_result(entry, test_result)
 
         if is_crash:
             capture.is_hang_or_crash = "CRASH"
@@ -61,8 +63,9 @@ async def run_single_mutation(
         await oracle_queue.put(capture)
 
     except Exception:
-        entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()))
-        mutation_engine.return_token(token)
+        test_result = engine.TestResult(0, 0, token)
+        entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()), test_result)
+        mutation_engine.return_token(test_result.token)
 
 
 async def init(test_path: str) -> int:

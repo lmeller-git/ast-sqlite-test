@@ -212,8 +212,17 @@ impl TestableEntry {
             .unwrap()
     }
 
-    pub fn fire_hooks(&self, outcome: TestOutcome) {
-        self.0.as_ref().unwrap().fire_rule_hooks(outcome.0);
+    pub fn fire_hooks(&self, outcome: TestOutcome, data: PyRef<TestResult>) {
+        self.0.as_ref().unwrap().fire_rule_hooks(
+            outcome.0,
+            &lsf_core::entry::Meta {
+                triggers_bug: data.triggers_bug,
+                is_valid_syntax: data.is_valid_syntax,
+                new_cov_nodes: 0,
+                exec_time: data.exec_time,
+                query_size: data.query_size,
+            },
+        );
     }
 
     #[staticmethod]

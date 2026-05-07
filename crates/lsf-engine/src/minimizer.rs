@@ -8,7 +8,7 @@ use lsf_core::{
     ast::AST,
     entry::{ID, Meta, RawEntry},
 };
-use lsf_cov::bitmap::ScoredEdges;
+use lsf_cov::bitmap::{EdgesFound, ScoredEdges};
 use lsf_feedback::{TestOutcome, TestableEntry};
 
 use crate::{CorpusHandler, Schedule};
@@ -19,7 +19,7 @@ pub trait CorpusMinimizer<T>: Send + Sync {
         &mut self,
         entry: &TestableEntry<RawEntry>,
         meta: &Meta,
-        edges_found: Vec<usize>,
+        edges_found: EdgesFound,
     ) -> TestOutcome;
     fn reset(&mut self);
 }
@@ -69,29 +69,31 @@ impl<T> CorpusMinimizer<T> for GreedyCoverage {
         &mut self,
         entry: &TestableEntry<RawEntry>,
         meta: &Meta,
-        edges_found: Vec<usize>,
+        edges_found: EdgesFound,
     ) -> TestOutcome {
         let is_diverse = self.diversity.try_insert(entry.id(), entry.ast());
-        if !is_diverse && meta.new_cov_nodes == 0 {
+        if !is_diverse && edges_found.all.is_empty() {
             return TestOutcome::Rejected(lsf_feedback::RejectionReason::Bad);
         }
-        if meta.new_cov_nodes > 0 {
+        // never empty
+        if !edges_found.all.is_empty() {
             let is_best = self.best_edges.update_if_best(
                 entry.id(),
                 entry.ast().len(),
-                edges_found.len(),
+                edges_found.all.len(),
                 meta.exec_time,
-                edges_found.into_iter(),
+                edges_found.all.into_iter(),
             );
             if !is_best && !is_diverse {
                 return TestOutcome::Rejected(lsf_feedback::RejectionReason::Bad);
             }
-            TestOutcome::Accepted(lsf_feedback::AcceptanceReason::CovIncrease(
-                meta.new_cov_nodes,
-            ))
-        } else {
-            TestOutcome::Accepted(lsf_feedback::AcceptanceReason::IsDiverse)
+            if meta.new_cov_nodes > 0 {
+                return TestOutcome::Accepted(lsf_feedback::AcceptanceReason::CovIncrease(
+                    meta.new_cov_nodes,
+                ));
+            }
         }
+        TestOutcome::Accepted(lsf_feedback::AcceptanceReason::IsDiverse)
     }
 
     fn reset(&mut self) {

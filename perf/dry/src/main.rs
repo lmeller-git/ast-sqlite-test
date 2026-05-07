@@ -170,13 +170,16 @@ fn virtual_run_test(
         }
     };
     let meta = random_meta(rng);
-    test.fire_rule_hooks(if meta.new_cov_nodes > 0 {
-        lsf_feedback::TestOutcome::Accepted(lsf_feedback::AcceptanceReason::CovIncrease(
-            meta.new_cov_nodes,
-        ))
-    } else {
-        lsf_feedback::TestOutcome::Accepted(lsf_feedback::AcceptanceReason::IsDiverse)
-    });
+    test.fire_rule_hooks(
+        if meta.new_cov_nodes > 0 {
+            lsf_feedback::TestOutcome::Accepted(lsf_feedback::AcceptanceReason::CovIncrease(
+                meta.new_cov_nodes,
+            ))
+        } else {
+            lsf_feedback::TestOutcome::Accepted(lsf_feedback::AcceptanceReason::IsDiverse)
+        },
+        &meta,
+    );
     engine.commit_test_result(test, meta, token);
 }
 
@@ -186,5 +189,6 @@ fn random_meta(rng: &mut dyn rand::Rng) -> Meta {
         is_valid_syntax: rng.random_bool(0.7),
         exec_time: rng.random_range(100..u32::MAX / 2),
         new_cov_nodes: rng.random_range(1..10),
+        query_size: rng.random_range(10..100),
     }
 }
