@@ -46,7 +46,7 @@ async def main(args: Namespace):
 
     mutation_engine = engine.Engine(
         engine.SchedulerBuilder.batched(
-            engine.SchedulerBuilder.weighted_ucb1(corpus_scheduler_body)
+            engine.SchedulerBuilder.fast_weigthed_ucb1(corpus_scheduler_body)
         ),
         corpus_handler,
         engine.CorpusMinimizerBuilder.greedy_coverage(max_edges),

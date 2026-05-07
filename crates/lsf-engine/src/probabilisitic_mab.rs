@@ -5,14 +5,11 @@ use lsf_core::entry::{ID, Meta};
 use lsf_feedback::{
     AdaptiveStatistics,
     TestableEntry,
-    mab::{MABArm, MABBody},
+    mab::{MABArm, MABBody, MAX_WEIGHT, ZERO_WEIGHT},
 };
 use rand::RngExt;
 
 use crate::{CorpusHandler, Schedule};
-
-const ZERO_WEIGHT: f64 = 0.001;
-const MAX_WEIGHT: f64 = 1e20;
 
 pub fn align_up(n: usize, alignment: usize) -> usize {
     (n + alignment - 1) & !(alignment - 1)
@@ -258,5 +255,91 @@ impl Schedule for ProbabilisticMABScheduler {
 impl Default for ProbabilisticMABScheduler {
     fn default() -> Self {
         Self::new(MABBody::default().into())
+    }
+}
+
+// lazy Roulette-wheel selection via stochastic acceptance
+// max_weight may be stale and is not necessarily the true max_weight. However by updating max_weight in the sample loop, we guarantee that no fractions are > 1, which should presevre integrity
+pub struct FastProbabilisticMABScheduler {
+    body: Arc<MABBody>,
+    max_weight: f64,
+    entries: IndexMap<ID, Arc<MABArm>, rustc_hash::FxBuildHasher>,
+}
+
+impl FastProbabilisticMABScheduler {
+    pub fn new(body: Arc<MABBody>) -> Self {
+        Self {
+            body,
+            max_weight: 0.,
+            entries: IndexMap::with_hasher(rustc_hash::FxBuildHasher),
+        }
+    }
+}
+
+impl Schedule for FastProbabilisticMABScheduler {
+    fn next_batch(
+        &mut self,
+        from: &mut dyn CorpusHandler<f64>,
+        size: usize,
+        rng: &mut dyn rand::Rng,
+    ) -> Vec<TestableEntry<lsf_core::entry::RawEntry>> {
+        let mut generation = Vec::with_capacity(size);
+
+        while generation.len() < size {
+            let rd_idx = rng.random_range(0..self.entries.len());
+            if let Some((id, arm)) = self.entries.get_index(rd_idx)
+                && let Some(entry) = from.get(id)
+            {
+                let score = arm.calculate_score();
+
+                if score > self.max_weight {
+                    self.max_weight = score;
+                }
+
+                if rng.random_bool(score / self.max_weight) {
+                    generation.push(
+                        TestableEntry::new(entry.raw().clone())
+                            .with_hook(arm.clone())
+                            .with_build_hook(arm.clone()),
+                    );
+                }
+            }
+        }
+
+        generation
+    }
+
+    fn on_add(&mut self, entry: &lsf_core::entry::CorpusEntry) -> f64 {
+        let item = Arc::new(MABArm::new_with_prior(self.body.clone(), entry.meta()));
+        let score = item.calculate_score();
+
+        if score > self.max_weight {
+            self.max_weight = score;
+        }
+
+        self.entries.insert(entry.id(), item);
+
+        score
+    }
+
+    fn on_remove(&mut self, id: ID) {
+        // could check if this was max and do chore if so, but this is very unlikely, as top fliers are guarded by corpus
+        self.entries.swap_remove(&id);
+    }
+
+    fn chore(&mut self) {
+        self.max_weight = -1.;
+        for (_, arm) in self.entries.iter() {
+            let s = arm.calculate_score();
+            if s > self.max_weight {
+                self.max_weight = s;
+            }
+        }
+    }
+
+    fn reset(&mut self) {
+        self.body.reset();
+        self.max_weight = 0.;
+        self.entries.clear();
     }
 }

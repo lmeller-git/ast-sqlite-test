@@ -6,6 +6,7 @@ use lsf_engine::{
     BinaryBlob,
     DynamicCorpus,
     Engine,
+    FastProbabilisticMABScheduler,
     GreedyCoverage,
     ProbabilisticMABScheduler,
     SchedulerBatcher,
@@ -34,7 +35,7 @@ fn main() {
     let _profiler = dhat::Profiler::new_heap();
 
     let scheduler_body = Arc::new(MABBody::new());
-    let scheduler = SchedulerBatcher::new(Box::new(ProbabilisticMABScheduler::new(
+    let scheduler = SchedulerBatcher::new(Box::new(FastProbabilisticMABScheduler::new(
         scheduler_body.clone(),
     )));
 

@@ -8,6 +8,7 @@ use lsf_engine::{
     CorpusMinimizer,
     DynamicCorpus,
     Engine as RawEngine,
+    FastProbabilisticMABScheduler,
     Generation as RawGeneration,
     GreedyCoverage,
     InMemory,
@@ -280,6 +281,13 @@ impl SchedulerBuilder {
     pub fn batched(mut scheduler: PyRefMut<SchedulerBuilder>) -> Self {
         Self(Some(Box::new(SchedulerBatcher::new(
             scheduler.0.take().unwrap(),
+        ))))
+    }
+
+    #[staticmethod]
+    pub fn fast_weigthed_ucb1(body: PyRef<MABBody>) -> Self {
+        Self(Some(Box::new(FastProbabilisticMABScheduler::new(
+            body.0.clone(),
         ))))
     }
 }

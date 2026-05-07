@@ -10,6 +10,8 @@ use crate::{AcceptanceReason, AdaptiveStatistics, FeedbackHook, RejectionReason,
 
 const DECAY_RATE: f64 = 0.999;
 const RESCALE_FACTOR: f64 = 1e15_f64;
+pub const ZERO_WEIGHT: f64 = 0.;
+pub const MAX_WEIGHT: f64 = 2e2;
 
 #[derive(Debug, Default)]
 pub struct MABBody {
@@ -256,7 +258,7 @@ impl AdaptiveStatistics for MABArm {
         let inflated_attempts = self.attempts.load(Ordering::Relaxed);
 
         if inflated_attempts < 1. {
-            return f64::INFINITY;
+            return MAX_WEIGHT;
         }
 
         let inflation = self.ctx.current_inflation.load(Ordering::Relaxed);
@@ -281,18 +283,29 @@ impl AdaptiveStatistics for MABArm {
             0.
         };
 
-        let penalty = time_out_rate * 0.33 + syntax_penalty + avg_size * 0.16 + avg_t_exec * 0.16;
-        let cons = (1. - penalty).max(0.001);
+        // 1ms, 100 chars
+        let time_penalty_ratio = (avg_t_exec / 1_000_000.0).ln_1p();
+        let size_penalty_ratio = (avg_size / 100.0).ln_1p();
 
-        // let health_factor = 1.;
+        let penalty = time_out_rate * 0.33
+            + syntax_penalty
+            + size_penalty_ratio * 0.16
+            + time_penalty_ratio * 0.16;
+        let cons = (1. - penalty).max(0.001);
 
         let exploitation = pros * cons;
 
         let effective_attempts = inflated_attempts / inflation;
-        let effective_total_attempts = self.ctx.total_attempts.load(Ordering::Relaxed) / inflation;
+        let effective_total_attempts =
+            (self.ctx.total_attempts.load(Ordering::Relaxed) / inflation).max(1.);
         let exploration = (4. * (effective_total_attempts).ln() / (effective_attempts)).sqrt();
 
-        exploitation + exploration
+        let final_score = (exploitation + exploration).min(MAX_WEIGHT);
+
+        if final_score.is_nan() {
+            return 0.001;
+        }
+        final_score
     }
 }
 
