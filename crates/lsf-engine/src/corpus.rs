@@ -7,6 +7,7 @@ pub trait CorpusHandler<T>: Sync + Send {
     fn remove(&mut self, id: &ID);
     fn resize(&mut self);
     fn ids(&self) -> rustc_hash::FxHashSet<ID>;
+    fn protected_ids(&self) -> rustc_hash::FxHashSet<ID>;
     fn clear(&mut self);
     fn size(&self) -> usize;
 }

@@ -57,7 +57,6 @@ pub struct DynamicCorpus {
     hot: IDMAp<Arc<AST>>,
     hot_eviction: PriorityQueue<ID, Reverse<OrderedFloat<f64>>>,
     disk_cache: Box<dyn StorageBackend>,
-    // ast_cleanup: CleanUp<Arc<AST>>,
     hot_cap: usize,
     cache_misses: usize,
     requests: usize,
@@ -181,6 +180,37 @@ impl CorpusHandler<f64> for DynamicCorpus {
 
     fn ids(&self) -> rustc_hash::FxHashSet<ID> {
         self.index.keys().copied().collect()
+    }
+
+    fn protected_ids(&self) -> rustc_hash::FxHashSet<ID> {
+        const PROTECTED_RATIO: f64 = 0.15;
+
+        let in_flight_count = self.in_flight.len();
+        let target =
+            ((self.size() as f64 * PROTECTED_RATIO) as usize).saturating_sub(in_flight_count);
+
+        let mut protected = rustc_hash::FxHashSet::with_capacity_and_hasher(
+            in_flight_count + target,
+            Default::default(),
+        );
+        protected.extend(self.in_flight.keys().copied());
+
+        if target == 0 {
+            return protected;
+        }
+
+        let mut index: Vec<_> = self.index.iter().collect();
+        let index_len = index.len();
+
+        if target < index_len {
+            index
+                .select_nth_unstable_by(index_len - target, |a, b| a.1.score.total_cmp(&b.1.score));
+            protected.extend(index[index_len - target..].iter().map(|(id, _)| **id));
+        } else {
+            protected.extend(index.iter().map(|(id, _)| **id));
+        }
+
+        protected
     }
 
     fn clear(&mut self) {
@@ -314,6 +344,10 @@ impl<T> CorpusHandler<T> for InMemory<CorpusEntry> {
 
     fn ids(&self) -> rustc_hash::FxHashSet<ID> {
         self.inner.keys().copied().collect()
+    }
+
+    fn protected_ids(&self) -> rustc_hash::FxHashSet<ID> {
+        Default::default()
     }
 }
 

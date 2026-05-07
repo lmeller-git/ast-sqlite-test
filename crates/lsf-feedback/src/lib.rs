@@ -25,6 +25,7 @@ pub enum TestOutcome {
 pub enum RejectionReason {
     SyntaxError,
     TriggersCrash,
+    TimeOut,
     Bad,
 }
 

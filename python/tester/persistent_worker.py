@@ -82,7 +82,7 @@ class SQLiteWorker:
                 return b"".join(chunks), True
             chunks.append(line)
 
-    async def execute(self, query: str, timeout_sec: float = 1.5) -> TestCapture:
+    async def execute(self, query: str, timeout_sec: float = 0.75) -> TestCapture:
         if self.proc is None or self.proc.returncode is not None:
             await self._start()
 
@@ -92,7 +92,7 @@ class SQLiteWorker:
         stderr_stream: asyncio.StreamReader = self.proc.stderr
 
         start_time = time.perf_counter_ns()
-        full_command = f"{query};\n.output stderr\n.print {self.STDERR_SENTINEL.decode()}\n.output stdout\n.print {self.STDOUT_SENTINEL.decode()}\n"
+        full_command = f"{query}\n;\n.output stderr\n.print {self.STDERR_SENTINEL.decode()}\n.output stdout\n.print {self.STDOUT_SENTINEL.decode()}\n"
 
         try:
             self.proc.stdin.write(full_command.encode())

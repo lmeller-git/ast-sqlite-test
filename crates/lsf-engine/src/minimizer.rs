@@ -44,7 +44,9 @@ impl GreedyCoverage {
 
 impl<T> CorpusMinimizer<T> for GreedyCoverage {
     fn minimize(&mut self, corpus: &mut dyn CorpusHandler<T>, scheduler: &mut dyn Schedule) {
-        let best_entries = self.best_edges.get_best_entries();
+        let mut best_entries = self.best_edges.get_best_entries();
+        best_entries.extend(corpus.protected_ids());
+
         let ids = corpus.ids();
         let bad_entries = ids.difference(&best_entries);
 
@@ -76,6 +78,7 @@ impl<T> CorpusMinimizer<T> for GreedyCoverage {
             let is_best = self.best_edges.update_if_best(
                 entry.id(),
                 entry.ast().len(),
+                edges_found.len(),
                 meta.exec_time,
                 edges_found.into_iter(),
             );

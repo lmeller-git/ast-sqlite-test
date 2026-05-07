@@ -4,9 +4,9 @@ import asyncio
 import platform
 
 from lib_sf.lib_sf import TestableEntry
-from tester.event_loop import CONCURRENCY_LIMIT, fuzzing_loop
+from tester.event_loop import CONCURRENCY_LIMIT, fuzzing_loop, N_ORACLES
 from tester.exec import init, run_single_mutation
-from tester.oracle import oracle
+from tester.oracle import oracle_worker
 from tester.persistent_worker import SQLiteWorker, PLATFORM
 from tester.rules import make_ruleset_havoc, make_ruleset_semantic, make_ruleset_structural
 
@@ -20,7 +20,7 @@ async def main(args: Namespace):
     max_edges = await init(args.test_path)
     print("found ", max_edges, " max_edges")
     ipc_queue = engine.IPCTokenQueue(CONCURRENCY_LIMIT, max_edges)
-    oracle_queue = asyncio.PriorityQueue(1024)
+    oracle_queue = asyncio.Queue(1024)
 
     corpus_scheduler_body = engine.MABBody()
     rule_scheduler_body = engine.MABBody()
@@ -52,6 +52,8 @@ async def main(args: Namespace):
         ],
         RNG,
     )
+
+    oracle_tasks = [oracle_worker(oracle_queue, args.oracle_path) for _ in range(N_ORACLES)]
 
     # populate coverage map with "basic edges"
 
@@ -94,8 +96,6 @@ async def main(args: Namespace):
         ]
     )
 
-    oracle_task = asyncio.create_task(oracle(oracle_queue, args.oracle_path))
-
     # TODO: force add guarded queries back to engine or skip this entirely
 
     mutation_engine.clear_strategies()
@@ -118,26 +118,26 @@ async def main(args: Namespace):
         ]
     ]
 
-    snapshot = mutation_engine.snapshot()
+    # snapshot = mutation_engine.snapshot()
 
-    tasks = [
-        run_single_mutation(
-            TestableEntry.from_raw(entry.clone_raw()),
-            ipc_queue,
-            mutation_engine,
-            oracle_queue,
-            init_workers,
-            args.test_path,
-        )
-        for entry in snapshot
-    ]
+    # tasks = [
+    #     run_single_mutation(
+    #         TestableEntry.from_raw(entry.clone_raw()),
+    #         ipc_queue,
+    #         mutation_engine,
+    #         oracle_queue,
+    #         init_workers,
+    #         args.test_path,
+    #     )
+    #     for entry in snapshot
+    # ]
 
-    r = await asyncio.gather(*tasks)
+    # r = await asyncio.gather(*tasks)
 
-    for worker in init_workers.values():
-        await worker.close()
+    # for worker in init_workers.values():
+    # await worker.close()
 
-    print(f"Done executing {r.__len__()} setup queries", flush=True)
+    # print(f"Done executing {r.__len__()} setup queries", flush=True)
 
     # mutation_engine.gc()
 
@@ -145,7 +145,7 @@ async def main(args: Namespace):
 
     _ = await asyncio.gather(
         fuzzing_loop(mutation_engine, ipc_queue, oracle_queue, args.stop_at, args.test_path),
-        oracle_task,
+        *oracle_tasks,
     )
 
 

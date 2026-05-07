@@ -10,7 +10,7 @@ async def run_single_mutation(
     entry: TestableEntry,
     ipc_queue: engine.IPCTokenQueue,
     mutation_engine: engine.Engine,
-    oracle_queue: asyncio.PriorityQueue[tuple[int, TestCapture | None]],
+    oracle_queue: asyncio.Queue[TestCapture | None],
     workers: dict[int, SQLiteWorker],
     test_path: str,
 ):
@@ -42,25 +42,23 @@ async def run_single_mutation(
         is_syntax_err = b"syntax error" in capture.stderr or b"Parse error" in capture.stderr
 
         # may want to return crashes and syntax errors also. They will quicly be moved to cold cache anyway, as they likely will not create good children
-        if is_crash or is_hang:
+        # would need to acocunt for this in mab stats though
+        if is_crash:
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.crash()))
-            # mutation_engine.return_token(token)
+            mutation_engine.return_token(token)
+        elif is_hang:
+            entry.fire_hooks(TestOutcome.rejected(RejectionReason.timeout()))
+            mutation_engine.return_token(token)
         elif is_syntax_err:
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()))
-            # mutation_engine.return_token(token)
-        # else:
-        mutation_engine.commit_test_result(entry, engine.TestResult(capture.exec_time, token))
+            mutation_engine.return_token(token)
+        else:
+            mutation_engine.commit_test_result(entry, engine.TestResult(capture.exec_time, token))
 
         if is_crash:
             capture.is_hang_or_crash = "CRASH"
 
-        priority = -capture.exec_time
-        if is_crash:
-            priority //= 10
-        if is_hang:
-            priority //= 2
-
-        await oracle_queue.put((-priority, capture))
+        await oracle_queue.put(capture)
 
     except Exception:
         entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()))

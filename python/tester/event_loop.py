@@ -1,18 +1,18 @@
 from lib_sf import engine
 import asyncio
-import sys
 
 from lib_sf.lib_sf import TestableEntry
 from tester.exec import run_single_mutation
 from tester.persistent_worker import SQLiteWorker, TestCapture
 
 CONCURRENCY_LIMIT = 16
+N_ORACLES = 4
 
 
 async def fuzzing_loop(
     mutation_engine: engine.Engine,
     ipc_queue: engine.IPCTokenQueue,
-    oracle_queue: asyncio.PriorityQueue[tuple[int, TestCapture | None]],
+    oracle_queue: asyncio.Queue[TestCapture | None],
     stop_at: int,
     test_path: str,
 ):
@@ -49,7 +49,6 @@ async def fuzzing_loop(
             )
             active_tasks.add(task)
 
-
         _done, active_tasks = await asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED)
 
         if mutation_engine.corpus_size() >= stop_at:
@@ -57,5 +56,7 @@ async def fuzzing_loop(
             _ = await asyncio.gather(*active_tasks, return_exceptions=True)
             for worker in workers.values():
                 await worker.close()
-            _ = await oracle_queue.put((sys.maxsize, None))
+            _ = await oracle_queue.join()
+            for _ in range(N_ORACLES):
+                oracle_queue.put_nowait(None)
             return

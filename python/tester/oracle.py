@@ -1,6 +1,8 @@
 import asyncio
 import os
 import hashlib
+import re
+
 from tester.persistent_worker import SQLiteWorker, TestCapture
 
 
@@ -70,8 +72,16 @@ def normalize_output(output: bytes) -> bytes:
     # Lowercase for case-insensitive comparison
     normalized = normalized.lower()
     # Normalize newlines to \n
-    normalized = normalized.replace(b'\r\n', b'\n').replace(b'\r', b'\n')
+    normalized = normalized.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
     return normalized
+
+
+def get_structural_signature(query: str) -> str:
+    sig = query.lower()
+    sig = re.sub(r"\b\d+\b", "N", sig)
+    sig = re.sub(r"'.*?'", "S", sig)
+    sig = " ".join(sig.split())
+    return sig
 
 
 def stderr_matches_any(stderr: bytes, patterns: list[bytes]) -> bool:
@@ -91,23 +101,39 @@ def is_interesting_unilateral(capture: TestCapture) -> bool:
     return stderr_matches_any(capture.stderr, INTERESTING_UNILATERAL_PATTERNS)
 
 
-async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]], oracle_path: str):
-    crash_counter = 0
-    seen_signatures: set[bytes] = set()
+# shared across orcales
+seen_signatures: set[bytes] = set()
+
+
+async def oracle_worker(incoming: asyncio.Queue[TestCapture | None], oracle_path: str):
     # Could in theory also spawn multiple workers here, but 1 should be enough, especially since it should never crash
     oracle_worker = SQLiteWorker(oracle_path)
     os.makedirs("docker_out/crashes", exist_ok=True)
 
     while True:
-        _, item = await incoming.get()
+        item = await incoming.get()
         if item is None:
+            incoming.task_done()
             return
 
         bug_type: str | None = None
         notes: str = ""
         ref: TestCapture | None = None
-        
+
         normalized_item_stderr = normalize_output(item.stderr)
+
+        # hang, logic bug are often due to legit stuff like recursive CTE or random. do not care about different variation sof these
+        if item.exit_code == 42:
+            query = get_structural_signature(item.query)
+        else:
+            query = item.query
+        # Create a signature that includes normalized stderr and a hash of the query for better deduplication
+        query_hash = hashlib.md5(query.encode()).hexdigest().encode()
+        signature = normalized_item_stderr + b"|" + query_hash
+        if signature in seen_signatures:
+            incoming.task_done()
+            continue
+        seen_signatures.add(signature)
 
         if is_unconditional_bug(item):
             bug_type = "MEMSAFETY"
@@ -131,7 +157,10 @@ async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]
             else:
                 if is_expected_error(item) and is_expected_error(ref):
                     pass
-                elif normalized_item_stderr.split(b"\n")[0] != normalize_output(ref.stderr).split(b"\n")[0]:
+                elif (
+                    normalized_item_stderr.split(b"\n")[0]
+                    != normalize_output(ref.stderr).split(b"\n")[0]
+                ):
                     bug_type = "DIVERGENCE"
                     notes = "Both errored, but with different messages (after normalization)."
 
@@ -149,31 +178,36 @@ async def oracle(incoming: asyncio.PriorityQueue[tuple[int, TestCapture | None]]
                 notes = "Same exit code (0) but stdout differs."
 
         if bug_type is not None:
-            # Create a signature that includes normalized stderr and a hash of the query for better deduplication
-            query_hash = hashlib.md5(item.query.encode()).hexdigest().encode()
-            signature = normalized_item_stderr + b"|" + query_hash
-            if signature in seen_signatures:
+            # hang, logic bug are often due to legit stuff like recursive CTE or random. do not care about different variation sof these
+            if bug_type == "LOGIC_BUG":
+                query = get_structural_signature(item.query)
+                query_hash = hashlib.md5(query.encode()).hexdigest().encode()
+                signature = normalized_item_stderr + b"|" + query_hash
+                if signature in seen_signatures:
+                    incoming.task_done()
+                    continue
+                seen_signatures.add(signature)
+
+            filename = f"docker_out/crashes/bug_{query_hash.hex()}_{bug_type}.txt"
+            if os.path.exists(filename):
                 incoming.task_done()
                 continue
-            seen_signatures.add(signature)
-
-            filename = f"docker_out/crashes/bug_{crash_counter:04d}_{bug_type}.txt"
             print(f"[!] {bug_type} — saving to {filename}", flush=True)
 
             ref_block = ""
             if ref is not None:
                 ref_block = f"\n--- Reference (/usr/bin/sqlite3-3.39.4) ---\n{ref}"
-
-            with open(filename, "w", encoding="utf-8") as f:
-                _ = f.write(
-                    f"{bug_type} REPORT\n\
-                    Notes: {notes}\n\n\
-                    Query:\n{item.query}\n\
-                    {ref_block}\n\
-                    --- Found (sqlite3_guarded) ---\n{item}"
-                )
-
-            crash_counter += 1
+            try:
+                with open(filename, "x", encoding="utf-8") as f:
+                    _ = f.write(
+                        f"{bug_type} REPORT\n\
+                        Notes: {notes}\n\n\
+                        Query:\n{item.query}\n\
+                        {ref_block}\n\
+                        --- Found (sqlite3_guarded) ---\n{item}"
+                    )
+            except FileExistsError:
+                # Another worker finished the same bug just before us
+                pass
 
         incoming.task_done()
-

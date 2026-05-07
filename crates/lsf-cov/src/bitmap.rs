@@ -116,10 +116,14 @@ impl ScoredEdges {
         &mut self,
         id: lsf_core::entry::ID,
         query_len: usize,
+        hit_edges_len: usize,
         exec_time_ns: u32,
         hit_edges: impl Iterator<Item = usize>,
     ) -> bool {
-        let score = exec_time_ns.ilog10().saturating_mul(query_len as u32);
+        let score = exec_time_ns
+            .ilog10()
+            .saturating_mul(query_len as u32)
+            .saturating_div((hit_edges_len as f64).ln_1p().ceil() as u32);
         let mut is_best_anywhere = false;
 
         for edge_id in hit_edges {

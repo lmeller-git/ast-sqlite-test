@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, map::MutableKeys};
 use lsf_core::entry::{ID, Meta};
 use lsf_feedback::{
     AdaptiveStatistics,
@@ -51,6 +51,7 @@ pub struct BlockSumTable {
     blocks: Vec<f64>,
     total_sum: f64,
     block_size: usize,
+    free_slots: Vec<usize>,
 }
 
 impl BlockSumTable {
@@ -62,47 +63,51 @@ impl BlockSumTable {
             leaves: Vec::with_capacity(initial_capacity),
             blocks: Vec::with_capacity(initial_capacity / block_size + 1),
             total_sum: 0.0,
+            free_slots: Vec::new(),
             block_size,
+        }
+    }
+
+    pub fn insert(&mut self, weight: f64) -> usize {
+        if let Some(free) = self.free_slots.pop() {
+            self.set_weigth(free, weight);
+            free
+        } else {
+            self.push(weight)
         }
     }
 
     pub fn push(&mut self, weight: f64) -> usize {
         let weight = weight.clamp(ZERO_WEIGHT, MAX_WEIGHT);
+
         let idx = self.leaves.len();
-        let block_idx = idx / self.block_size;
+        self.leaves.push(0.);
+        self.set_weigth(idx, weight);
+
+        idx
+    }
+
+    fn set_weigth(&mut self, slot: usize, weight: f64) {
+        let block_idx = slot / self.block_size;
 
         if block_idx >= self.blocks.len() {
             self.blocks.push(0.0);
         }
 
-        self.leaves.push(weight);
-        self.blocks[block_idx] += weight;
-        self.total_sum += weight;
-        idx
+        let old = self.leaves[slot];
+        self.leaves[slot] = weight;
+        self.blocks[block_idx] += weight - old;
+        self.total_sum += weight - old;
     }
 
     pub fn remove(&mut self, idx: usize) {
-        let block_idx = idx / self.block_size;
-
-        if let Some(block) = self.blocks.get_mut(block_idx)
-            && let Some(leave) = self.leaves.get_mut(idx)
-        {
-            *block -= *leave;
-            self.total_sum -= *leave;
-            *leave = 0.;
-        }
+        self.set_weigth(idx, 0.);
+        self.free_slots.push(idx);
     }
 
     pub fn update(&mut self, idx: usize, weight: f64) {
-        if let Some(leave) = self.leaves.get_mut(idx)
-            && let Some(block) = self.blocks.get_mut(idx / self.block_size)
-        {
-            let new_weight = weight.clamp(ZERO_WEIGHT, MAX_WEIGHT);
-            let delta = new_weight - *leave;
-            *leave = new_weight;
-            *block += delta;
-            self.total_sum += delta
-        }
+        let new_weight = weight.clamp(ZERO_WEIGHT, MAX_WEIGHT);
+        self.set_weigth(idx, new_weight);
     }
 
     pub fn resum(&mut self) {
@@ -202,9 +207,14 @@ impl Schedule for ProbabilisticMABScheduler {
     fn on_add(&mut self, entry: &lsf_core::entry::CorpusEntry) -> f64 {
         let item = SmallSchedueldItem::new_with_prior(self.mab.clone(), (), &entry.meta);
         let score = item.stats.calculate_score();
-        let idx = self.queue.push(score);
-        let (idx_map, _) = self.id_mapping.insert_full(entry.id(), item);
-        debug_assert_eq!(idx, idx_map);
+        let idx = self.queue.insert(score);
+        if idx >= self.id_mapping.len() {
+            // really this is idx == self.id_mapping.len()
+            self.id_mapping.insert(entry.id(), item);
+        } else if let Some((id, value)) = self.id_mapping.get_index_mut2(idx) {
+            *id = entry.id();
+            *value = item;
+        }
         score
     }
 
@@ -217,6 +227,12 @@ impl Schedule for ProbabilisticMABScheduler {
     fn chore(&mut self) {
         // O(N), maybe not do this very often/at all
         self.queue.resum();
+    }
+
+    fn reset(&mut self) {
+        self.queue = BlockSumTable::new(DEFAULT_CAP);
+        self.id_mapping.clear();
+        self.mab.reset();
     }
 }
 

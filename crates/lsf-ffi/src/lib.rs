@@ -177,6 +177,11 @@ impl RejectionReason {
     pub fn crash() -> Self {
         Self(lsf_feedback::RejectionReason::TriggersCrash)
     }
+
+    #[staticmethod]
+    pub fn timeout() -> Self {
+        Self(lsf_feedback::RejectionReason::TimeOut)
+    }
 }
 
 #[pyclass]

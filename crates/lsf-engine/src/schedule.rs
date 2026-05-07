@@ -38,6 +38,7 @@ pub trait Schedule: Send + Sync {
     fn on_remove(&mut self, _id: ID) {}
 
     fn chore(&mut self) {}
+    fn reset(&mut self) {}
 }
 
 const MAX_REFILL: usize = 128;
@@ -123,6 +124,11 @@ impl Schedule for SchedulerBatcher {
 
     fn chore(&mut self) {
         self.inner_scheduler.chore();
+    }
+
+    fn reset(&mut self) {
+        self.batch.clear();
+        self.inner_scheduler.reset();
     }
 }
 
@@ -262,5 +268,10 @@ impl Schedule for AdaptiveWeightedRandomScheduler {
                 })
             })
             .collect()
+    }
+
+    fn reset(&mut self) {
+        self.stat_mapping.clear();
+        self.dist = None
     }
 }

@@ -67,6 +67,11 @@ impl Schedule for MABScheduler {
         self.queue.push(item);
         score
     }
+
+    fn reset(&mut self) {
+        self.queue.clear();
+        self.mab.reset();
+    }
 }
 
 impl Default for MABScheduler {

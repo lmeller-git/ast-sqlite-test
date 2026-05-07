@@ -55,6 +55,13 @@ impl MABBody {
             self.normalization_epoch.fetch_add(1, Ordering::Relaxed);
         }
     }
+
+    pub fn reset(&self) {
+        self.total_attempts.store(0., Ordering::Relaxed);
+        self.epoch.store(0, Ordering::Relaxed);
+        self.normalization_epoch.store(0, Ordering::Relaxed);
+        self.current_inflation.store(1., Ordering::Relaxed);
+    }
 }
 
 #[derive(Debug, Default)]
@@ -64,6 +71,7 @@ pub struct MABArm {
     cov_increases: AtomicF64,
     syntax_err: AtomicF64,
     crash: AtomicF64,
+    child_timeout: AtomicF64,
     pub local_epoch: AtomicU32,
     ctx: Arc<MABBody>,
 }
@@ -107,8 +115,19 @@ impl MABArm {
                 0.
             }),
             local_epoch: AtomicU32::new(norm_epoch),
+            child_timeout: AtomicF64::new(0.),
             ctx: body,
         }
+    }
+
+    pub fn reset(&self) {
+        self.attempts.store(0., Ordering::Relaxed);
+        self.accepted.store(0., Ordering::Relaxed);
+        self.cov_increases.store(0., Ordering::Relaxed);
+        self.syntax_err.store(0., Ordering::Relaxed);
+        self.crash.store(0., Ordering::Relaxed);
+        self.child_timeout.store(0., Ordering::Relaxed);
+        self.local_epoch.store(0, Ordering::Relaxed);
     }
 
     fn normalize(&self) {
@@ -159,7 +178,14 @@ impl FeedbackHook for MABArm {
                 }
                 RejectionReason::TriggersCrash => {
                     self.crash.fetch_add(1. * inflation, Ordering::Relaxed);
+                    // implicitly reward crashes
+                    self.accepted.fetch_add(1. * inflation, Ordering::Relaxed);
                 }
+                RejectionReason::TimeOut => {
+                    self.child_timeout
+                        .fetch_add(1. * inflation, Ordering::Relaxed);
+                }
+                // implicitly discouraged
                 RejectionReason::Bad => {}
             },
             TestOutcome::Accepted(s) => match s {
@@ -207,13 +233,24 @@ impl AdaptiveStatistics for MABArm {
 
         // we want to
         // increase score for accepted ratio, coverage increase and crashes (likely a bug) and reduce it for syntax errors, as they are somewhat uninteresting
-        let cov_inc_rate = (self.cov_increases.load(Ordering::Relaxed)) / (inflated_attempts);
+        let cov_inc_rate = self.cov_increases.load(Ordering::Relaxed) / inflated_attempts;
+        // if we feed syntax errs, hangs, ... back we need to discourage them. We migth even want to discourage them anyways
+
+        // let time_out_rate = self.child_timeout.load(Ordering::Relaxed) / inflated_attempts;
+        // let syntax_err_rate = self.syntax_err.load(Ordering::Relaxed) / inflated_attempts;
+
+        // let penalty = time_out_rate + syntax_err_rate * 0.5;
+        // let health_factor = (1. - penalty).max(0.001);
+
+        let health_factor = 1.;
+
+        let exploitation = cov_inc_rate * health_factor;
 
         let effective_attempts = inflated_attempts / inflation;
         let effective_total_attempts = self.ctx.total_attempts.load(Ordering::Relaxed) / inflation;
         let exploration = (4. * (effective_total_attempts).ln() / (effective_attempts)).sqrt();
 
-        cov_inc_rate + exploration
+        exploitation + exploration
     }
 }
 

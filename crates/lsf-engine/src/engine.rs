@@ -31,6 +31,7 @@ pub struct Engine {
     rng: SmallRng,
     mab_bodies: Vec<Arc<MABBody>>,
     edge_map: EdgeMap,
+    size_at_last_reset: usize,
 }
 
 impl Debug for Engine {
@@ -60,6 +61,7 @@ impl Engine {
             shmem_queue,
             rng: SmallRng::seed_from_u64(rng_seed),
             mab_bodies,
+            size_at_last_reset: 0,
         }
     }
 
@@ -153,9 +155,10 @@ impl Engine {
     pub fn populate(&mut self, seed_gens: Vec<Box<dyn ObtainSeed>>) {
         for generator in seed_gens {
             let seeds = generator.obtain();
-            seeds
-                .into_iter()
-                .for_each(|seed| self.corpus.insert(seed, f64::INFINITY))
+            seeds.into_iter().for_each(|seed| {
+                self.scheduler.on_add(&seed);
+                self.corpus.insert(seed, f64::INFINITY)
+            })
         }
     }
 
@@ -168,10 +171,21 @@ impl Engine {
     }
 
     pub fn chore(&mut self) {
-        self.minimizer
-            .minimize(self.corpus.as_mut(), self.scheduler.as_mut());
+        const GC_AT: f64 = 0.1;
+        const GC_MIN_ABSOLUTE: usize = 100;
+
         self.corpus.resize();
-        self.scheduler.chore();
+        let corpus_size = self.corpus_size();
+
+        let new_entries = corpus_size.saturating_sub(self.size_at_last_reset);
+        let growth_rate = new_entries as f64 / self.size_at_last_reset as f64;
+
+        if growth_rate >= GC_AT && new_entries >= GC_MIN_ABSOLUTE {
+            self.minimizer
+                .minimize(self.corpus.as_mut(), self.scheduler.as_mut());
+            self.scheduler.chore();
+            self.size_at_last_reset = self.corpus_size();
+        }
     }
 
     pub fn corpus_size(&self) -> usize {
@@ -180,6 +194,8 @@ impl Engine {
 
     pub fn clear(&mut self) {
         self.corpus.clear();
+        self.minimizer.reset();
+        self.scheduler.reset();
     }
 }
 
