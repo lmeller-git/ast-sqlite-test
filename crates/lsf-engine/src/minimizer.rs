@@ -24,7 +24,7 @@ pub trait CorpusMinimizer<T>: Send + Sync {
     fn reset(&mut self);
 }
 
-const CULL_AFTER: u8 = 3;
+const CULL_AFTER: u8 = 5;
 
 pub struct GreedyCoverage {
     best_edges: ScoredEdges,
@@ -46,6 +46,7 @@ impl<T> CorpusMinimizer<T> for GreedyCoverage {
     fn minimize(&mut self, corpus: &mut dyn CorpusHandler<T>, scheduler: &mut dyn Schedule) {
         let mut best_entries = self.best_edges.get_best_entries();
         best_entries.extend(corpus.protected_ids());
+        best_entries.extend(self.diversity.entries.iter());
 
         let ids = corpus.ids();
         let bad_entries = ids.difference(&best_entries);
@@ -103,7 +104,7 @@ impl<T> CorpusMinimizer<T> for GreedyCoverage {
     }
 }
 
-const MAX_DIVERSITY_WINDOW: usize = 1024;
+const MAX_DIVERSITY_WINDOW: usize = 2048;
 const MIN_DIST: u32 = 20;
 
 #[derive(Default)]

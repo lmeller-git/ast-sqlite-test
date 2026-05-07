@@ -176,7 +176,9 @@ async def oracle_worker(incoming: asyncio.Queue[TestCapture | None], oracle_path
             elif normalize_output(ref.stdout) != normalize_output(item.stdout):
                 bug_type = "LOGIC_BUG"
                 notes = "Same exit code (0) but stdout differs (after normalization)."
-            elif ref.stdout != item.stdout:
+            elif ref.stdout != item.stdout and not (
+                "random" in item.query or "PRIMARY KEY" in item.query
+            ):
                 bug_type = "LOGIC_BUG"
                 notes = "Same exit code (0) but stdout differs."
 

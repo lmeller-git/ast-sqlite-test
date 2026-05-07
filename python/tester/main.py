@@ -114,7 +114,7 @@ async def main(args: Namespace):
                     make_ruleset_semantic(sem_rule_scheduler_body),
                     make_ruleset_structural(struct_rule_scheduler_body),
                 ],
-                1,
+                2,
             ),
             engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.7),
             engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_name_guard(), 0.7),

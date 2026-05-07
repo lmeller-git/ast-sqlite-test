@@ -7,10 +7,8 @@ def make_ruleset_havoc(body: engine.MABBody):
         [
             engine.StrategyBuilder.tree_mutate_stmt(engine.TreeMutatorOperation.null_random()),
             engine.StrategyBuilder.tree_mutate_expr(engine.TreeMutatorOperation.null_random()),
-            engine.StrategyBuilder.scheduled(engine.StrategyBuilder.type_cast(), body),
-            engine.StrategyBuilder.null_inject(),
-            engine.StrategyBuilder.op_flip(),
-            engine.StrategyBuilder.recursive_expand_expr(),
+            engine.StrategyBuilder.type_cast(),
+            engine.StrategyBuilder.sub_query(),
         ],
         2
     )
@@ -38,7 +36,6 @@ def make_ruleset_structural(body: engine.MABBody):
             engine.StrategyBuilder.tree_mutate_stmt(engine.TreeMutatorOperation.shuffle_two()),
             engine.StrategyBuilder.tree_mutate_expr(engine.TreeMutatorOperation.shuffle_two()),
             engine.StrategyBuilder.set_ops(),
-            engine.StrategyBuilder.sub_query(),
             engine.StrategyBuilder.recursive_expand_expr(),
         ],
         2

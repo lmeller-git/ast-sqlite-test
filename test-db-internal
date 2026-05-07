@@ -2,4 +2,4 @@
 
 cd /app
 
-time just run-docker_ --seeds /app/seeds --save_to docker_out/queries --disable-addr-randomization true --stop_at 10000
+time just run-docker_ --seeds /app/seeds --save_to docker_out/queries --disable-addr-randomization true --stop_at 450000
