@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use lsf_cov::ipc::{IPCToken, SharedMemHandle};
 use lsf_engine::{
@@ -51,7 +51,7 @@ use sqlparser::ast::{Expr, Statement};
 use crate::{CorpusEntry, TestableEntry};
 
 #[pyclass]
-pub struct Engine(RawEngine);
+pub struct Engine(Mutex<RawEngine>);
 
 #[pymethods]
 impl Engine {
@@ -66,70 +66,85 @@ impl Engine {
         mab_bodies: Vec<PyRef<MABBody>>,
         rng_seed: u64,
     ) -> Self {
-        Self(RawEngine::new(
-            scheduler.0.take().unwrap(),
-            corpus_handler.0.take().unwrap(),
-            corpus_minimzer.0.take().unwrap(),
-            strategies.iter_mut().map(|s| s.0.take().unwrap()).collect(),
-            shmem_queue.0.clone(),
-            mab_bodies.iter().map(|b| b.0.clone()).collect(),
-            rng_seed,
-        ))
+        Self(
+            RawEngine::new(
+                scheduler.0.take().unwrap(),
+                corpus_handler.0.take().unwrap(),
+                corpus_minimzer.0.take().unwrap(),
+                strategies.iter_mut().map(|s| s.0.take().unwrap()).collect(),
+                shmem_queue.0.clone(),
+                mab_bodies.iter().map(|b| b.0.clone()).collect(),
+                rng_seed,
+            )
+            .into(),
+        )
     }
 
-    pub fn populate(&mut self, mut seeders: Vec<PyRefMut<SeedGeneratorBuilder>>) {
+    pub fn populate(&self, mut seeders: Vec<PyRefMut<SeedGeneratorBuilder>>) {
         self.0
+            .lock()
+            .unwrap()
             .populate(seeders.iter_mut().map(|s| s.0.take().unwrap()).collect());
     }
 
-    pub fn mutate_batch(&mut self, batch_size: usize) -> Generation {
-        Generation(self.0.mutate_batch(batch_size))
+    pub fn mutate_batch(&self, py: Python, batch_size: usize) -> Generation {
+        py.detach(|| Generation(self.0.lock().unwrap().mutate_batch(batch_size)))
     }
 
     pub fn commit_test_result(
-        &mut self,
+        &self,
+        py: Python,
         mut raw: PyRefMut<TestableEntry>,
         mut data: PyRefMut<TestResult>,
     ) {
-        self.0.commit_test_result(
-            raw.0.take().unwrap(),
-            lsf_core::entry::Meta {
-                triggers_bug: data.triggers_bug,
-                is_valid_syntax: data.is_valid_syntax,
-                new_cov_nodes: 0,
-                exec_time: data.exec_time,
-                query_size: data.query_size,
-            },
-            data.token.take().unwrap(),
-        );
+        let raw = raw.0.take().unwrap();
+        let meta = lsf_core::entry::Meta {
+            triggers_bug: data.triggers_bug,
+            is_valid_syntax: data.is_valid_syntax,
+            new_cov_nodes: 0,
+            exec_time: data.exec_time,
+            query_size: data.query_size,
+        };
+        let token = data.token.take().unwrap();
+        py.detach(|| self.0.lock().unwrap().commit_test_result(raw, meta, token));
     }
 
-    pub fn return_token(&mut self, mut token: PyRefMut<IPCTokenHandle>) {
-        self.0.return_token(token.0.take().unwrap());
+    pub fn return_token(&self, py: Python, mut token: PyRefMut<IPCTokenHandle>) {
+        let token = token.0.take().unwrap();
+        py.detach(|| self.0.lock().unwrap().return_token(token));
     }
 
-    pub fn snapshot(&mut self) -> Vec<CorpusEntry> {
-        self.0.snapshot().into_iter().map(CorpusEntry).collect()
+    pub fn snapshot(&self) -> Vec<CorpusEntry> {
+        self.0
+            .lock()
+            .unwrap()
+            .snapshot()
+            .into_iter()
+            .map(CorpusEntry)
+            .collect()
     }
 
-    pub fn clear_strategies(&mut self) {
-        self.0.clear_strategies();
+    pub fn clear_strategies(&self) {
+        self.0.lock().unwrap().clear_strategies();
     }
 
-    pub fn add_strategy(&mut self, mut strategy: PyRefMut<StrategyBuilder>) {
-        self.0.add_strategy(strategy.0.take().unwrap());
+    pub fn add_strategy(&self, mut strategy: PyRefMut<StrategyBuilder>) {
+        self.0
+            .lock()
+            .unwrap()
+            .add_strategy(strategy.0.take().unwrap());
     }
 
-    pub fn chore(&mut self) {
-        self.0.chore();
+    pub fn chore(&self, py: Python) {
+        py.detach(|| self.0.lock().unwrap().chore());
     }
 
     pub fn corpus_size(&self) -> usize {
-        self.0.corpus_size()
+        self.0.lock().unwrap().corpus_size()
     }
 
-    pub fn clear(&mut self) {
-        self.0.clear();
+    pub fn clear(&self) {
+        self.0.lock().unwrap().clear();
     }
 }
 
@@ -516,23 +531,29 @@ impl IPCTokenHandle {
     }
 }
 
-#[pyclass]
-pub struct IPCTokenQueue(Arc<SharedMemHandle>);
+#[pyclass(from_py_object)]
+#[derive(Clone)]
+pub struct IPCTokenQueue(SharedMemHandle);
 
 #[pymethods]
 impl IPCTokenQueue {
     #[new]
     pub fn new(n_workers: usize, max_edges: usize) -> Self {
-        Self(Arc::new(SharedMemHandle::new(n_workers, max_edges)))
+        Self(SharedMemHandle::new(n_workers, max_edges))
     }
 
-    pub fn pop(&self) -> Option<IPCTokenHandle> {
-        self.0.pop().map(|token| IPCTokenHandle(Some(token)))
+    pub fn send(&self, py: Python, mut token: PyRefMut<IPCTokenHandle>) {
+        let token = token.0.take().unwrap();
+        py.detach(|| self.0.send(token))
     }
 
-    pub fn push(&self, mut token: PyRefMut<IPCTokenHandle>) -> Option<IPCTokenHandle> {
-        self.0
-            .push(token.0.take().unwrap())
-            .map_or_else(|tok| Some(IPCTokenHandle(Some(tok))), |_| None)
+    pub fn recv(&self, py: Python) -> Option<IPCTokenHandle> {
+        py.detach(|| {
+            self.0
+                .rx()
+                .recv()
+                .ok()
+                .map(|token| IPCTokenHandle(Some(token)))
+        })
     }
 }

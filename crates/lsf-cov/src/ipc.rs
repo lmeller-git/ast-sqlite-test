@@ -1,14 +1,16 @@
 use std::fmt::Debug;
 
-use nblf_queue::{MPMCQueue, Queue};
 use shared_memory::{Shmem, ShmemConf};
 
 use crate::bitmap::EdgeMapView;
 
 const TOKENS_PER_WORKER: usize = 1;
 
+// TODO move to ffi crate (maybe)
+#[derive(Clone)]
 pub struct SharedMemHandle {
-    token_queue: Queue<Box<IPCToken>>,
+    rx: flume::Receiver<Box<IPCToken>>,
+    tx: flume::Sender<Box<IPCToken>>,
     pub shmem_size: usize,
 }
 
@@ -19,25 +21,33 @@ impl SharedMemHandle {
             n_workers * TOKENS_PER_WORKER,
             max_edges
         );
-        let queue = Queue::new(n_workers * TOKENS_PER_WORKER);
+        let (tx, rx) = flume::bounded(n_workers * TOKENS_PER_WORKER);
 
         for i in 0..n_workers * TOKENS_PER_WORKER {
-            _ = queue.push(Box::new(IPCToken::new(i, max_edges)));
+            _ = tx.send(Box::new(IPCToken::new(i, max_edges)));
         }
 
         Self {
-            token_queue: queue,
+            tx,
+            rx,
             shmem_size: max_edges,
         }
     }
 
-    pub fn pop(&self) -> Option<Box<IPCToken>> {
-        self.token_queue.pop()
+    pub fn rx(&self) -> &flume::Receiver<Box<IPCToken>> {
+        &self.rx
     }
 
-    #[allow(clippy::result_large_err)]
-    pub fn push(&self, token: Box<IPCToken>) -> Result<(), Box<IPCToken>> {
-        self.token_queue.push(token)
+    pub fn tx(&self) -> &flume::Sender<Box<IPCToken>> {
+        &self.tx
+    }
+
+    pub fn send(&self, mut token: Box<IPCToken>) {
+        // SAFETY: we own the token and it is of size self.shmem_size
+        unsafe {
+            std::ptr::write_bytes(token.as_mut_slice().as_mut_ptr(), 0, self.shmem_size);
+        }
+        _ = self.tx.send(token);
     }
 }
 

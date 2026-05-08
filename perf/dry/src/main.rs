@@ -41,7 +41,7 @@ fn main() {
 
     let corpus_handler = DynamicCorpus::new(Box::new(BinaryBlob::new("../temp_out".into())));
 
-    let shmem_queue = Arc::new(SharedMemHandle::new(4, 2_usize.pow(14)));
+    let shmem_queue = SharedMemHandle::new(4, 2_usize.pow(14));
 
     let top_level_strategy = Arc::new(MABBody::new());
     let scheduler1 = Arc::new(MABBody::new());
@@ -148,11 +148,11 @@ fn fuzz_loop(engine: &mut Engine, token_queue: &SharedMemHandle) {
             println!(
                 "corpus size: {}, {}% done",
                 size,
-                size as f64 / 80000. * 100.
+                epoch as f64 / 2_i32.pow(14) as f64 * 100.
             );
         }
 
-        if size >= 80000 {
+        if epoch >= 2_i32.pow(14) {
             break;
         }
         epoch += 1;
@@ -160,18 +160,13 @@ fn fuzz_loop(engine: &mut Engine, token_queue: &SharedMemHandle) {
 }
 
 fn virtual_run_test(
-    test: TestableEntry<RawEntry>,
+    mut test: TestableEntry<RawEntry>,
     engine: &mut Engine,
     token_queue: &SharedMemHandle,
     rng: &mut dyn rand::Rng,
 ) {
-    #[allow(clippy::never_loop)]
-    let token = loop {
-        if let Some(token) = token_queue.pop() {
-            break token;
-        } else {
-            panic!("cannot happen in sequential case")
-        }
+    let Ok(token) = token_queue.rx().recv() else {
+        return;
     };
     let meta = random_meta(rng);
     test.fire_rule_hooks(

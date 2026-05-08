@@ -2,10 +2,10 @@ from lib_sf import engine
 import asyncio
 
 from lib_sf.lib_sf import TestableEntry
-from tester.exec import run_single_mutation
+from tester.exec import CONCURRENCY_LIMIT, run_single_mutation
 from tester.persistent_worker import SQLiteWorker, TestCapture
 
-CONCURRENCY_LIMIT = 16
+QUERY_STASH = CONCURRENCY_LIMIT * 8
 N_ORACLES = 4
 
 
@@ -20,16 +20,14 @@ async def fuzzing_loop(
     active_tasks: set[asyncio.Task[None]] = set()
     testable_queries: list[TestableEntry] = []
     epoch = 0
+    loop = asyncio.get_event_loop()
 
     while True:
-        if len(testable_queries) < CONCURRENCY_LIMIT * 2:
-            batch = mutation_engine.mutate_batch(CONCURRENCY_LIMIT * 4 - len(testable_queries))
-            for entry in batch.into_members():
-                testable_queries.append(entry)
-            if epoch % 2000 == 0:
-                print(f"epoch {epoch}\nCorpus size: {mutation_engine.corpus_size()}")
-                mutation_engine.chore()
-            epoch += 1
+        if len(testable_queries) < QUERY_STASH / 2:
+            batch = await loop.run_in_executor(
+                None, mutation_engine.mutate_batch, QUERY_STASH - len(testable_queries)
+            )
+            testable_queries += batch.into_members()
 
         to_spawn = CONCURRENCY_LIMIT - len(active_tasks)
 
@@ -49,7 +47,13 @@ async def fuzzing_loop(
             )
             active_tasks.add(task)
 
+        if epoch % 2000 == 0:
+            print(f"epoch {epoch}\nCorpus size: {mutation_engine.corpus_size()}")
+            await loop.run_in_executor(None, mutation_engine.chore)
+
         _done, active_tasks = await asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED)
+
+        epoch += 1
 
         if mutation_engine.corpus_size() >= stop_at:
             print(f"Hit {stop_at} queries")

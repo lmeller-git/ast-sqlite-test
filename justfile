@@ -37,3 +37,14 @@ run-docker:
 run-docker-it:
     docker build --build-arg USE_ASAN=true -t ast-sqlite-fuzzer .
     docker run --security-opt seccomp=unconfined -v $(pwd)/docker_out:/app/docker_out -u $(id -u):$(id -g) --init -it --rm ast-sqlite-fuzzer /bin/bash
+
+
+run-docker-perf-it:
+    docker build --build-arg USE_ASAN=true -t ast-sqlite-fuzzer .
+    docker run -p 6006:6006 --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --privileged -v $(pwd)/docker_out:/app/docker_out --init -it --rm ast-sqlite-fuzzer /bin/bash
+
+run-flamegraoph:
+    setarch -R $(uname -m) uvx py-spy record -o docker_out/perf_out/flamegraph.svg --native -- .venv/bin/python python/tester/main.py --stop_at 5000 --seeds /app/seeds
+
+run-tracer:
+    setarch -R $(uname -m) uvx viztracer --log_async -- .venv/bin/python python/tester/main.py --stop_at 200 --seeds /app/seeds

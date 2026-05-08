@@ -1,14 +1,13 @@
 from lib_sf import engine
 from argparse import ArgumentParser, Namespace
 import asyncio
-import platform
 import uvloop
 
 from lib_sf.lib_sf import TestableEntry
-from tester.event_loop import CONCURRENCY_LIMIT, fuzzing_loop, N_ORACLES
-from tester.exec import init, run_single_mutation
+from tester.event_loop import fuzzing_loop, N_ORACLES
+from tester.exec import CONCURRENCY_LIMIT, init, run_single_mutation
 from tester.oracle import oracle_worker
-from tester.persistent_worker import SQLiteWorker, PLATFORM
+from tester.persistent_worker import SQLiteWorker
 from tester.rules import (
     make_ruleset_generate,
     make_ruleset_havoc,
@@ -20,13 +19,10 @@ RNG = 42
 
 
 async def main(args: Namespace):
-    if args.disable_addr_randomization:
-        PLATFORM = platform.machine()
-
     max_edges = await init(args.test_path)
     print("found ", max_edges, " max_edges")
     ipc_queue = engine.IPCTokenQueue(CONCURRENCY_LIMIT, max_edges)
-    oracle_queue = asyncio.Queue(1024)
+    oracle_queue = asyncio.Queue(2048)
 
     corpus_scheduler_body = engine.MABBody()
     rule_scheduler_body = engine.MABBody()
@@ -129,28 +125,30 @@ async def main(args: Namespace):
         ]
     ]
 
-    # snapshot = mutation_engine.snapshot()
+    snapshot = mutation_engine.snapshot()
 
-    # tasks = [
-    #     run_single_mutation(
-    #         TestableEntry.from_raw(entry.clone_raw()),
-    #         ipc_queue,
-    #         mutation_engine,
-    #         oracle_queue,
-    #         init_workers,
-    #         args.test_path,
-    #     )
-    #     for entry in snapshot
-    # ]
+    mutation_engine.clear()
 
-    # r = await asyncio.gather(*tasks)
+    tasks = [
+        run_single_mutation(
+            TestableEntry.from_raw(entry.clone_raw()),
+            ipc_queue,
+            mutation_engine,
+            oracle_queue,
+            init_workers,
+            args.test_path,
+        )
+        for entry in snapshot
+    ]
 
-    # for worker in init_workers.values():
-    # await worker.close()
+    r = await asyncio.gather(*tasks)
 
-    # print(f"Done executing {r.__len__()} setup queries", flush=True)
+    for worker in init_workers.values():
+        await worker.close()
 
-    # mutation_engine.chore()
+    print(f"Done executing {r.__len__()} setup queries", flush=True)
+
+    mutation_engine.chore()
 
     print("\n===========\ninit done, entering loop\n==================\n")
 
@@ -171,6 +169,5 @@ if __name__ == "__main__":
     _ = parser.add_argument("--save_to", default=None, type=str)
     _ = parser.add_argument("--test_path", default="/home/test/sqlite3-src/build/sqlite3")
     _ = parser.add_argument("--oracle_path", default="/usr/bin/sqlite3-3.39.4")
-    _ = parser.add_argument("--disable-addr-randomization", default=False, type=bool)
     args = parser.parse_args()
     uvloop.run(main(args))

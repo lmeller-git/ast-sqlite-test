@@ -70,8 +70,8 @@ impl<T> TestableEntry<T> {
         self
     }
 
-    pub fn fire_rule_hooks(&self, outcome: TestOutcome, meta: &Meta) {
-        for hook in &self.applied_rule_stats {
+    pub fn fire_rule_hooks(&mut self, outcome: TestOutcome, meta: &Meta) {
+        for hook in self.applied_rule_stats.drain(..) {
             hook.on_exec(outcome, meta);
         }
     }

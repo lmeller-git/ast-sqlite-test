@@ -97,6 +97,9 @@ impl Schedule for SchedulerBatcher {
         let mut batch = Vec::with_capacity(size);
 
         while batch.len() < size {
+            if self.batch.is_empty() {
+                self.refill(from, size * BATCH_MULTIPLICATOR, rng);
+            }
             let window_size = self.batch.len().min(size);
             let window_start = self.batch.len() - window_size;
 

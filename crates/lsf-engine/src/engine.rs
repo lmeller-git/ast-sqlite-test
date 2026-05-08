@@ -24,7 +24,7 @@ pub const GRANULARITY: usize = 50;
 
 pub struct Engine {
     corpus: Box<dyn CorpusHandler<f64>>,
-    shmem_queue: Arc<SharedMemHandle>,
+    shmem_queue: SharedMemHandle,
     scheduler: Box<dyn Schedule>,
     strategies: Vec<Box<dyn MutationStrategy>>,
     minimizer: Box<dyn CorpusMinimizer<f64>>,
@@ -48,7 +48,7 @@ impl Engine {
         corpus_handler: Box<dyn CorpusHandler<f64>>,
         minimizer: Box<dyn CorpusMinimizer<f64>>,
         strategies: Vec<Box<dyn MutationStrategy>>,
-        shmem_queue: Arc<SharedMemHandle>,
+        shmem_queue: SharedMemHandle,
         mab_bodies: Vec<Arc<MABBody>>,
         rng_seed: u64,
     ) -> Self {
@@ -119,12 +119,12 @@ impl Engine {
 
     pub fn commit_test_result(
         &mut self,
-        raw_entry: TestableEntry<RawEntry>,
+        mut raw_entry: TestableEntry<RawEntry>,
         mut meta: Meta,
         shmem: Box<IPCToken>,
     ) {
         let new_edges = self.edge_map.update(shmem.as_edge_map());
-        self.shmem_queue.push(shmem).expect("token was duplicated");
+        self.shmem_queue.send(shmem);
         meta.new_cov_nodes = new_edges.new.len();
 
         let accepted = self.minimizer.on_add(&raw_entry, &meta, new_edges);
@@ -148,8 +148,8 @@ impl Engine {
         });
     }
 
-    pub fn return_token(&mut self, token: Box<IPCToken>) {
-        self.shmem_queue.push(token).expect("token was duplicated");
+    pub fn return_token(&self, token: Box<IPCToken>) {
+        self.shmem_queue.send(token)
     }
 
     pub fn populate(&mut self, seed_gens: Vec<Box<dyn ObtainSeed>>) {
@@ -171,7 +171,7 @@ impl Engine {
     }
 
     pub fn chore(&mut self) {
-        const GC_AT: f64 = 0.05;
+        const GC_AT: f64 = 0.2;
         const GC_MIN_ABSOLUTE: usize = 100;
 
         self.corpus.resize();
@@ -368,7 +368,7 @@ mod tests {
             Box::new(InMemory::new()),
             Box::new(GreedyCoverage::new(1)),
             vec![Box::new(SpliceIn {})],
-            Arc::new(SharedMemHandle::new(1, 1)),
+            SharedMemHandle::new(1, 1),
             vec![],
             42,
         );

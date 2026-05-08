@@ -5,6 +5,9 @@ from lib_sf.lib_sf import RejectionReason, TestOutcome, TestableEntry
 from lib_sf import engine
 from tester.persistent_worker import SQLiteWorker, TestCapture
 
+CONCURRENCY_LIMIT = 8
+semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
+
 
 async def run_single_mutation(
     entry: TestableEntry,
@@ -14,10 +17,26 @@ async def run_single_mutation(
     workers: dict[int, SQLiteWorker],
     test_path: str,
 ):
-    token = ipc_queue.pop()
-    while token is None:
-        await asyncio.sleep(0)
-        token = ipc_queue.pop()
+    async with semaphore:
+        await run_single_mutation_inner(
+            entry, ipc_queue, mutation_engine, oracle_queue, workers, test_path
+        )
+
+
+async def run_single_mutation_inner(
+    entry: TestableEntry,
+    ipc_queue: engine.IPCTokenQueue,
+    mutation_engine: engine.Engine,
+    oracle_queue: asyncio.Queue[TestCapture | None],
+    workers: dict[int, SQLiteWorker],
+    test_path: str,
+):
+    loop = asyncio.get_event_loop()
+
+    token = await loop.run_in_executor(None, ipc_queue.recv)
+
+    if token is None:
+        return
 
     try:
         token_id = token.id()
@@ -26,7 +45,8 @@ async def run_single_mutation(
                 test_path, {"FUZZER_SHMEM_PATH": token.as_env(), "ASAN_OPTIONS": "detect_leaks=0"}
             )
         worker = workers[token_id]
-        capture = await worker.execute(entry.to_sql_string())
+        sql_str = await loop.run_in_executor(None, entry.to_sql_string)
+        capture = await worker.execute(sql_str)
         is_hang = (
             capture.exit_code is not None
             and capture.exit_code == 42
@@ -47,15 +67,16 @@ async def run_single_mutation(
         # would need to acocunt for this in mab stats though
         if is_crash:
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.crash()), test_result)
-            # mutation_engine.return_token(test_result.token)
+            # ipc_queue.send(test_result.token)
         elif is_hang:
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.timeout()), test_result)
-            # mutation_engine.return_token(test_result.token)
+            # ipc_queue.send(test_result.token)
         elif is_syntax_err:
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()), test_result)
-            # mutation_engine.return_token(test_result.token)
+            # ipc_queue.send(test_result.token)
         # else:
-        mutation_engine.commit_test_result(entry, test_result)
+        await loop.run_in_executor(None, mutation_engine.commit_test_result, entry, test_result)
+
         if is_crash:
             capture.is_hang_or_crash = "CRASH"
 
@@ -64,7 +85,7 @@ async def run_single_mutation(
     except Exception:
         test_result = engine.TestResult(0, 0, token)
         entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()), test_result)
-        mutation_engine.return_token(test_result.token)
+        await loop.run_in_executor(None, ipc_queue.send, test_result.token)
 
 
 async def init(test_path: str) -> int:

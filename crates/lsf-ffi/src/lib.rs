@@ -136,17 +136,19 @@ impl RawEntry {
     }
 
     // TODO optimize to_sql_string methods to redeuce allocs
-    pub fn to_sql_string(&self) -> String {
-        self.0
-            .as_ref()
-            .map(|e| {
-                e.ast()
-                    .iter()
-                    .map(std::string::ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(";")
-            })
-            .unwrap()
+    pub fn to_sql_string(&self, py: Python<'_>) -> String {
+        py.detach(|| {
+            let ast = self.0.as_ref().unwrap().ast();
+            let mut buffer = String::with_capacity(ast.len());
+
+            for (i, stmt) in ast.iter().enumerate() {
+                if i > 0 {
+                    buffer.push(';');
+                }
+                buffer.extend(format!("{}", stmt).drain(..));
+            }
+            buffer
+        })
     }
 }
 
@@ -221,21 +223,23 @@ impl TestableEntry {
     }
 
     // TODO optimize to_sql_string methods to redeuce allocs
-    pub fn to_sql_string(&self) -> String {
-        self.0
-            .as_ref()
-            .map(|e| {
-                e.ast()
-                    .iter()
-                    .map(std::string::ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(";")
-            })
-            .unwrap()
+    pub fn to_sql_string(&self, py: Python<'_>) -> String {
+        py.detach(|| {
+            let ast = self.0.as_ref().unwrap().ast();
+            let mut buffer = String::with_capacity(ast.len());
+
+            for (i, stmt) in ast.iter().enumerate() {
+                if i > 0 {
+                    buffer.push(';');
+                }
+                buffer.extend(format!("{}", stmt).drain(..));
+            }
+            buffer
+        })
     }
 
-    pub fn fire_hooks(&self, outcome: TestOutcome, data: PyRef<TestResult>) {
-        self.0.as_ref().unwrap().fire_rule_hooks(
+    pub fn fire_hooks(&mut self, outcome: TestOutcome, data: PyRef<TestResult>) {
+        self.0.as_mut().unwrap().fire_rule_hooks(
             outcome.0,
             &lsf_core::entry::Meta {
                 triggers_bug: data.triggers_bug,

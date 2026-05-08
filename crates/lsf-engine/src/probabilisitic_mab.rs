@@ -5,7 +5,7 @@ use lsf_core::entry::{ID, Meta};
 use lsf_feedback::{
     AdaptiveStatistics,
     TestableEntry,
-    mab::{MABArm, MABBody, MAX_WEIGHT, ZERO_WEIGHT},
+    mab::{MABArm, MABBody, MAX_WEIGHT, MIN_WEIGHT},
 };
 use rand::RngExt;
 
@@ -79,7 +79,7 @@ impl BlockSumTable {
     }
 
     pub fn push(&mut self, weight: f64) -> usize {
-        let weight = weight.clamp(ZERO_WEIGHT, MAX_WEIGHT);
+        let weight = weight.clamp(MIN_WEIGHT, MAX_WEIGHT);
 
         let idx = self.leaves.len();
         self.leaves.push(0.);
@@ -107,7 +107,7 @@ impl BlockSumTable {
     }
 
     pub fn update(&mut self, idx: usize, weight: f64) {
-        let new_weight = weight.clamp(ZERO_WEIGHT, MAX_WEIGHT);
+        let new_weight = weight.clamp(MIN_WEIGHT, MAX_WEIGHT);
         self.set_weigth(idx, new_weight);
     }
 
@@ -258,19 +258,21 @@ impl Default for ProbabilisticMABScheduler {
     }
 }
 
-// lazy Roulette-wheel selection via stochastic acceptance
+// Roulette-wheel selection via stochastic acceptance
+// we can set max_weight to MAX_WEIGHT, which still yields a decent acceptance rate for bad entries, as the score dist is roughly 0. - 6.5 - 100
+// if we set max_weigth to the max_weigth in corpus:
 // max_weight may be stale and is not necessarily the true max_weight. However by updating max_weight in the sample loop, we guarantee that no fractions are > 1, which should presevre integrity
 pub struct FastProbabilisticMABScheduler {
     body: Arc<MABBody>,
     max_weight: f64,
-    entries: IndexMap<ID, Arc<MABArm>, rustc_hash::FxBuildHasher>,
+    entries: IndexMap<ID, SmallSchedueldItem<f64>, rustc_hash::FxBuildHasher>,
 }
 
 impl FastProbabilisticMABScheduler {
     pub fn new(body: Arc<MABBody>) -> Self {
         Self {
             body,
-            max_weight: 0.,
+            max_weight: MAX_WEIGHT,
             entries: IndexMap::with_hasher(rustc_hash::FxBuildHasher),
         }
     }
@@ -283,24 +285,27 @@ impl Schedule for FastProbabilisticMABScheduler {
         size: usize,
         rng: &mut dyn rand::Rng,
     ) -> Vec<TestableEntry<lsf_core::entry::RawEntry>> {
+        // it is not clear wether cachign is actually faster here, but its just a copy paste from above so whatever
+        const ACCEPT_UNDER: u32 = 50;
+
+        let current_epoch = self.body.epoch.load(std::sync::atomic::Ordering::Relaxed);
         let mut generation = Vec::with_capacity(size);
 
         while generation.len() < size {
             let rd_idx = rng.random_range(0..self.entries.len());
-            if let Some((id, arm)) = self.entries.get_index(rd_idx)
+            if let Some((id, arm)) = self.entries.get_index_mut(rd_idx)
                 && let Some(entry) = from.get(id)
             {
-                let score = arm.calculate_score();
-
-                if score > self.max_weight {
-                    self.max_weight = score;
+                if arm.epoch.abs_diff(current_epoch) >= ACCEPT_UNDER {
+                    arm.item = arm.stats.calculate_score();
+                    arm.epoch = current_epoch;
                 }
 
-                if rng.random_bool(score / self.max_weight) {
+                if rng.random_bool(arm.item / self.max_weight) {
                     generation.push(
                         TestableEntry::new(entry.raw().clone())
-                            .with_hook(arm.clone())
-                            .with_build_hook(arm.clone()),
+                            .with_hook(arm.stats.clone())
+                            .with_build_hook(arm.stats.clone()),
                     );
                 }
             }
@@ -310,12 +315,10 @@ impl Schedule for FastProbabilisticMABScheduler {
     }
 
     fn on_add(&mut self, entry: &lsf_core::entry::CorpusEntry) -> f64 {
-        let item = Arc::new(MABArm::new_with_prior(self.body.clone(), entry.meta()));
-        let score = item.calculate_score();
-
-        if score > self.max_weight {
-            self.max_weight = score;
-        }
+        let mut item = SmallSchedueldItem::new_with_prior(self.body.clone(), 0., entry.meta());
+        let score = item.stats.calculate_score();
+        item.epoch = self.body.epoch.load(std::sync::atomic::Ordering::Relaxed);
+        item.item = score;
 
         self.entries.insert(entry.id(), item);
 
@@ -327,19 +330,10 @@ impl Schedule for FastProbabilisticMABScheduler {
         self.entries.swap_remove(&id);
     }
 
-    fn chore(&mut self) {
-        self.max_weight = -1.;
-        for (_, arm) in self.entries.iter() {
-            let s = arm.calculate_score();
-            if s > self.max_weight {
-                self.max_weight = s;
-            }
-        }
-    }
+    fn chore(&mut self) {}
 
     fn reset(&mut self) {
         self.body.reset();
-        self.max_weight = 0.;
         self.entries.clear();
     }
 }

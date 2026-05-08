@@ -10,7 +10,7 @@ use crate::{AcceptanceReason, AdaptiveStatistics, FeedbackHook, RejectionReason,
 
 const DECAY_RATE: f64 = 0.999;
 const RESCALE_FACTOR: f64 = 1e15_f64;
-pub const ZERO_WEIGHT: f64 = 0.;
+pub const MIN_WEIGHT: f64 = 0.001;
 pub const MAX_WEIGHT: f64 = 2e2;
 
 #[derive(Debug, Default)]
@@ -300,12 +300,13 @@ impl AdaptiveStatistics for MABArm {
             (self.ctx.total_attempts.load(Ordering::Relaxed) / inflation).max(1.);
         let exploration = (4. * (effective_total_attempts).ln() / (effective_attempts)).sqrt();
 
-        let final_score = (exploitation + exploration).min(MAX_WEIGHT);
+        let final_score = exploitation + exploration;
 
         if final_score.is_nan() {
-            return 0.001;
+            return MIN_WEIGHT;
         }
-        final_score
+
+        final_score.clamp(MIN_WEIGHT, MAX_WEIGHT)
     }
 }
 
