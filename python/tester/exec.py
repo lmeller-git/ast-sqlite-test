@@ -5,7 +5,7 @@ from lib_sf.lib_sf import RejectionReason, TestOutcome, TestableEntry
 from lib_sf import engine
 from tester.persistent_worker import SQLiteWorker, TestCapture
 
-CONCURRENCY_LIMIT = 8
+CONCURRENCY_LIMIT = 16
 semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
 
 

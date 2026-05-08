@@ -74,7 +74,7 @@ class SQLiteWorker:
             else:
                 chunks.append(line)
 
-    async def execute(self, query: str, timeout_sec: float = 0.75) -> TestCapture:
+    async def execute(self, query: str, timeout_sec: float = 1.0) -> TestCapture:
         if self.proc is None or self.proc.returncode is not None:
             await self._start()
 
@@ -129,15 +129,15 @@ class SQLiteWorker:
 
             # process is alive, query ran
             # need to restore a clean state via kill, since ATTACHED dbs dont get wiped on .open :memory:
-            if "ATTACH" in query:
-                self.proc.kill()
-                _ = await self.proc.wait()
-                self.proc = None
-                for f in os.scandir(self.workdir):
-                    try:
-                        os.remove(f.path) if f.is_file() else shutil.rmtree(f.path)
-                    except OSError:
-                        pass
+            # if "ATTACH" in query:
+            #     self.proc.kill()
+            #     _ = await self.proc.wait()
+            #     self.proc = None
+            #     for f in os.scandir(self.workdir):
+            #         try:
+            #             os.remove(f.path) if f.is_file() else shutil.rmtree(f.path)
+            #         except OSError:
+            #             pass
 
             return TestCapture(
                 stdout=stdout_bytes,
@@ -167,14 +167,13 @@ class SQLiteWorker:
 
         except Exception as e:
             print(f"exception {str(e)}\n", flush=True)
-            # should never happen
-            if self.proc is not None:
-                try:
-                    self.proc.kill()
-                    _ = await self.proc.wait()
-                except ProcessLookupError:
-                    print("couldnt kill process after exception", flush=True)
-            self.proc = None
+            # if self.proc is not None:
+            #     try:
+            #         self.proc.kill()
+            #         _ = await self.proc.wait()
+            #     except ProcessLookupError:
+            #         print("couldnt kill process after exception", flush=True)
+            # self.proc = None
             exec_time = time.perf_counter_ns() - start_time
             return TestCapture(
                 stdout=b"",
