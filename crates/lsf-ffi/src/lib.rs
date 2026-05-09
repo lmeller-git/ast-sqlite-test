@@ -106,13 +106,16 @@ impl CorpusEntry {
 
     // TODO optimize to_sql_string methods to redeuce allocs
     pub fn to_sql_string(&self) -> String {
-        self.0
-            .as_ref()
-            .ast()
-            .iter()
-            .map(std::string::ToString::to_string)
-            .collect::<Vec<String>>()
-            .join(";")
+        let ast = self.0.ast();
+        let mut buffer = String::with_capacity(ast.len());
+
+        for (i, stmt) in ast.iter().enumerate() {
+            if i > 0 {
+                buffer.push(';');
+            }
+            buffer.extend(format!("{}", stmt).drain(..));
+        }
+        buffer
     }
 
     pub fn clone_raw(&self) -> RawEntry {
@@ -136,19 +139,17 @@ impl RawEntry {
     }
 
     // TODO optimize to_sql_string methods to redeuce allocs
-    pub fn to_sql_string(&self, py: Python<'_>) -> String {
-        py.detach(|| {
-            let ast = self.0.as_ref().unwrap().ast();
-            let mut buffer = String::with_capacity(ast.len());
+    pub fn to_sql_string(&self) -> String {
+        let ast = self.0.as_ref().unwrap().ast();
+        let mut buffer = String::with_capacity(ast.len());
 
-            for (i, stmt) in ast.iter().enumerate() {
-                if i > 0 {
-                    buffer.push(';');
-                }
-                buffer.extend(format!("{}", stmt).drain(..));
+        for (i, stmt) in ast.iter().enumerate() {
+            if i > 0 {
+                buffer.push(';');
             }
-            buffer
-        })
+            buffer.extend(format!("{}", stmt).drain(..));
+        }
+        buffer
     }
 }
 
@@ -223,19 +224,17 @@ impl TestableEntry {
     }
 
     // TODO optimize to_sql_string methods to redeuce allocs
-    pub fn to_sql_string(&self, py: Python<'_>) -> String {
-        py.detach(|| {
-            let ast = self.0.as_ref().unwrap().ast();
-            let mut buffer = String::with_capacity(ast.len());
+    pub fn to_sql_string(&self) -> String {
+        let ast = self.0.as_ref().unwrap().ast();
+        let mut buffer = String::with_capacity(ast.len());
 
-            for (i, stmt) in ast.iter().enumerate() {
-                if i > 0 {
-                    buffer.push(';');
-                }
-                buffer.extend(format!("{}", stmt).drain(..));
+        for (i, stmt) in ast.iter().enumerate() {
+            if i > 0 {
+                buffer.push(';');
             }
-            buffer
-        })
+            buffer.extend(format!("{}", stmt).drain(..));
+        }
+        buffer
     }
 
     pub fn fire_hooks(&mut self, outcome: TestOutcome, data: PyRef<TestResult>) {

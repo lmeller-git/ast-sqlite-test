@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 import asyncio
+from pathlib import Path
+import signal
 import time
 import os
 import tempfile
@@ -29,19 +31,14 @@ class SQLiteWorker:
         self.env: dict[str, str] | None = env
         self.STDOUT_SENTINEL: bytes = b"__STDOUT_EOQ__"
         self.STDERR_SENTINEL: bytes = b"__STDERR_EOQ__"
-        self.workdir: str = tempfile.mkdtemp(prefix="sqlite_worker_")
+        self.workdir: str = tempfile.mkdtemp(prefix="sqlite_worker_", dir = "/dev/shm")
 
     async def _start(self) -> None:
-        # print("starting worker")
         if self.proc is not None:
             if self.proc.returncode is None:
                 self.proc.kill()
-                # print("killing")
-            # else:
-                # print("waiting")
 
             _ = await self.proc.wait()
-            # print("done")
             self.proc = None
 
         full_env = os.environ.copy()
@@ -149,16 +146,25 @@ class SQLiteWorker:
             )
 
         except asyncio.TimeoutError:
+            err_output = ""
+            self.proc.send_signal(signal.SIGINT)
             try:
-                self.proc.kill()
-                _ = await self.proc.wait()
-            except ProcessLookupError:
-                print("couldnt kill timed out process", flush=True)
-            self.proc = None
+                err_output = await asyncio.wait_for(self.proc.stderr.readline(), timeout=0.1)
+                if b"interrupted" in err_output:
+                    # interrupted actual hang
+                   pass
+                else:
+                    # maybe it just finished on its own, or some other error
+                    pass
+            except asyncio.TimeoutError:
+                # SIGINT did not work. likely because of an unclosed qoute upstream
+                #  migth want to reutnr sth indicating a syntax err instead TODO
+                await self.hard_reset()
+
             exec_time = time.perf_counter_ns() - start_time
             return TestCapture(
                 stdout=b"",
-                stderr=b"EXECUTION TIMEOUT EXCEEDED",
+                stderr=b"EXECUTION TIMEOUT EXCEEDED, " + err_output.encode(),
                 exit_code=42,
                 query=query,
                 exec_time=exec_time,
@@ -167,13 +173,21 @@ class SQLiteWorker:
 
         except Exception as e:
             print(f"exception {str(e)}\n", flush=True)
-            # if self.proc is not None:
-            #     try:
-            #         self.proc.kill()
-            #         _ = await self.proc.wait()
-            #     except ProcessLookupError:
-            #         print("couldnt kill process after exception", flush=True)
-            # self.proc = None
+            # self.proc.send_signal(signal.SIGINT)
+            # try:
+            #     err_output = await asyncio.wait_for(self.proc.stderr.readline(), timeout=0.1)
+            #     if b"interrupted" in err_output:
+            #         # interrupted actual hang
+            #        pass
+            #     else:
+            #         # maybe it just finished on its own, or some other error
+            #         pass
+            # except asyncio.TimeoutError:
+            #     # SIGINT did not work. likely because of an unclosed qoute upstream
+            #     #  migth want to reutnr sth indicating a syntax err instead TODO
+            #     #await self.hard_reset()
+            #     pass
+
             exec_time = time.perf_counter_ns() - start_time
             return TestCapture(
                 stdout=b"",
@@ -188,6 +202,23 @@ class SQLiteWorker:
         if self.proc is not None and self.proc.returncode is None:
             self.proc.stdin.write(f".open {self.db_path}\n".encode())
             await self.proc.stdin.drain()
+            self.clear_workdir_contents()
+
+    async def hard_reset(self) -> None:
+        try:
+            self.proc.kill()
+            _ = await self.proc.wait()
+        except ProcessLookupError:
+            print("couldnt kill timed out process", flush=True)
+        self.proc = None
+
+    def clear_workdir_contents(self):
+        path = Path(self.workdir)
+        for child in path.iterdir():
+            if child.is_file() or child.is_symlink():
+                child.unlink()
+            elif child.is_dir():
+                shutil.rmtree(child)
 
     async def close(self) -> None:
         if self.proc is not None and self.proc.returncode is None:

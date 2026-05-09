@@ -6,8 +6,6 @@ from lib_sf import engine
 from tester.persistent_worker import SQLiteWorker, TestCapture
 
 CONCURRENCY_LIMIT = 16
-semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
-
 
 async def run_single_mutation(
     entry: TestableEntry,
@@ -17,23 +15,7 @@ async def run_single_mutation(
     workers: dict[int, SQLiteWorker],
     test_path: str,
 ):
-    async with semaphore:
-        await run_single_mutation_inner(
-            entry, ipc_queue, mutation_engine, oracle_queue, workers, test_path
-        )
-
-
-async def run_single_mutation_inner(
-    entry: TestableEntry,
-    ipc_queue: engine.IPCTokenQueue,
-    mutation_engine: engine.Engine,
-    oracle_queue: asyncio.Queue[TestCapture | None],
-    workers: dict[int, SQLiteWorker],
-    test_path: str,
-):
-    loop = asyncio.get_event_loop()
-
-    token = await loop.run_in_executor(None, ipc_queue.recv)
+    token = await ipc_queue.recv()
 
     if token is None:
         return
@@ -45,7 +27,7 @@ async def run_single_mutation_inner(
                 test_path, {"FUZZER_SHMEM_PATH": token.as_env(), "ASAN_OPTIONS": "detect_leaks=0"}
             )
         worker = workers[token_id]
-        sql_str = await loop.run_in_executor(None, entry.to_sql_string)
+        sql_str = entry.to_sql_string()
         capture = await worker.execute(sql_str, 0.75 + 0.1 * len(sql_str) / 1000)
         is_hang = (
             capture.exit_code is not None
@@ -75,7 +57,7 @@ async def run_single_mutation_inner(
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()), test_result)
             # ipc_queue.send(test_result.token)
         # else:
-        await loop.run_in_executor(None, mutation_engine.commit_test_result, entry, test_result)
+        mutation_engine.commit_test_result( entry, test_result)
 
         if is_crash:
             capture.is_hang_or_crash = "CRASH"
@@ -85,7 +67,7 @@ async def run_single_mutation_inner(
     except Exception:
         test_result = engine.TestResult(0, 0, token)
         entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()), test_result)
-        await loop.run_in_executor(None, ipc_queue.send, test_result.token)
+        ipc_queue.send(test_result.token)
 
 
 async def init(test_path: str) -> int:

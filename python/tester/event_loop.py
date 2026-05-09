@@ -20,13 +20,10 @@ async def fuzzing_loop(
     active_tasks: set[asyncio.Task[None]] = set()
     testable_queries: list[TestableEntry] = []
     epoch = 0
-    loop = asyncio.get_event_loop()
 
     while True:
         if len(testable_queries) < QUERY_STASH / 2:
-            batch = await loop.run_in_executor(
-                None, mutation_engine.mutate_batch, QUERY_STASH - len(testable_queries)
-            )
+            batch = mutation_engine.mutate_batch(QUERY_STASH - len(testable_queries))
             testable_queries += batch.into_members()
 
         to_spawn = CONCURRENCY_LIMIT - len(active_tasks)
@@ -49,7 +46,7 @@ async def fuzzing_loop(
 
         if epoch % 2000 == 0:
             print(f"epoch {epoch}\nCorpus size: {mutation_engine.corpus_size()}")
-            await loop.run_in_executor(None, mutation_engine.chore)
+            mutation_engine.chore()
 
         _done, active_tasks = await asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED)
 
