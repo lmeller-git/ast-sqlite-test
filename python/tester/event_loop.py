@@ -1,5 +1,6 @@
 from lib_sf import engine
 import asyncio
+import time
 
 from lib_sf.lib_sf import TestableEntry
 from tester.exec import CONCURRENCY_LIMIT, run_single_mutation
@@ -14,6 +15,7 @@ async def fuzzing_loop(
     ipc_queue: engine.IPCTokenQueue,
     oracle_queue: asyncio.Queue[TestCapture | None],
     stop_at: int,
+    stop_time: int | None,
     test_path: str,
 ):
     workers: dict[int, SQLiteWorker] = {}
@@ -52,7 +54,9 @@ async def fuzzing_loop(
 
         epoch += 1
 
-        if mutation_engine.corpus_size() >= stop_at:
+        if mutation_engine.corpus_size() >= stop_at or (
+            stop_time is not None and time.time() >= stop_time
+        ):
             print(f"Hit {stop_at} queries")
             _ = await asyncio.gather(*active_tasks, return_exceptions=True)
             for worker in workers.values():

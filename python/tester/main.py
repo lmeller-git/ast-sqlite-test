@@ -1,3 +1,4 @@
+import time
 from lib_sf import engine
 from argparse import ArgumentParser, Namespace
 import asyncio
@@ -21,6 +22,9 @@ RNG = 42
 
 
 async def main(args: Namespace):
+    if args.timeout_hours is not None:
+        start_time = time.time()
+        end_time = args.timeout_hours * 3600.0 + start_time
     max_edges = await init(args.test_path)
     print("found ", max_edges, " max_edges")
     ipc_queue = engine.IPCTokenQueue(CONCURRENCY_LIMIT, max_edges)
@@ -60,7 +64,7 @@ async def main(args: Namespace):
             struct_rule_scheduler_body,
             generator_body,
             reducer_body,
-            increaser_body
+            increaser_body,
         ],
         RNG,
     )
@@ -160,7 +164,14 @@ async def main(args: Namespace):
     print("\n===========\ninit done, entering loop\n==================\n")
 
     _ = await asyncio.gather(
-        fuzzing_loop(mutation_engine, ipc_queue, oracle_queue, args.stop_at, args.test_path),
+        fuzzing_loop(
+            mutation_engine,
+            ipc_queue,
+            oracle_queue,
+            args.stop_at,
+            None if args.timeout_hours is None else end_time,
+            args.test_path,
+        ),
         *oracle_tasks,
     )
 
@@ -176,5 +187,6 @@ if __name__ == "__main__":
     _ = parser.add_argument("--save_to", default=None, type=str)
     _ = parser.add_argument("--test_path", default="/home/test/sqlite3-src/build/sqlite3")
     _ = parser.add_argument("--oracle_path", default="/usr/bin/sqlite3-3.39.4")
+    _ = parser.add_argument("--timeout_hours", default=None, type=float)
     args = parser.parse_args()
     uvloop.run(main(args))
