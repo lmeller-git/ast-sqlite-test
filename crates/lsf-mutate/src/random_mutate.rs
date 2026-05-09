@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use arbitrary::{Arbitrary, Unstructured};
 use rand::RngExt;
 
-use crate::{AstNode, MutationState, MutationStrategy};
+use crate::{AstNode, MutationStrategy};
 
 #[derive(Default)]
 pub struct ArbitraryGenerator<T> {
@@ -29,24 +29,36 @@ impl<T: Send + Sync + for<'a> Arbitrary<'a> + AstNode> MutationStrategy for Arbi
             return Err(crate::MutationError::ASTSHARED);
         };
 
-        let mut is_mutated = MutationState::Unchanged;
+        let mut node_count = 0;
+        _ = T::visit(child_ast, |_| {
+            node_count += 1;
+            std::ops::ControlFlow::Continue::<()>(())
+        });
 
-        let mut data = vec![0u8; 128];
+        if node_count == 0 {
+            return Ok(crate::MutationState::Unchanged);
+        }
+
+        let target_index = rng.random_range(0..node_count);
+
+        let mut current_index = 0;
+        let mut is_mutated = crate::MutationState::Unchanged;
+        let mut data = vec![0u8; 256];
 
         _ = T::visit_mut(child_ast, |node| {
-            if !rng.random_bool(0.2) {
-                return std::ops::ControlFlow::Continue::<()>(());
-            }
-            rng.fill_bytes(&mut data);
+            if current_index == target_index {
+                rng.fill_bytes(&mut data);
+                let mut unstructured = Unstructured::new(&data);
 
-            let mut unstructured = Unstructured::new(&data);
+                if let Ok(new_node) = unstructured.arbitrary() {
+                    *node = new_node;
+                    is_mutated = crate::MutationState::Mutated;
+                }
 
-            if let Ok(new_node) = unstructured.arbitrary() {
-                *node = new_node;
-                is_mutated = MutationState::Mutated;
                 return std::ops::ControlFlow::Break::<()>(());
             }
 
+            current_index += 1;
             std::ops::ControlFlow::Continue::<()>(())
         });
 

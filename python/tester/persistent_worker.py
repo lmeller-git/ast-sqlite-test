@@ -74,7 +74,7 @@ class SQLiteWorker:
             else:
                 chunks.append(line)
 
-    async def execute(self, query: str, timeout_sec: float = 1.0) -> TestCapture:
+    async def execute(self, query: str, timeout_sec: float = 0.75) -> TestCapture:
         if self.proc is None or self.proc.returncode is not None:
             await self._start()
 

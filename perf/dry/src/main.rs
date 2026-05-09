@@ -50,7 +50,7 @@ fn main() {
     let ruleset = lsf_mutate::MABScheduler::new(
         top_level_strategy.clone(),
         vec![
-            Box::new(SpliceIn {}) as Box<dyn MutationStrategy>,
+            Box::new(SpliceIn::default()) as Box<dyn MutationStrategy>,
             Box::new(lsf_mutate::MABScheduler::new(
                 scheduler1.clone(),
                 vec![

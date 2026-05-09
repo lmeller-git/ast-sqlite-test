@@ -367,14 +367,14 @@ mod tests {
             Box::new(WeightedRandomScheduler {}),
             Box::new(InMemory::new()),
             Box::new(GreedyCoverage::new(1)),
-            vec![Box::new(SpliceIn {})],
+            vec![Box::new(SpliceIn::default())],
             SharedMemHandle::new(1, 1),
             vec![],
             42,
         );
         engine.clear_strategies();
         assert!(engine.strategies.is_empty());
-        engine.add_strategy(Box::new(SpliceIn {}));
+        engine.add_strategy(Box::new(SpliceIn::default()));
 
         assert!(engine.mutate_batch(16).members().is_empty());
 
@@ -401,7 +401,7 @@ mod tests {
             "SELECT a FROM b".to_string(),
         ))]);
 
-        engine.add_strategy(Box::new(SpliceIn {}));
+        engine.add_strategy(Box::new(SpliceIn::default()));
         assert!(!engine.mutate_batch(1).members().is_empty());
     }
 }

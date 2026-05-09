@@ -3,25 +3,22 @@ use lsf_feedback::TestableEntry;
 use rand::Rng;
 use thiserror::Error;
 
-mod afl;
 mod ident;
 mod json_tree;
 mod random_mutate;
 mod recurse;
+mod reduce;
 mod sample;
 mod schedule;
 mod splice;
 mod structure;
 mod values;
 
-#[allow(unused_imports)]
-pub use afl::*;
 pub use ident::*;
 pub use json_tree::*;
-#[allow(unused_imports)]
 pub use random_mutate::*;
-#[allow(unused_imports)]
 pub use recurse::*;
+pub use reduce::*;
 pub use sample::*;
 pub use schedule::*;
 pub use splice::*;

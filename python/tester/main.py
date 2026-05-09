@@ -11,6 +11,8 @@ from tester.persistent_worker import SQLiteWorker
 from tester.rules import (
     make_ruleset_generate,
     make_ruleset_havoc,
+    make_ruleset_increase,
+    make_ruleset_reduce,
     make_ruleset_semantic,
     make_ruleset_structural,
 )
@@ -30,6 +32,8 @@ async def main(args: Namespace):
     struct_rule_scheduler_body = engine.MABBody()
     sem_rule_scheduler_body = engine.MABBody()
     generator_body = engine.MABBody()
+    reducer_body = engine.MABBody()
+    increaser_body = engine.MABBody()
 
     if args.save_to is not None:
         corpus_handler = engine.CorpusManagerBuilder.dynamic_cache(
@@ -55,6 +59,8 @@ async def main(args: Namespace):
             sem_rule_scheduler_body,
             struct_rule_scheduler_body,
             generator_body,
+            reducer_body,
+            increaser_body
         ],
         RNG,
     )
@@ -112,9 +118,10 @@ async def main(args: Namespace):
             engine.StrategyBuilder.ucb1(
                 rule_scheduler_body,
                 [
-                    engine.StrategyBuilder.splice_in(),
-                    # make_ruleset_generate(generator_body),
-                    make_ruleset_havoc(havoc_rule_scheduler_body, generator_body),
+                    make_ruleset_reduce(reducer_body),
+                    make_ruleset_increase(increaser_body),
+                    make_ruleset_generate(generator_body),
+                    make_ruleset_havoc(havoc_rule_scheduler_body),
                     make_ruleset_semantic(sem_rule_scheduler_body),
                     make_ruleset_structural(struct_rule_scheduler_body),
                 ],

@@ -14,9 +14,21 @@ use sqlparser::ast::{
 
 use crate::MutationStrategy;
 
-pub struct SpliceIn {}
+pub struct SpliceIn {
+    pub p_extend: f64,
+}
 
-impl SpliceIn {}
+impl SpliceIn {
+    pub fn new(p_extend: f64) -> Self {
+        Self { p_extend }
+    }
+}
+
+impl Default for SpliceIn {
+    fn default() -> Self {
+        Self { p_extend: 0.5 }
+    }
+}
 
 impl MutationStrategy for SpliceIn {
     fn breed_inner(
@@ -30,9 +42,23 @@ impl MutationStrategy for SpliceIn {
         };
         let other_idx = rng.random_range(..parent_gen.len());
         let other = &parent_gen[other_idx];
+        if other.ast().is_empty() {
+            return Ok(crate::MutationState::Unchanged);
+        }
         let random_start = rng.random_range(..other.ast().len());
-        let random_end = rng.random_range(random_start + 1..=other.ast().len());
-        let random_insert = rng.random_range(..child_ast.len());
+
+        let mut splice_len = 1;
+        while rng.random_bool(self.p_extend) {
+            splice_len += 1;
+        }
+
+        let random_end = other.ast().len().min(random_start + splice_len);
+
+        if random_end == random_start {
+            return Ok(crate::MutationState::Unchanged);
+        }
+
+        let random_insert = rng.random_range(..=child_ast.len());
 
         _ = child_ast.splice(
             random_insert..random_insert,
@@ -196,7 +222,7 @@ mod tests {
         test_single_mutation(
             "SELECT A FROM B",
             "SELECT A FROM B; SELECT A FROM B",
-            Box::new(SpliceIn {}),
+            Box::new(SpliceIn::default()),
         );
     }
 }

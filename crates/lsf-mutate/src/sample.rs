@@ -117,7 +117,7 @@ mod tests {
             Box::new(RandomMutationSampler::new(
                 1,
                 1,
-                vec![Box::new(SpliceIn {})],
+                vec![Box::new(SpliceIn::default())],
             )),
         );
 
@@ -128,7 +128,7 @@ mod tests {
             Box::new(RandomMutationSampler::new(
                 2,
                 2,
-                vec![Box::new(SpliceIn {})],
+                vec![Box::new(SpliceIn::default())],
             )),
         );
     }
@@ -138,7 +138,7 @@ mod tests {
         test_single_mutation(
             "SELECT a FROM b",
             "SELECT a FROM b",
-            Box::new(Randomly::new(Box::new(SpliceIn {}), 0.)),
+            Box::new(Randomly::new(Box::new(SpliceIn::default()), 0.)),
         );
     }
 }

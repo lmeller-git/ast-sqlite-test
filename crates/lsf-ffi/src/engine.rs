@@ -29,6 +29,7 @@ use lsf_mutate::{
     ArbitraryGenerator,
     ExprShuffle,
     FieldOperation,
+    HoistExpr,
     MutationStrategy,
     NullInject,
     NumericBounds,
@@ -39,6 +40,7 @@ use lsf_mutate::{
     RelShuffle,
     SetOps,
     SpliceIn,
+    SpliceOut,
     SubQuery,
     TableGuard,
     TableNameScramble,
@@ -337,8 +339,15 @@ impl StrategyBuilder {
     }
 
     #[staticmethod]
-    pub fn splice_in() -> Self {
-        Self(Some(Box::new(SpliceIn {})))
+    #[pyo3(signature = (p_extend = 0.5))]
+    pub fn splice_in(p_extend: f64) -> Self {
+        Self(Some(Box::new(SpliceIn::new(p_extend))))
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (p_extend = 0.5))]
+    pub fn splice_out(p_extend: f64) -> Self {
+        Self(Some(Box::new(SpliceOut::new(p_extend))))
     }
 
     #[staticmethod]
@@ -452,6 +461,12 @@ impl StrategyBuilder {
             chance_per_node,
             chance_per_level,
         })))
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (chance_per_node = 0.1))]
+    pub fn hoist_expr(chance_per_node: f64) -> Self {
+        Self(Some(Box::new(HoistExpr { chance_per_node })))
     }
 
     #[staticmethod]

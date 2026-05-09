@@ -46,7 +46,7 @@ async def run_single_mutation_inner(
             )
         worker = workers[token_id]
         sql_str = await loop.run_in_executor(None, entry.to_sql_string)
-        capture = await worker.execute(sql_str)
+        capture = await worker.execute(sql_str, 0.75 + 0.1 * len(sql_str) / 1000)
         is_hang = (
             capture.exit_code is not None
             and capture.exit_code == 42
