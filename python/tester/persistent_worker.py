@@ -146,7 +146,7 @@ class SQLiteWorker:
             )
 
         except asyncio.TimeoutError:
-            err_output = ""
+            err_output = b""
             self.proc.send_signal(signal.SIGINT)
             try:
                 err_output = await asyncio.wait_for(self.proc.stderr.readline(), timeout=0.1)
@@ -164,7 +164,7 @@ class SQLiteWorker:
             exec_time = time.perf_counter_ns() - start_time
             return TestCapture(
                 stdout=b"",
-                stderr=b"EXECUTION TIMEOUT EXCEEDED, " + err_output.encode(),
+                stderr=b"EXECUTION TIMEOUT EXCEEDED, " + err_output,
                 exit_code=42,
                 query=query,
                 exec_time=exec_time,
