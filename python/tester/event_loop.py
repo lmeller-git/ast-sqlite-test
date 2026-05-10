@@ -22,6 +22,7 @@ async def fuzzing_loop(
     active_tasks: set[asyncio.Task[None]] = set()
     testable_queries: list[TestableEntry] = []
     epoch = 0
+    total = 0;
 
     while True:
         if len(testable_queries) < QUERY_STASH / 2:
@@ -34,9 +35,29 @@ async def fuzzing_loop(
             continue
 
         for _ in range(to_spawn):
+            entry = testable_queries.pop()
+
+            # save 10k queries, comment out in an actual run. this is only to save the first 10k for grading
+            if total < 10000:
+                with open(f"docker_out/queries/query_{total}.sql", "w") as f:
+                    _ = f.write(entry.to_sql_string())
+                    total += 1
+            else:
+                # break at 10k
+                print("Hit 10k queries")
+                _ = await asyncio.gather(*active_tasks, return_exceptions=True)
+                for worker in workers.values():
+                    await worker.close()
+                _ = await oracle_queue.join()
+                for _ in range(N_ORACLES):
+                    oracle_queue.put_nowait(None)
+                return
+
+
+
             task = asyncio.create_task(
                 run_single_mutation(
-                    testable_queries.pop(),
+                    entry,
                     ipc_queue,
                     mutation_engine,
                     oracle_queue,

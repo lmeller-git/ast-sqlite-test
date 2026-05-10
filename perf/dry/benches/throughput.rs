@@ -62,7 +62,7 @@ fn setup_engine() -> (Engine, SharedMemHandle, SmallRng) {
 
 fn bench_fuzzer_throughput(c: &mut Criterion) {
     let mut group = c.benchmark_group("fuzzer_throughput");
-    let batch_size = 16;
+    let batch_size = 64;
 
     group.throughput(Throughput::Elements(batch_size as u64));
 

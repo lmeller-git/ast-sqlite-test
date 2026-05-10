@@ -163,6 +163,8 @@ async def main(args: Namespace):
 
     print("\n===========\ninit done, entering loop\n==================\n")
 
+    now = time.time()
+
     _ = await asyncio.gather(
         fuzzing_loop(
             mutation_engine,
@@ -174,6 +176,10 @@ async def main(args: Namespace):
         ),
         *oracle_tasks,
     )
+
+    duration = time.time() - now
+    qpm = (10000.0 / duration) * 60.0
+    print(f"qpm for complete pipeline: {qpm:.3f}")
 
 
 def add(n1: int, n2: int) -> int:
