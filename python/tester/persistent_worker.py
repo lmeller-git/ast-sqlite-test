@@ -71,7 +71,7 @@ class SQLiteWorker:
             else:
                 chunks.append(line)
 
-    async def execute(self, query: str, timeout_sec: float = 0.75) -> TestCapture:
+    async def execute(self, query: str, timeout_sec: float = 1.) -> TestCapture:
         if self.proc is None or self.proc.returncode is not None:
             await self._start()
 
@@ -147,15 +147,31 @@ class SQLiteWorker:
 
         except asyncio.TimeoutError:
             err_output = b""
-            self.proc.send_signal(signal.SIGINT)
+            try:
+                self.proc.send_signal(signal.SIGINT)
+            except ProcessLookupError:
+                # already dead
+                stdout_remaining, stderr_remaining = await self.proc.communicate()
+                exec_time = time.perf_counter_ns() - start_time
+                await self.hard_reset()
+
+                return TestCapture(
+                    stdout=stdout_remaining,
+                    stderr=stderr_remaining,
+                    exit_code=self.proc.returncode or -1,
+                    query=query,
+                    exec_time=exec_time,
+                    is_hang_or_crash="CRASH",
+                )
+
             try:
                 err_output = await asyncio.wait_for(self.proc.stderr.readline(), timeout=0.1)
                 if b"interrupted" in err_output:
                     # interrupted actual hang
-                   pass
+                    pass
                 else:
                     # maybe it just finished on its own, or some other error
-                    pass
+                    await self.hard_reset()
             except asyncio.TimeoutError:
                 # SIGINT did not work. likely because of an unclosed qoute upstream
                 #  migth want to reutnr sth indicating a syntax err instead TODO
