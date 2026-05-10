@@ -75,13 +75,12 @@ impl IPCToken {
         Self { path, shmem, id }
     }
 
-    #[allow(dead_code)]
-    fn as_mut_slice(&mut self) -> &mut [u8] {
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
         // SAFETY: May only be called via an exclusive borrow. Since this struct is !Copy and !Clone, only one exclusive borrow may exist at a time
         unsafe { std::slice::from_raw_parts_mut(self.shmem.as_ptr(), self.shmem.len()) }
     }
 
-    fn as_slice(&self) -> &[u8] {
+    pub fn as_slice(&self) -> &[u8] {
         // SAFETY: concurrent read only access is fine
         unsafe { std::slice::from_raw_parts(self.shmem.as_ptr(), self.shmem.len()) }
     }

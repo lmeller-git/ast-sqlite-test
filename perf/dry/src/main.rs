@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use lsf_core::entry::{Meta, RawEntry};
+use dry::{apply_default_ruleset, virtual_run_test};
 use lsf_cov::ipc::SharedMemHandle;
 use lsf_engine::{
     BinaryBlob,
@@ -8,23 +8,11 @@ use lsf_engine::{
     Engine,
     FastProbabilisticMABScheduler,
     GreedyCoverage,
-    ProbabilisticMABScheduler,
     SchedulerBatcher,
     SeedDirReader,
 };
 use lsf_feedback::{TestableEntry, mab::MABBody};
-use lsf_mutate::{
-    ArbitraryGenerator,
-    ExprShuffle,
-    MutationStrategy,
-    NullInject,
-    OperatorFlip,
-    RelShuffle,
-    SpliceIn,
-    TreeMutator,
-};
-use rand::{RngExt, SeedableRng, rngs::SmallRng};
-use sqlparser::ast::{Expr, Statement};
+use rand::{SeedableRng, rngs::SmallRng};
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
@@ -43,72 +31,17 @@ fn main() {
 
     let shmem_queue = SharedMemHandle::new(4, 2_usize.pow(14));
 
-    let top_level_strategy = Arc::new(MABBody::new());
-    let scheduler1 = Arc::new(MABBody::new());
-    let scheduler2 = Arc::new(MABBody::new());
-
-    let ruleset = lsf_mutate::MABScheduler::new(
-        top_level_strategy.clone(),
-        vec![
-            Box::new(SpliceIn::default()) as Box<dyn MutationStrategy>,
-            Box::new(lsf_mutate::MABScheduler::new(
-                scheduler1.clone(),
-                vec![
-                    Box::new(TreeMutator {
-                        chance_per_node: 0.3,
-                        chance_per_field: 0.5,
-                        operation: lsf_mutate::FieldOperation::ShuffleTwo,
-                        _phantom: std::marker::PhantomData::<Statement>,
-                    }) as Box<dyn MutationStrategy>,
-                    Box::new(ExprShuffle {
-                        chance_per_node: 0.5,
-                    }),
-                    Box::new(TreeMutator {
-                        chance_per_node: 0.3,
-                        chance_per_field: 0.5,
-                        operation: lsf_mutate::FieldOperation::ShuffleTwo,
-                        _phantom: std::marker::PhantomData::<Expr>,
-                    }),
-                    Box::new(ArbitraryGenerator::<Statement>::new()),
-                    Box::new(ArbitraryGenerator::<Expr>::new()),
-                ]
-                .into_iter(),
-                2,
-            )),
-            Box::new(lsf_mutate::MABScheduler::new(
-                scheduler2.clone(),
-                vec![
-                    Box::new(RelShuffle {
-                        chance_per_node: 0.5,
-                    }) as Box<dyn MutationStrategy>,
-                    Box::new(OperatorFlip { flip_chance: 0.5 }),
-                    Box::new(NullInject {
-                        mutation_chance: 0.3,
-                    }),
-                    Box::new(TreeMutator {
-                        chance_per_node: 0.3,
-                        chance_per_field: 0.5,
-                        operation: lsf_mutate::FieldOperation::NullRandom,
-                        _phantom: std::marker::PhantomData::<Expr>,
-                    }),
-                ]
-                .into_iter(),
-                2,
-            )),
-        ]
-        .into_iter(),
-        1,
-    );
-
     let mut engine = Engine::new(
         Box::new(scheduler),
         Box::new(corpus_handler),
         Box::new(GreedyCoverage::new(2_usize.pow(14))),
-        vec![Box::new(ruleset)],
+        vec![],
         shmem_queue.clone(),
-        vec![scheduler_body, top_level_strategy, scheduler1, scheduler2],
+        vec![scheduler_body],
         42,
     );
+
+    apply_default_ruleset(&mut engine);
 
     engine.populate(vec![Box::new(SeedDirReader::new("../../seeds".into()))]);
 
@@ -156,38 +89,5 @@ fn fuzz_loop(engine: &mut Engine, token_queue: &SharedMemHandle) {
             break;
         }
         epoch += 1;
-    }
-}
-
-fn virtual_run_test(
-    mut test: TestableEntry<RawEntry>,
-    engine: &mut Engine,
-    token_queue: &SharedMemHandle,
-    rng: &mut dyn rand::Rng,
-) {
-    let Ok(token) = token_queue.rx().recv() else {
-        return;
-    };
-    let meta = random_meta(rng);
-    test.fire_rule_hooks(
-        if meta.new_cov_nodes > 0 {
-            lsf_feedback::TestOutcome::Accepted(lsf_feedback::AcceptanceReason::CovIncrease(
-                meta.new_cov_nodes,
-            ))
-        } else {
-            lsf_feedback::TestOutcome::Accepted(lsf_feedback::AcceptanceReason::IsDiverse)
-        },
-        &meta,
-    );
-    engine.commit_test_result(test, meta, token);
-}
-
-fn random_meta(rng: &mut dyn rand::Rng) -> Meta {
-    Meta {
-        triggers_bug: rng.random_bool(0.01),
-        is_valid_syntax: rng.random_bool(0.7),
-        exec_time: rng.random_range(100..u32::MAX / 2),
-        new_cov_nodes: rng.random_range(1..10),
-        query_size: rng.random_range(10..100),
     }
 }

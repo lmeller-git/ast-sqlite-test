@@ -75,9 +75,7 @@ impl EdgeMap {
         }
 
         if !new_edges.is_empty() {
-            self.total_found += new_edges.len();
-
-            println!("Total coverage so far: {:.3}%", self.current_cov() * 100.)
+            self.total_found += new_edges.len()
         }
 
         EdgesFound {
@@ -95,7 +93,19 @@ pub struct EdgeMapView<'a> {
     raw_view: &'a [u8],
 }
 
-impl<'a> EdgeMapView<'a> {}
+impl<'a> EdgeMapView<'a> {
+    pub fn len(&self) -> usize {
+        self.raw_view.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn get(&self, idx: usize) -> Option<&u8> {
+        self.raw_view.get(idx)
+    }
+}
 
 impl<'a> From<&'a [u8]> for EdgeMapView<'a> {
     fn from(value: &'a [u8]) -> Self {

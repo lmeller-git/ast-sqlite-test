@@ -32,6 +32,7 @@ pub struct Engine {
     mab_bodies: Vec<Arc<MABBody>>,
     edge_map: EdgeMap,
     size_at_last_reset: usize,
+    verbosity: u8,
 }
 
 impl Debug for Engine {
@@ -62,7 +63,13 @@ impl Engine {
             rng: SmallRng::seed_from_u64(rng_seed),
             mab_bodies,
             size_at_last_reset: 0,
+            verbosity: 1,
         }
+    }
+
+    pub fn silent(mut self) -> Self {
+        self.verbosity = 0;
+        self
     }
 
     pub fn with_scheduler(mut self, scheduler: Box<dyn Schedule>) -> Self {
@@ -126,6 +133,13 @@ impl Engine {
         let new_edges = self.edge_map.update(shmem.as_edge_map());
         self.shmem_queue.send(shmem);
         meta.new_cov_nodes = new_edges.new.len();
+
+        if self.verbosity > 0 && !new_edges.new.is_empty() {
+            println!(
+                "Total coverage so far: {:.3}%",
+                self.edge_map.current_cov() * 100.
+            )
+        }
 
         let accepted = self.minimizer.on_add(&raw_entry, &meta, new_edges);
 
