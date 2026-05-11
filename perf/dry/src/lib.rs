@@ -3,7 +3,10 @@ use std::sync::Arc;
 use lsf_core::entry::{Meta, RawEntry};
 use lsf_cov::ipc::SharedMemHandle;
 use lsf_engine::Engine;
-use lsf_feedback::{TestableEntry, mab::MABBody};
+use lsf_feedback::{
+    TestableEntry,
+    mab::{MABBody, MABConfig},
+};
 use lsf_mutate::{
     ArbitraryGenerator,
     ExprShuffle,
@@ -23,6 +26,14 @@ use lsf_mutate::{
 };
 use rand::RngExt;
 use sqlparser::ast::{Expr, Statement};
+
+pub fn short_running_config() -> MABConfig {
+    MABConfig {
+        exploration_constant: 0.25,
+        max_accepted_syntax_err: 0.1,
+        ..Default::default()
+    }
+}
 
 pub fn virtual_run_test(
     mut test: TestableEntry<RawEntry>,
@@ -64,14 +75,29 @@ pub fn random_meta(rng: &mut dyn rand::Rng) -> Meta {
     }
 }
 
-pub fn apply_default_ruleset(engine: &mut Engine) {
+pub fn apply_default_short_ruleset(engine: &mut Engine) {
+    let config = short_running_config();
     let strats = [
-        make_ruleset_generate,
         make_ruleset_havoc,
         make_ruleset_increase,
-        make_ruleset_reduce,
         make_ruleset_semantic,
         make_ruleset_structural,
+    ];
+    for ruleset in strats {
+        let body: Arc<MABBody> = MABBody::new().with_config(config.clone()).into();
+        engine.add_mab_body(body.clone());
+        engine.add_strategy(ruleset(body));
+    }
+}
+
+pub fn apply_default_long_ruleset(engine: &mut Engine) {
+    let strats = [
+        make_ruleset_havoc,
+        make_ruleset_increase,
+        make_ruleset_semantic,
+        make_ruleset_structural,
+        make_ruleset_reduce,
+        make_ruleset_generate,
     ];
     for ruleset in strats {
         let body: Arc<MABBody> = MABBody::new().into();
@@ -185,6 +211,50 @@ pub fn make_ruleset_generate(body: Arc<MABBody>) -> Box<dyn MutationStrategy> {
         [
             Box::new(ArbitraryGenerator::<Expr>::new()) as Box<dyn MutationStrategy>,
             Box::new(ArbitraryGenerator::<Statement>::new()),
+        ]
+        .into_iter(),
+        2,
+    ))
+}
+
+pub fn make_longrunning_ruleset(
+    rule_scheduler_body: Arc<MABBody>,
+    havoc_rule_scheduler_body: Arc<MABBody>,
+    struct_rule_scheduler_body: Arc<MABBody>,
+    sem_rule_scheduler_body: Arc<MABBody>,
+    generator_body: Arc<MABBody>,
+    reducer_body: Arc<MABBody>,
+    increaser_body: Arc<MABBody>,
+) -> Box<dyn MutationStrategy> {
+    Box::new(MABScheduler::new(
+        rule_scheduler_body,
+        [
+            make_ruleset_havoc(havoc_rule_scheduler_body),
+            make_ruleset_generate(generator_body),
+            make_ruleset_increase(increaser_body),
+            make_ruleset_reduce(reducer_body),
+            make_ruleset_semantic(sem_rule_scheduler_body),
+            make_ruleset_structural(struct_rule_scheduler_body),
+        ]
+        .into_iter(),
+        2,
+    ))
+}
+
+pub fn make_shortrunning_ruleset(
+    rule_scheduler_body: Arc<MABBody>,
+    havoc_rule_scheduler_body: Arc<MABBody>,
+    struct_rule_scheduler_body: Arc<MABBody>,
+    sem_rule_scheduler_body: Arc<MABBody>,
+    increaser_body: Arc<MABBody>,
+) -> Box<dyn MutationStrategy> {
+    Box::new(MABScheduler::new(
+        rule_scheduler_body,
+        [
+            make_ruleset_havoc(havoc_rule_scheduler_body),
+            make_ruleset_increase(increaser_body),
+            make_ruleset_semantic(sem_rule_scheduler_body),
+            make_ruleset_structural(struct_rule_scheduler_body),
         ]
         .into_iter(),
         2,

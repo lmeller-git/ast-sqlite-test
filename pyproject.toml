@@ -7,6 +7,7 @@ requires-python = ">=3.14"
 readme = "README.md"
 description = "Project 1 for course Automated Software Testing ETH"
 dependencies = [
+    "numpy>=2.4.4",
     "uvloop>=0.22.1",
 ]
 

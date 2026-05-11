@@ -5,8 +5,28 @@ class Generation:
     def into_members(self) -> list[TestableEntry]: ...
 
 
+class MABConfig:
+    # threshhold for syntax penalty
+    exploration_constant: float
+    max_accepted_syntax_err: float
+    # accepted + cov_inc should be 1. ideally
+    weight_accepted: float
+    weight_cov_inc: float
+    # sum(malus) shopuld be 1. ideallyu
+    weight_timeout: float
+    weight_syntax_penalty: float
+    weight_size_penalty: float
+    weight_time_penalty: float
+    # baseline size
+    scale_size: float
+
+    @staticmethod
+    def new_default() -> MABConfig: ...
+
+
 class MABBody:
     def __init__(self) -> None: ...
+    def with_config(self, config: MABConfig) -> None: ...
 
 
 class CorpusMinimizerBuilder:
