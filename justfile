@@ -36,7 +36,7 @@ run-docker:
 
 run-docker-coverage:
     docker build --build-arg USE_ASAN=true -t ast-sqlite-fuzzer .
-    docker run --security-opt seccomp=unconfined -v $(pwd)/docker_out:/app/docker_out --init -it --rm ast-sqlite-fuzzer //usr/bin/test-db-coverage
+    MSYS_NO_PATHCONV=1 docker run --security-opt seccomp=unconfined --mount type=bind,source="{{justfile_directory()}}\docker_out",target=/app/docker_out --init -it --rm ast-sqlite-fuzzer /usr/bin/test-db-coverage
 
 run-docker-it:
     docker build --build-arg USE_ASAN=true -t ast-sqlite-fuzzer .

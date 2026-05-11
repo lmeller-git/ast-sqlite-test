@@ -243,6 +243,18 @@ def read_query_log(path: Path) -> Iterable[str]:
             yield query
 
 
+def read_query_dir(path: Path) -> Iterable[str]:
+    for query_path in sorted(path.glob("query_*.sql"), key=query_file_index):
+        yield query_path.read_text(encoding="utf-8")
+
+
+def query_file_index(path: Path) -> int:
+    try:
+        return int(path.stem.removeprefix("query_"))
+    except ValueError:
+        return -1
+
+
 def write_reports(out_dir: Path, counts: dict[str, int], total_queries: int) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -297,17 +309,18 @@ class KeywordCoverageRecorder:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("query_log", type=Path)
+    parser.add_argument("input", type=Path)
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
 
     counts = empty_counts()
     total_queries = 0
-    for query in read_query_log(args.query_log):
+    queries = read_query_dir(args.input) if args.input.is_dir() else read_query_log(args.input)
+    for query in queries:
         total_queries += 1
         update_counts(counts, query)
 
-    write_reports(args.out or args.query_log.parent, counts, total_queries)
+    write_reports(args.out or args.input.parent, counts, total_queries)
 
 
 if __name__ == "__main__":
