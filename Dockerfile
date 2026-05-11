@@ -115,8 +115,8 @@ RUN clang -O3 $SQLITE_FLAGS $EXTRA_FLAGS -fsanitize-coverage=trace-pc-guard -o .
 
 WORKDIR /app
 
-COPY test-db test-db-internal /usr/bin/
-RUN chmod +x /usr/bin/test-db /usr/bin/test-db-internal
+COPY test-db test-db-internal test-db-coverage /usr/bin/
+RUN chmod +x /usr/bin/test-db /usr/bin/test-db-internal /usr/bin/test-db-coverage
 
 RUN mkdir -p /app/docker_out/crashes /app/docker_out/queries
 
