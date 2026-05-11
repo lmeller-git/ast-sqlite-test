@@ -55,6 +55,7 @@ async def fuzzing_loop(
                 # break at 10k
                 is_done = True
                 print("Hit 10k queries")
+                break
 
             if not is_done:
                 task = asyncio.create_task(
@@ -77,7 +78,10 @@ async def fuzzing_loop(
             or mutation_engine.corpus_size() >= stop_at
             or (stop_time is not None and time.time() >= stop_time)
         ):
-            print(f"Hit {mutation_engine.corpus_size()} queries")
+            if eval_requirement:
+                print(f"Hit {total} generated queries")
+            else:
+                print(f"Hit {mutation_engine.corpus_size()} queries")
             _ = await asyncio.gather(*active_tasks, return_exceptions=True)
             for worker in workers.values():
                 await worker.close()
