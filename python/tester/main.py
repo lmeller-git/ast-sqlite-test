@@ -9,14 +9,7 @@ from tester.event_loop import fuzzing_loop, N_ORACLES
 from tester.exec import CONCURRENCY_LIMIT, init, run_single_mutation
 from tester.oracle import oracle_worker
 from tester.persistent_worker import SQLiteWorker
-from tester.rules import (
-    make_ruleset_generate,
-    make_ruleset_havoc,
-    make_ruleset_increase,
-    make_ruleset_reduce,
-    make_ruleset_semantic,
-    make_ruleset_structural,
-)
+from tester.rules import make_longrunning_ruleset, make_shortrunning_ruleset
 
 RNG = 42
 
@@ -25,10 +18,19 @@ async def main(args: Namespace):
     if args.timeout_hours is not None:
         start_time = time.time()
         end_time = args.timeout_hours * 3600.0 + start_time
+
+    short_run = args.stop_at <= 20000
+
     max_edges = await init(args.test_path)
     print("found ", max_edges, " max_edges")
     ipc_queue = engine.IPCTokenQueue(CONCURRENCY_LIMIT, max_edges)
     oracle_queue = asyncio.Queue(2048)
+
+    scheduler_config = engine.MABConfig.new_default()
+
+    if short_run:
+        scheduler_config.exploration_constant = 0.25
+        scheduler_config.max_accepted_syntax_err = 0.1
 
     corpus_scheduler_body = engine.MABBody()
     rule_scheduler_body = engine.MABBody()
@@ -39,12 +41,26 @@ async def main(args: Namespace):
     reducer_body = engine.MABBody()
     increaser_body = engine.MABBody()
 
-    if args.save_to is not None:
-        corpus_handler = engine.CorpusManagerBuilder.dynamic_cache(
+    corpus_scheduler_body.with_config(scheduler_config)
+    rule_scheduler_body.with_config(scheduler_config)
+    havoc_rule_scheduler_body.with_config(scheduler_config)
+    struct_rule_scheduler_body.with_config(scheduler_config)
+    sem_rule_scheduler_body.with_config(scheduler_config)
+    generator_body.with_config(scheduler_config)
+    reducer_body.with_config(scheduler_config)
+    increaser_body.with_config(scheduler_config)
+
+    # use InMemory Corpus for short run, as we will gneraet small amount of queries
+    if args.save_to is not None and not short_run:
+        disk_cache = (
             engine.DiskCacheBuilder.sql_saver(
                 engine.DiskCacheBuilder.blob(args.save_to), args.save_to
             )
+            if not args.eval_requirement  # sql queriesa re saved separately for requirement fulfilling runs
+            else engine.DiskCacheBuilder.blob(args.save_to)
         )
+
+        corpus_handler = engine.CorpusManagerBuilder.dynamic_cache(disk_cache)
     else:
         corpus_handler = engine.CorpusManagerBuilder.in_memory()
 
@@ -119,17 +135,22 @@ async def main(args: Namespace):
     [
         mutation_engine.add_strategy(strat)
         for strat in [
-            engine.StrategyBuilder.ucb1(
+            make_longrunning_ruleset(
                 rule_scheduler_body,
-                [
-                    make_ruleset_reduce(reducer_body),
-                    make_ruleset_increase(increaser_body),
-                    make_ruleset_generate(generator_body),
-                    make_ruleset_havoc(havoc_rule_scheduler_body),
-                    make_ruleset_semantic(sem_rule_scheduler_body),
-                    make_ruleset_structural(struct_rule_scheduler_body),
-                ],
-                2,
+                havoc_rule_scheduler_body,
+                struct_rule_scheduler_body,
+                sem_rule_scheduler_body,
+                generator_body,
+                reducer_body,
+                increaser_body,
+            )
+            if not short_run
+            else make_shortrunning_ruleset(
+                rule_scheduler_body,
+                havoc_rule_scheduler_body,
+                struct_rule_scheduler_body,
+                sem_rule_scheduler_body,
+                increaser_body,
             ),
             engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_name_guard(), 0.7),
             engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.7),
@@ -173,6 +194,7 @@ async def main(args: Namespace):
             args.stop_at,
             None if args.timeout_hours is None else end_time,
             args.test_path,
+            args.eval_requirement,
         ),
         *oracle_tasks,
     )
@@ -194,5 +216,6 @@ if __name__ == "__main__":
     _ = parser.add_argument("--test_path", default="/home/test/sqlite3-src/build/sqlite3")
     _ = parser.add_argument("--oracle_path", default="/usr/bin/sqlite3-3.39.4")
     _ = parser.add_argument("--timeout_hours", default=None, type=float)
+    _ = parser.add_argument("--eval_requirement", default=False, type=bool)
     args = parser.parse_args()
     uvloop.run(main(args))

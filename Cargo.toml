@@ -34,4 +34,4 @@ sqlparser = { path = "extern/sqlparser-rs" }
 [profile.release]
 lto = "fat"
 codegen-units = 1
-debug = true
+# debug = true

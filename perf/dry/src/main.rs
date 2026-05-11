@@ -1,6 +1,11 @@
 use std::{sync::Arc, time::Instant};
 
-use dry::{apply_default_ruleset, virtual_run_test};
+use dry::{
+    apply_default_long_ruleset,
+    apply_default_short_ruleset,
+    short_running_config,
+    virtual_run_test,
+};
 use lsf_cov::ipc::SharedMemHandle;
 use lsf_engine::{
     BinaryBlob,
@@ -8,6 +13,7 @@ use lsf_engine::{
     Engine,
     FastProbabilisticMABScheduler,
     GreedyCoverage,
+    InMemory,
     SchedulerBatcher,
     SeedDirReader,
 };
@@ -22,15 +28,24 @@ fn main() {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
-    perf_10k_rules();
-    perf_10k_engine();
+    println!("long config: ");
+    let (engine, shmem_queue) = setup_engine_long();
+    perf_10k_rules(engine, shmem_queue);
+    let (engine, shmem_queue) = setup_engine_long();
+    perf_10k_engine(engine, shmem_queue, true);
+
+    println!("short config: ");
+    let (engine, shmem_queue) = setup_engine_short();
+    perf_10k_rules(engine, shmem_queue);
+    let (engine, shmem_queue) = setup_engine_short();
+    // no gc for short runs
+    perf_10k_engine(engine, shmem_queue, false);
+
     // profile();
 }
 
 #[allow(dead_code)]
-fn perf_10k_engine() {
-    let (mut engine, shmem_queue) = setup_engine();
-
+fn perf_10k_engine(mut engine: Engine, shmem_queue: SharedMemHandle, do_gc: bool) {
     let mut total = 0;
     let mut epoch: usize = 0;
     let batch_size = 64; // roughly batch_size in python
@@ -50,7 +65,7 @@ fn perf_10k_engine() {
         }
 
         epoch += 1;
-        if epoch.is_multiple_of(2000) {
+        if do_gc && epoch.is_multiple_of(2000) {
             engine.chore();
         }
     }
@@ -63,9 +78,7 @@ fn perf_10k_engine() {
 }
 
 #[allow(dead_code)]
-fn perf_10k_rules() {
-    let (mut engine, _shmem_queue) = setup_engine();
-
+fn perf_10k_rules(mut engine: Engine, _shmem_queue: SharedMemHandle) {
     let mut total = 0;
     let batch_size = 64; // roughly batch_size in python
 
@@ -86,7 +99,49 @@ fn perf_10k_rules() {
     println!("queries per minute from 10k for rules: {:.3}", qpm);
 }
 
-fn setup_engine() -> (Engine, SharedMemHandle) {
+fn setup_engine_short() -> (Engine, SharedMemHandle) {
+    let config = short_running_config();
+    let scheduler_body = Arc::new(MABBody::new().with_config(config));
+    let scheduler = SchedulerBatcher::new(Box::new(FastProbabilisticMABScheduler::new(
+        scheduler_body.clone(),
+    )));
+
+    let corpus_handler = InMemory::new();
+
+    let shmem_queue = SharedMemHandle::new(4, 2_usize.pow(10));
+
+    let mut engine = Engine::new(
+        Box::new(scheduler),
+        Box::new(corpus_handler),
+        Box::new(GreedyCoverage::new(2_usize.pow(10))),
+        vec![],
+        shmem_queue.clone(),
+        vec![scheduler_body],
+        42,
+    )
+    .silent();
+
+    apply_default_short_ruleset(&mut engine);
+    engine.populate(vec![Box::new(SeedDirReader::new("../../seeds".into()))]);
+
+    let snapshot = engine.snapshot();
+    engine.clear();
+    let mut rng = SmallRng::seed_from_u64(42);
+
+    // warmup
+    for entry in snapshot {
+        virtual_run_test(
+            TestableEntry::new(entry.raw),
+            &mut engine,
+            &shmem_queue,
+            &mut rng,
+        );
+    }
+
+    (engine, shmem_queue)
+}
+
+fn setup_engine_long() -> (Engine, SharedMemHandle) {
     let scheduler_body = Arc::new(MABBody::new());
     let scheduler = SchedulerBatcher::new(Box::new(FastProbabilisticMABScheduler::new(
         scheduler_body.clone(),
@@ -97,12 +152,12 @@ fn setup_engine() -> (Engine, SharedMemHandle) {
     let corpus_handler =
         DynamicCorpus::new(Box::new(BinaryBlob::new(temp_dir.to_str().unwrap().into())));
 
-    let shmem_queue = SharedMemHandle::new(4, 2_usize.pow(14));
+    let shmem_queue = SharedMemHandle::new(4, 2_usize.pow(10));
 
     let mut engine = Engine::new(
         Box::new(scheduler),
         Box::new(corpus_handler),
-        Box::new(GreedyCoverage::new(2_usize.pow(14))),
+        Box::new(GreedyCoverage::new(2_usize.pow(10))),
         vec![],
         shmem_queue.clone(),
         vec![scheduler_body],
@@ -110,8 +165,22 @@ fn setup_engine() -> (Engine, SharedMemHandle) {
     )
     .silent();
 
-    apply_default_ruleset(&mut engine);
+    apply_default_long_ruleset(&mut engine);
     engine.populate(vec![Box::new(SeedDirReader::new("../../seeds".into()))]);
+
+    let snapshot = engine.snapshot();
+    engine.clear();
+    let mut rng = SmallRng::seed_from_u64(42);
+
+    // warmup
+    for entry in snapshot {
+        virtual_run_test(
+            TestableEntry::new(entry.raw),
+            &mut engine,
+            &shmem_queue,
+            &mut rng,
+        );
+    }
 
     (engine, shmem_queue)
 }
@@ -137,7 +206,7 @@ fn profile() {
         42,
     );
 
-    apply_default_ruleset(&mut engine);
+    apply_default_short_ruleset(&mut engine);
 
     engine.populate(vec![Box::new(SeedDirReader::new("../../seeds".into()))]);
 

@@ -241,6 +241,73 @@ impl TestResult {
         self.token.take().map(|t| IPCTokenHandle(Some(t))).unwrap()
     }
 }
+#[pyclass(from_py_object)]
+#[derive(Debug, Clone)]
+pub struct MABConfig {
+    // threshhold for syntax penalty
+    #[pyo3(get, set)]
+    pub exploration_constant: f64,
+    #[pyo3(get, set)]
+    pub max_accepted_syntax_err: f64,
+    /// accepted + cov_inc should be 1. ideally
+    #[pyo3(get, set)]
+    pub weight_accepted: f64,
+    #[pyo3(get, set)]
+    pub weight_cov_inc: f64,
+    /// sum(malus) shopuld be 1. ideallyu
+    #[pyo3(get, set)]
+    pub weight_timeout: f64,
+    #[pyo3(get, set)]
+    pub weight_syntax_penalty: f64,
+    #[pyo3(get, set)]
+    pub weight_size_penalty: f64,
+    #[pyo3(get, set)]
+    pub weight_time_penalty: f64,
+    /// baseline size
+    #[pyo3(get, set)]
+    pub scale_size: f64,
+}
+
+#[pymethods]
+impl MABConfig {
+    #[staticmethod]
+    pub fn new_default() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for MABConfig {
+    fn default() -> Self {
+        Self {
+            exploration_constant: 4.0,
+            max_accepted_syntax_err: 0.5,
+            weight_accepted: 0.1,
+            weight_cov_inc: 0.9,
+            weight_timeout: 0.33,
+            weight_syntax_penalty: 0.33,
+            weight_size_penalty: 0.16,
+            weight_time_penalty: 0.16,
+            scale_size: 100.0,
+        }
+    }
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<lsf_feedback::mab::MABConfig> for MABConfig {
+    fn into(self) -> lsf_feedback::mab::MABConfig {
+        lsf_feedback::mab::MABConfig {
+            exploration_constant: self.exploration_constant,
+            max_accepted_syntax_err: self.max_accepted_syntax_err,
+            weight_accepted: self.weight_accepted,
+            weight_cov_inc: self.weight_cov_inc,
+            weight_timeout: self.weight_timeout,
+            weight_syntax_penalty: self.weight_syntax_penalty,
+            weight_size_penalty: self.weight_size_penalty,
+            weight_time_penalty: self.weight_time_penalty,
+            scale_size: self.scale_size,
+        }
+    }
+}
 
 #[pyclass]
 pub struct MABBody(Arc<lsf_feedback::mab::MABBody>);
@@ -250,6 +317,11 @@ impl MABBody {
     #[new]
     pub fn new() -> Self {
         Self(Arc::new(lsf_feedback::mab::MABBody::new()))
+    }
+
+    pub fn with_config(&mut self, config: MABConfig) {
+        let mut_body = Arc::get_mut(&mut self.0).unwrap();
+        mut_body.config = config.into();
     }
 }
 

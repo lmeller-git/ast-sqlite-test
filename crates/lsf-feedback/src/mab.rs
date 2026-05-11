@@ -13,12 +13,46 @@ const RESCALE_FACTOR: f64 = 1e15_f64;
 pub const MIN_WEIGHT: f64 = 0.001;
 pub const MAX_WEIGHT: f64 = 2e2;
 
+#[derive(Debug, Clone)]
+pub struct MABConfig {
+    // threshhold for syntax penalty
+    pub exploration_constant: f64,
+    pub max_accepted_syntax_err: f64,
+    /// accepted + cov_inc should be 1. ideally
+    pub weight_accepted: f64,
+    pub weight_cov_inc: f64,
+    /// sum(malus) shopuld be 1. ideallyu
+    pub weight_timeout: f64,
+    pub weight_syntax_penalty: f64,
+    pub weight_size_penalty: f64,
+    pub weight_time_penalty: f64,
+    /// baseline size
+    pub scale_size: f64,
+}
+
+impl Default for MABConfig {
+    fn default() -> Self {
+        Self {
+            exploration_constant: 4.0,
+            max_accepted_syntax_err: 0.5,
+            weight_accepted: 0.1,
+            weight_cov_inc: 0.9,
+            weight_timeout: 0.33,
+            weight_syntax_penalty: 0.33,
+            weight_size_penalty: 0.16,
+            weight_time_penalty: 0.16,
+            scale_size: 100.0,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct MABBody {
     pub total_attempts: AtomicF64,
     pub current_inflation: AtomicF64,
     pub epoch: AtomicU32,
     pub normalization_epoch: AtomicU32,
+    pub config: MABConfig,
 }
 
 impl MABBody {
@@ -27,6 +61,11 @@ impl MABBody {
             current_inflation: AtomicF64::new(1.),
             ..Default::default()
         }
+    }
+
+    pub fn with_config(mut self, config: MABConfig) -> Self {
+        self.config = config;
+        self
     }
 
     pub fn tick_by(&self, by: u32) {
@@ -252,7 +291,6 @@ impl AdaptiveStatistics for MABArm {
     fn update(&self, _test_result: TestOutcome) {}
 
     fn calculate_score(&self) -> f64 {
-        const MAX_ACCEPTED_SYNTAX_ERR: f64 = 0.5;
         self.normalize();
 
         let inflated_attempts = self.attempts.load(Ordering::Relaxed);
@@ -261,6 +299,8 @@ impl AdaptiveStatistics for MABArm {
             return MAX_WEIGHT;
         }
 
+        let config = &self.ctx.config;
+
         let inflation = self.ctx.current_inflation.load(Ordering::Relaxed);
 
         // we want to
@@ -268,7 +308,7 @@ impl AdaptiveStatistics for MABArm {
         let cov_inc_rate = self.cov_increases.load(Ordering::Relaxed) / inflated_attempts;
         let accepted_rate = self.accepted.load(Ordering::Relaxed) / inflated_attempts;
 
-        let pros = accepted_rate * 0.1 + cov_inc_rate * 0.9;
+        let pros = accepted_rate * config.weight_accepted + cov_inc_rate * config.weight_cov_inc;
 
         // if we feed syntax errs, hangs, ... back we need to discourage them. We migth even want to discourage them anyways
 
@@ -277,20 +317,20 @@ impl AdaptiveStatistics for MABArm {
         let avg_t_exec = self.total_exec_ns.load(Ordering::Relaxed) / inflated_attempts;
         let avg_size = self.total_query_size.load(Ordering::Relaxed) / inflated_attempts;
 
-        let syntax_penalty = if syntax_err_rate > MAX_ACCEPTED_SYNTAX_ERR {
-            (syntax_err_rate - MAX_ACCEPTED_SYNTAX_ERR) * 0.33
+        let syntax_penalty = if syntax_err_rate > config.max_accepted_syntax_err {
+            syntax_err_rate - config.max_accepted_syntax_err
         } else {
             0.
         };
 
         // 1ms, 100 chars
         let time_penalty_ratio = (avg_t_exec / 1_000_000.0).ln_1p();
-        let size_penalty_ratio = (avg_size / 100.0).ln_1p();
+        let size_penalty_ratio = (avg_size / config.scale_size).ln_1p();
 
-        let penalty = time_out_rate * 0.33
-            + syntax_penalty
-            + size_penalty_ratio * 0.16
-            + time_penalty_ratio * 0.16;
+        let penalty = time_out_rate * config.weight_timeout
+            + syntax_penalty * config.weight_syntax_penalty
+            + size_penalty_ratio * config.weight_syntax_penalty
+            + time_penalty_ratio * config.weight_time_penalty;
         let cons = (1. - penalty).max(0.001);
 
         let exploitation = pros * cons;
@@ -298,7 +338,9 @@ impl AdaptiveStatistics for MABArm {
         let effective_attempts = inflated_attempts / inflation;
         let effective_total_attempts =
             (self.ctx.total_attempts.load(Ordering::Relaxed) / inflation).max(1.);
-        let exploration = (4. * (effective_total_attempts).ln() / (effective_attempts)).sqrt();
+        let exploration = (config.exploration_constant * (effective_total_attempts).ln()
+            / (effective_attempts))
+            .sqrt();
 
         let final_score = exploitation + exploration;
 
