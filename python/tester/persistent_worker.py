@@ -7,6 +7,7 @@ import os
 import tempfile
 import shutil
 from typing import override
+import itertools
 
 
 @dataclass(order=True)
@@ -31,7 +32,8 @@ class SQLiteWorker:
         self.env: dict[str, str] | None = env
         self.STDOUT_SENTINEL: bytes = b"__STDOUT_EOQ__"
         self.STDERR_SENTINEL: bytes = b"__STDERR_EOQ__"
-        self.workdir: str = tempfile.mkdtemp(prefix="sqlite_worker_", dir = "/dev/shm")
+        self.workdir: str = tempfile.mkdtemp(prefix="sqlite_worker_", dir="/dev/shm")
+        self._reset_counter: itertools.count[int] = itertools.count()
 
     async def _start(self) -> None:
         if self.proc is not None:
@@ -42,6 +44,8 @@ class SQLiteWorker:
             self.proc = None
 
         full_env = os.environ.copy()
+        full_env["ASAN_OPTIONS"] = "log_path=sdterr"
+        full_env["UBSAN_OPTIONS"] = "log_path=stderr:print_stacktrace=1"
         if self.env is not None:
             full_env.update(self.env)
 
@@ -59,23 +63,26 @@ class SQLiteWorker:
         self, stream: asyncio.StreamReader, sentinel: bytes
     ) -> tuple[bytes, bool]:
         # TODO: use readuntil instead
-        chunks: list[bytes] = []
-        while True:
-            # TODO: handle StreamOverrunError
-            line = await stream.read(65535)
-            if not line:
-                return b"".join(chunks), False
-            if sentinel in line:
-                chunks.append(line)
-                return b"".join(chunks), True
-            else:
-                chunks.append(line)
+        # buffer = bytearray()
+        # while True:
+        #     chunk = await stream.read(65535)
+        #     if not chunk:
+        #         return bytes(buffer), False
+        #     buffer.extend(chunk)
+        #     if sentinel in buffer:
+        #         return bytes(buffer), True
+        try:
+            data = await stream.readuntil(sentinel)
+            return data, True
+        except asyncio.IncompleteReadError as e:
+            return e.partial, False
+        except asyncio.LimitOverrunError as e:
+            data = await stream.read(e.consumed)
+            return data, False
 
-    async def execute(self, query: str, timeout_sec: float = 1.) -> TestCapture:
+    async def execute(self, query: str, timeout_sec: float = 1.0) -> TestCapture:
         if self.proc is None or self.proc.returncode is not None:
             await self._start()
-
-        _ = await self.reset()
 
         stdout_stream: asyncio.StreamReader = self.proc.stdout
         stderr_stream: asyncio.StreamReader = self.proc.stderr
@@ -213,11 +220,25 @@ class SQLiteWorker:
                 exec_time=exec_time,
                 is_hang_or_crash="CRASH",
             )
+        finally:
+            await self.reset()
 
     async def reset(self) -> None:
         if self.proc is not None and self.proc.returncode is None:
-            self.proc.stdin.write(f".open {self.db_path}\n".encode())
+            marker = f"__RESET_{next(self._reset_counter)}__".encode()
+            reset_cmd = f".open {self.db_path}\n.bail off\n.log off\n.output stderr\n.print {marker.decode()}\n.output stdout\n.print {marker.decode()}\n"
+            self.proc.stdin.write(reset_cmd.encode())
             await self.proc.stdin.drain()
+            try:
+                _ = await asyncio.wait_for(
+                    asyncio.gather(
+                        self._read_until_sentinel(self.proc.stderr, marker),
+                        self._read_until_sentinel(self.proc.stdout, marker),
+                    ),
+                    timeout=0.5,
+                )
+            except asyncio.TimeoutError:
+                await self.hard_reset()
             self.clear_workdir_contents()
 
     async def hard_reset(self) -> None:

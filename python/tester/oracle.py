@@ -174,15 +174,12 @@ async def oracle_worker(incoming: asyncio.Queue[TestCapture | None], oracle_path
             if ref.exit_code != 0:
                 bug_type = "DIVERGENCE"
                 notes = f"Target exited 0 but reference exited {ref.exit_code}."
-            elif "random" in item.query or "PRIMARY KEY" in item.query:
+            elif "random" in item.query or "PRIMARY KEY" in item.query or "ANALYZE" in item.query:
                 pass
 
             elif normalize_output(ref.stdout) != normalize_output(item.stdout):
                 bug_type = "LOGIC_BUG"
                 notes = "Same exit code (0) but stdout differs (after normalization)."
-            elif ref.stdout != item.stdout:
-                bug_type = "LOGIC_BUG"
-                notes = "Same exit code (0) but stdout differs."
 
         if bug_type is not None:
             # hang, logic bug are often due to legit stuff like recursive CTE or random. do not care about different variation sof these
