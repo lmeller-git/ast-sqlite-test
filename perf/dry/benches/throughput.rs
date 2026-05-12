@@ -167,7 +167,7 @@ fn bench_fuzzer_throughput(c: &mut Criterion) {
     let (mut engine_full, shmem_queue, mut rng) = setup_engine_long(apply_default_long_ruleset);
     let mut epoch: u64 = 0;
 
-    group.bench_function("engine_full_long_aggressive", |b| {
+    group.bench_function("engine_full_long", |b| {
         b.iter(|| {
             let mut batch = engine_full.mutate_batch(batch_size);
 
@@ -200,7 +200,7 @@ fn bench_fuzzer_throughput(c: &mut Criterion) {
         setup_engine_long(apply_default_aggressive_ruleset);
     let mut epoch: u64 = 0;
 
-    group.bench_function("engine_full_long_generic", |b| {
+    group.bench_function("engine_full_long_aggressive", |b| {
         b.iter(|| {
             let mut batch = engine_full.mutate_batch(batch_size);
 
