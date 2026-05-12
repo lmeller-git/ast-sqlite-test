@@ -29,6 +29,8 @@ impl MutationStrategy for RecursiveExpandExpr {
             if rng.random_bool(self.chance_per_node)
                 && let Ok(mut json_node) = serde_json::to_value(&expr)
             {
+                prune_depth(&mut json_node, self.max_depth);
+
                 let root_node = json_node.clone();
 
                 let serde_json::Value::Object(json_object) = &mut json_node else {
@@ -88,6 +90,7 @@ fn expand_recursive(
     }
     let key = &expandable_fields[rng.random_range(..expandable_fields.len())];
     if let Some(slot) = node.get_mut(key) {
+        // replace a nested subtree of root with root
         *slot = root.clone();
         if let serde_json::Value::Object(inner_map) = slot {
             expand_recursive(
@@ -98,6 +101,21 @@ fn expand_recursive(
                 chance_per_level,
                 rng,
             );
+        }
+    }
+}
+
+fn prune_depth(v: &mut serde_json::Value, depth: usize) {
+    if depth == 0 {
+        if let serde_json::Value::Object(m) = v {
+            // no need to prune arrays, as only the Object path is expanded
+            m.clear()
+        }
+        return;
+    }
+    if let serde_json::Value::Object(m) = v {
+        for val in m.values_mut() {
+            prune_depth(val, depth - 1);
         }
     }
 }

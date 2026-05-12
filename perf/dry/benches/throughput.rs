@@ -2,6 +2,8 @@ use std::{hint::black_box, sync::Arc};
 
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use dry::{
+    apply_default_aggressive_ruleset,
+    apply_default_generic_ruleset,
     apply_default_long_ruleset,
     apply_default_short_ruleset,
     short_running_config,
@@ -64,7 +66,7 @@ fn setup_engine_short() -> (Engine, SharedMemHandle, SmallRng) {
     (engine, shmem_queue, rng)
 }
 
-fn setup_engine_long() -> (Engine, SharedMemHandle, SmallRng) {
+fn setup_engine_long(strat: impl Fn(&mut Engine)) -> (Engine, SharedMemHandle, SmallRng) {
     let scheduler_body = Arc::new(MABBody::new());
     let scheduler = SchedulerBatcher::new(Box::new(FastProbabilisticMABScheduler::new(
         scheduler_body.clone(),
@@ -88,7 +90,7 @@ fn setup_engine_long() -> (Engine, SharedMemHandle, SmallRng) {
     )
     .silent();
 
-    apply_default_long_ruleset(&mut engine);
+    strat(&mut engine);
 
     engine.populate(vec![Box::new(SeedDirReader::new("../../seeds".into()))]);
 
@@ -151,7 +153,7 @@ fn bench_fuzzer_throughput(c: &mut Criterion) {
     drop(engine_full);
     drop(shmem_queue);
 
-    let (mut engine_mut, _, _) = setup_engine_long();
+    let (mut engine_mut, _, _) = setup_engine_long(apply_default_long_ruleset);
     group.bench_function("mutate_only_long", |b| {
         b.iter(|| {
             let batch = engine_mut.mutate_batch(batch_size);
@@ -162,10 +164,75 @@ fn bench_fuzzer_throughput(c: &mut Criterion) {
     drop(engine_mut);
 
     // full engien (chore, corpus, ...)
-    let (mut engine_full, shmem_queue, mut rng) = setup_engine_long();
+    let (mut engine_full, shmem_queue, mut rng) = setup_engine_long(apply_default_long_ruleset);
     let mut epoch: u64 = 0;
 
-    group.bench_function("engine_full_long", |b| {
+    group.bench_function("engine_full_long_aggressive", |b| {
+        b.iter(|| {
+            let mut batch = engine_full.mutate_batch(batch_size);
+
+            for item in batch.drain(..) {
+                virtual_run_test(item, &mut engine_full, &shmem_queue, &mut rng);
+            }
+
+            epoch += 1;
+            if epoch.is_multiple_of(2000) {
+                engine_full.chore();
+            }
+        })
+    });
+
+    drop(engine_full);
+    drop(shmem_queue);
+
+    let (mut engine_mut, _, _) = setup_engine_long(apply_default_aggressive_ruleset);
+    group.bench_function("mutate_only_long_aggressive", |b| {
+        b.iter(|| {
+            let batch = engine_mut.mutate_batch(batch_size);
+            black_box(batch);
+        })
+    });
+
+    drop(engine_mut);
+
+    // full engien (chore, corpus, ...)
+    let (mut engine_full, shmem_queue, mut rng) =
+        setup_engine_long(apply_default_aggressive_ruleset);
+    let mut epoch: u64 = 0;
+
+    group.bench_function("engine_full_long_generic", |b| {
+        b.iter(|| {
+            let mut batch = engine_full.mutate_batch(batch_size);
+
+            for item in batch.drain(..) {
+                virtual_run_test(item, &mut engine_full, &shmem_queue, &mut rng);
+            }
+
+            epoch += 1;
+            if epoch.is_multiple_of(2000) {
+                engine_full.chore();
+            }
+        })
+    });
+
+    drop(engine_full);
+    drop(shmem_queue);
+
+    let (mut engine_mut, _, _) = setup_engine_long(apply_default_generic_ruleset);
+    group.bench_function("mutate_only_long_generic", |b| {
+        b.iter(|| {
+            let batch = engine_mut.mutate_batch(batch_size);
+            black_box(batch);
+        })
+    });
+
+    drop(engine_mut);
+
+    // full engien (chore, corpus, ...)
+    let (mut engine_full, shmem_queue, mut rng) = setup_engine_long(apply_default_generic_ruleset);
+    let mut epoch: u64 = 0;
+
+    group.bench_function("engine_full_long_generic", |b| {
         b.iter(|| {
             let mut batch = engine_full.mutate_batch(batch_size);
 

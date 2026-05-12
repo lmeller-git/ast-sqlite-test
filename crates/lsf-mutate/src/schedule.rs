@@ -116,7 +116,7 @@ impl MutationStrategy for MABScheduler {
         parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<MutationState, MutationError> {
-        const ACCEPT_UNDER: u32 = 50;
+        const ACCEPT_UNDER: u32 = 10;
         let current_epoch = self.body.epoch.load(std::sync::atomic::Ordering::Relaxed);
         let mut acc = Vec::new();
 
@@ -157,5 +157,39 @@ impl MutationStrategy for MABScheduler {
         } else {
             Ok(MutationState::Unchanged)
         }
+    }
+}
+
+pub struct Repeat {
+    pub up_to: usize,
+    pub inner: Box<dyn MutationStrategy>,
+}
+
+impl MutationStrategy for Repeat {
+    fn breed_inner(
+        &self,
+        child: &mut TestableEntry<RawEntry>,
+        parent_gen: &[TestableEntry<RawEntry>],
+        rng: &mut dyn rand::Rng,
+    ) -> Result<MutationState, MutationError> {
+        self.inner.breed(child, parent_gen, rng)
+    }
+
+    fn breed(
+        &self,
+        child: &mut TestableEntry<RawEntry>,
+        parent_gen: &[TestableEntry<RawEntry>],
+        rng: &mut dyn rand::Rng,
+    ) -> Result<MutationState, MutationError> {
+        let n = rng.random_range(1..=self.up_to);
+        let mut state = MutationState::Unchanged;
+
+        for _ in 0..n {
+            let s = self.breed_inner(child, parent_gen, rng)?;
+            if let MutationState::Mutated = s {
+                state = s;
+            }
+        }
+        Ok(state)
     }
 }

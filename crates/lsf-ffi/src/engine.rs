@@ -31,6 +31,7 @@ use lsf_mutate::{
     FieldOperation,
     HoistExpr,
     MutationStrategy,
+    NOOP,
     NullInject,
     NumericBounds,
     OperatorFlip,
@@ -38,6 +39,7 @@ use lsf_mutate::{
     Randomly,
     RecursiveExpandExpr,
     RelShuffle,
+    Repeat,
     SetOps,
     SpliceIn,
     SpliceOut,
@@ -508,7 +510,7 @@ impl StrategyBuilder {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (max_depth = 3, chance_per_node = 0.1, chance_per_level = 0.5))]
+    #[pyo3(signature = (max_depth = 3, chance_per_node = 0.2, chance_per_level = 0.5))]
     pub fn recursive_expand_expr(
         max_depth: usize,
         chance_per_node: f64,
@@ -522,7 +524,7 @@ impl StrategyBuilder {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (chance_per_node = 0.1))]
+    #[pyo3(signature = (chance_per_node = 0.2))]
     pub fn hoist_expr(chance_per_node: f64) -> Self {
         Self(Some(Box::new(HoistExpr { chance_per_node })))
     }
@@ -549,6 +551,19 @@ impl StrategyBuilder {
     #[staticmethod]
     pub fn arbitrary_expr_generator() -> Self {
         Self(Some(Box::new(ArbitraryGenerator::<Expr>::new())))
+    }
+
+    #[staticmethod]
+    pub fn repeat(mut rule: PyRefMut<StrategyBuilder>, up_to: usize) -> Self {
+        Self(Some(Box::new(Repeat {
+            up_to,
+            inner: rule.0.take().unwrap(),
+        })))
+    }
+
+    #[staticmethod]
+    pub fn noop() -> Self {
+        Self(Some(Box::new(NOOP)))
     }
 }
 

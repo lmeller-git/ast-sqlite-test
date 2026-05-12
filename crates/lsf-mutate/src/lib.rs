@@ -82,6 +82,19 @@ pub enum MutationError {
     ASTSHARED,
 }
 
+pub struct NOOP;
+
+impl MutationStrategy for NOOP {
+    fn breed_inner(
+        &self,
+        _child: &mut TestableEntry<RawEntry>,
+        _parent_gen: &[TestableEntry<RawEntry>],
+        _rng: &mut dyn Rng,
+    ) -> Result<MutationState, MutationError> {
+        Ok(MutationState::Unchanged)
+    }
+}
+
 #[cfg(test)]
 pub(crate) fn test_single_mutation(sql: &str, expected: &str, strategy: Box<dyn MutationStrategy>) {
     use rand::{SeedableRng, rngs::SmallRng};

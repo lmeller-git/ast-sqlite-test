@@ -313,7 +313,7 @@ impl SeedDirReader {
                 if let Ok(ast) = Parser::parse_sql(&SQLiteDialect {}, &buffer).inspect_err(|e| {
                     eprintln!(
                         "could not parse sql\n{}in file {}, due to {e:?}\n",
-                        &buffer,
+                        buffer,
                         path.display()
                     )
                 }) {

@@ -1,6 +1,8 @@
 use std::{sync::Arc, time::Instant};
 
 use dry::{
+    apply_default_aggressive_ruleset,
+    apply_default_generic_ruleset,
     apply_default_long_ruleset,
     apply_default_short_ruleset,
     short_running_config,
@@ -29,9 +31,9 @@ fn main() {
     let _profiler = dhat::Profiler::new_heap();
 
     println!("long config: ");
-    let (engine, shmem_queue) = setup_engine_long();
+    let (engine, shmem_queue) = setup_engine_long(apply_default_long_ruleset);
     perf_10k_rules(engine, shmem_queue);
-    let (engine, shmem_queue) = setup_engine_long();
+    let (engine, shmem_queue) = setup_engine_long(apply_default_long_ruleset);
     perf_10k_engine(engine, shmem_queue, true);
 
     println!("short config: ");
@@ -40,6 +42,18 @@ fn main() {
     let (engine, shmem_queue) = setup_engine_short();
     // no gc for short runs
     perf_10k_engine(engine, shmem_queue, false);
+
+    println!("aggressive config: ");
+    let (engine, shmem_queue) = setup_engine_long(apply_default_aggressive_ruleset);
+    perf_10k_rules(engine, shmem_queue);
+    let (engine, shmem_queue) = setup_engine_long(apply_default_aggressive_ruleset);
+    perf_10k_engine(engine, shmem_queue, true);
+
+    println!("generic config: ");
+    let (engine, shmem_queue) = setup_engine_long(apply_default_generic_ruleset);
+    perf_10k_rules(engine, shmem_queue);
+    let (engine, shmem_queue) = setup_engine_long(apply_default_generic_ruleset);
+    perf_10k_engine(engine, shmem_queue, true);
 
     // profile();
 }
@@ -141,7 +155,7 @@ fn setup_engine_short() -> (Engine, SharedMemHandle) {
     (engine, shmem_queue)
 }
 
-fn setup_engine_long() -> (Engine, SharedMemHandle) {
+fn setup_engine_long(strat: impl Fn(&mut Engine)) -> (Engine, SharedMemHandle) {
     let scheduler_body = Arc::new(MABBody::new());
     let scheduler = SchedulerBatcher::new(Box::new(FastProbabilisticMABScheduler::new(
         scheduler_body.clone(),
@@ -165,7 +179,7 @@ fn setup_engine_long() -> (Engine, SharedMemHandle) {
     )
     .silent();
 
-    apply_default_long_ruleset(&mut engine);
+    strat(&mut engine);
     engine.populate(vec![Box::new(SeedDirReader::new("../../seeds".into()))]);
 
     let snapshot = engine.snapshot();
