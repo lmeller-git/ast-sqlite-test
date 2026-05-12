@@ -10,6 +10,7 @@ use lsf_feedback::{
 use lsf_mutate::{
     ArbitraryGenerator,
     ExprShuffle,
+    ForceIdent,
     HoistExpr,
     MABScheduler,
     MutationStrategy,
@@ -87,12 +88,15 @@ pub fn apply_default_short_ruleset(engine: &mut Engine) {
         make_ruleset_semantic,
         make_ruleset_shuffle,
     ];
+
     for ruleset in strats {
         let body: Arc<MABBody> = MABBody::new().with_config(config.clone()).into();
         engine.add_mab_body(body.clone());
         engine.add_strategy(ruleset(body));
     }
-    engine.add_strategy(Box::new(Randomly::new(Box::new(TableGuard {}), 0.7)));
+
+    engine.add_strategy(Box::new(Randomly::new(Box::new(TableGuard {}), 0.6)));
+    engine.add_strategy(Box::new(Randomly::new(Box::new(ForceIdent), 0.1)));
 }
 
 pub fn apply_default_long_ruleset(engine: &mut Engine) {
@@ -104,12 +108,15 @@ pub fn apply_default_long_ruleset(engine: &mut Engine) {
         make_ruleset_reduce,
         make_ruleset_generate,
     ];
+
     for ruleset in strats {
         let body: Arc<MABBody> = MABBody::new().into();
         engine.add_mab_body(body.clone());
         engine.add_strategy(ruleset(body));
     }
-    engine.add_strategy(Box::new(Randomly::new(Box::new(TableGuard {}), 0.7)));
+
+    engine.add_strategy(Box::new(Randomly::new(Box::new(TableGuard {}), 0.6)));
+    engine.add_strategy(Box::new(Randomly::new(Box::new(ForceIdent), 0.1)));
 }
 
 pub fn apply_default_generic_ruleset(engine: &mut Engine) {
@@ -139,7 +146,8 @@ pub fn apply_default_generic_ruleset(engine: &mut Engine) {
     );
 
     engine.add_strategy(strat);
-    engine.add_strategy(Box::new(Randomly::new(Box::new(TableGuard {}), 0.7)));
+    engine.add_strategy(Box::new(Randomly::new(Box::new(TableGuard {}), 0.6)));
+    engine.add_strategy(Box::new(Randomly::new(Box::new(ForceIdent), 0.1)));
 }
 
 pub fn apply_default_aggressive_ruleset(engine: &mut Engine) {
@@ -172,7 +180,8 @@ pub fn apply_default_aggressive_ruleset(engine: &mut Engine) {
     );
 
     engine.add_strategy(strat);
-    engine.add_strategy(Box::new(Randomly::new(Box::new(TableGuard {}), 0.7)));
+    engine.add_strategy(Box::new(Randomly::new(Box::new(TableGuard {}), 0.6)));
+    engine.add_strategy(Box::new(Randomly::new(Box::new(ForceIdent), 0.1)));
 }
 
 pub fn make_ruleset_specific(body: Arc<MABBody>) -> Box<dyn MutationStrategy> {

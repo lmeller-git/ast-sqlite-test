@@ -29,6 +29,7 @@ use lsf_mutate::{
     ArbitraryGenerator,
     ExprShuffle,
     FieldOperation,
+    ForceIdent,
     HoistExpr,
     MutationStrategy,
     NOOP,
@@ -564,6 +565,11 @@ impl StrategyBuilder {
     #[staticmethod]
     pub fn noop() -> Self {
         Self(Some(Box::new(NOOP)))
+    }
+
+    #[staticmethod]
+    pub fn force_ident() -> Self {
+        Self(Some(Box::new(ForceIdent)))
     }
 }
 

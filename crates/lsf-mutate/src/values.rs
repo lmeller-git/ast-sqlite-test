@@ -6,11 +6,15 @@ use sqlparser::{
         BinaryOperator,
         DataType,
         Expr,
+        FunctionArg,
         Ident,
         ObjectNamePart,
+        ObjectNamePartFunction,
         Value,
         ValueWithSpan,
         visit_expressions_mut,
+        visit_relations,
+        visit_relations_mut,
     },
     tokenizer::Span,
 };
@@ -197,5 +201,64 @@ impl MutationStrategy for TypeCast {
         } else {
             Ok(crate::MutationState::Unchanged)
         }
+    }
+}
+
+pub struct ForceIdent;
+
+impl MutationStrategy for ForceIdent {
+    fn breed_inner(
+        &self,
+        child: &mut TestableEntry<RawEntry>,
+        _parent_gen: &[TestableEntry<RawEntry>],
+        rng: &mut dyn Rng,
+    ) -> Result<crate::MutationState, crate::MutationError> {
+        let Some(child_ast) = child.ast_mut() else {
+            return Err(crate::MutationError::ASTSHARED);
+        };
+
+        let mut relation = Vec::new();
+
+        _ = visit_relations(child_ast, |rel| {
+            if let Some(rel) = rel.0.last()
+                && let ObjectNamePart::Identifier(Ident { value, .. }) = rel
+            {
+                relation.push(value.clone());
+            }
+            std::ops::ControlFlow::Continue::<()>(())
+        });
+
+        if relation.is_empty() {
+            return Ok(crate::MutationState::Unchanged);
+        }
+
+        let rd_ident = &relation[rng.random_range(..relation.len())];
+
+        _ = visit_relations_mut(child_ast, |rel| {
+            for rel in rel.0.iter_mut() {
+                match rel {
+                    ObjectNamePart::Identifier(Ident { value, .. }) => *value = rd_ident.clone(),
+                    ObjectNamePart::Function(ObjectNamePartFunction {
+                        name: Ident { value, .. },
+                        args,
+                    }) => {
+                        *value = rd_ident.clone();
+                        for id in args.iter_mut() {
+                            if let FunctionArg::Named {
+                                name: Ident { value, .. },
+                                ..
+                            } = id
+                            {
+                                *value = rd_ident.clone()
+                            }
+                        }
+                    }
+                }
+            }
+
+            std::ops::ControlFlow::Continue::<()>(())
+        });
+
+        Ok(crate::MutationState::Mutated)
     }
 }

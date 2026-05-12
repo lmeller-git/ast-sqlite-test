@@ -162,7 +162,8 @@ async def main(args: Namespace):
                 sem_rule_scheduler_body,
                 increaser_body,
             ),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.7),
+            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.6),
+            engine.StrategyBuilder.randomize(engine.StrategyBuilder.force_ident(), 0.1)
         ]
     ]
 
