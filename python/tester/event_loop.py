@@ -45,7 +45,7 @@ async def fuzzing_loop(
                 with open(f"docker_out/queries/query_{total}.sql", "w") as f:
                     _ = f.write(entry.to_sql_string())
                     total += 1
-            elif eval_requirement:
+            elif eval_requirement and not is_done:
                 # break at 10k
                 is_done = True
                 print("Hit 10k queries")

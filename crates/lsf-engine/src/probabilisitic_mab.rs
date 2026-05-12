@@ -286,7 +286,7 @@ impl Schedule for FastProbabilisticMABScheduler {
         rng: &mut dyn rand::Rng,
     ) -> Vec<TestableEntry<lsf_core::entry::RawEntry>> {
         // it is not clear wether cachign is actually faster here, but its just a copy paste from above so whatever
-        const ACCEPT_UNDER: u32 = 50;
+        const ACCEPT_UNDER: u32 = 10;
 
         let current_epoch = self.body.epoch.load(std::sync::atomic::Ordering::Relaxed);
         let mut generation = Vec::with_capacity(size);

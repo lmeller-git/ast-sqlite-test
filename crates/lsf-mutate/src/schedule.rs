@@ -116,7 +116,7 @@ impl MutationStrategy for MABScheduler {
         parent_gen: &[TestableEntry<RawEntry>],
         rng: &mut dyn rand::Rng,
     ) -> Result<MutationState, MutationError> {
-        const ACCEPT_UNDER: u32 = 50;
+        const ACCEPT_UNDER: u32 = 10;
         let current_epoch = self.body.epoch.load(std::sync::atomic::Ordering::Relaxed);
         let mut acc = Vec::new();
 

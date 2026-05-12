@@ -6,7 +6,7 @@ import uvloop
 
 from lib_sf.lib_sf import TestableEntry
 from tester.event_loop import fuzzing_loop, N_ORACLES
-from tester.exec import CONCURRENCY_LIMIT, init, run_single_mutation
+from tester.exec import CONCURRENCY_LIMIT, init, run_single_mutation, return_rt_err_rate
 from tester.oracle import oracle_worker
 from tester.persistent_worker import SQLiteWorker
 from tester.rules import make_longrunning_ruleset, make_shortrunning_ruleset
@@ -152,7 +152,6 @@ async def main(args: Namespace):
                 sem_rule_scheduler_body,
                 increaser_body,
             ),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_name_guard(), 0.7),
             engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.7),
         ]
     ]
@@ -202,6 +201,7 @@ async def main(args: Namespace):
     duration = time.time() - now
     qpm = (10000.0 / duration) * 60.0
     print(f"qpm for complete pipeline: {qpm:.3f}")
+    print(f"runtime error rate is {return_rt_err_rate(10000):.3f}")
 
 
 def add(n1: int, n2: int) -> int:

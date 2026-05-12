@@ -114,6 +114,7 @@ async def oracle_worker(incoming: asyncio.Queue[TestCapture | None], oracle_path
         item = await incoming.get()
         if item is None:
             incoming.task_done()
+            await oracle_worker.close()
             return
 
         bug_type: str | None = None

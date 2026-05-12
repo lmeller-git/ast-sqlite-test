@@ -15,12 +15,14 @@ use lsf_mutate::{
     MutationStrategy,
     NumericBounds,
     OperatorFlip,
+    Randomly,
     RecursiveExpandExpr,
     RelShuffle,
     SetOps,
     SpliceIn,
     SpliceOut,
     SubQuery,
+    TableGuard,
     TreeMutator,
     TypeCast,
 };
@@ -88,6 +90,7 @@ pub fn apply_default_short_ruleset(engine: &mut Engine) {
         engine.add_mab_body(body.clone());
         engine.add_strategy(ruleset(body));
     }
+    engine.add_strategy(Box::new(Randomly::new(Box::new(TableGuard {}), 0.7)));
 }
 
 pub fn apply_default_long_ruleset(engine: &mut Engine) {
@@ -104,6 +107,7 @@ pub fn apply_default_long_ruleset(engine: &mut Engine) {
         engine.add_mab_body(body.clone());
         engine.add_strategy(ruleset(body));
     }
+    engine.add_strategy(Box::new(Randomly::new(Box::new(TableGuard {}), 0.7)));
 }
 
 pub fn make_ruleset_havoc(body: Arc<MABBody>) -> Box<dyn MutationStrategy> {

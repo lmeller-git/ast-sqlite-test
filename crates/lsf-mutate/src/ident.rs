@@ -56,13 +56,12 @@ impl MutationStrategy for TableNameScramble {
 
             _ = visit_relations_mut(stmt, |relation| {
                 let ObjectName(name_parts) = relation;
-                for part in name_parts {
-                    if let ObjectNamePart::Identifier(ident) = part {
-                        let random_choice = rng.random_range(..tables.len());
-                        ident.value = tables[random_choice].clone();
-                        child_is_mutated = true;
-                    }
+                if let Some(ObjectNamePart::Identifier(ident)) = name_parts.last_mut() {
+                    let random_choice = rng.random_range(..tables.len());
+                    ident.value = tables[random_choice].clone();
+                    child_is_mutated = true;
                 }
+
                 std::ops::ControlFlow::Continue::<()>(())
             });
         }
@@ -93,7 +92,9 @@ impl MutationStrategy for TableGuard {
             if let Statement::CreateTable(CreateTable { if_not_exists, .. })
             | Statement::CreateVirtualTable { if_not_exists, .. } = stmt
             {
-                mutation_occured = true;
+                if !*if_not_exists {
+                    mutation_occured = true;
+                }
                 *if_not_exists = true
             }
             std::ops::ControlFlow::Continue::<()>(())
