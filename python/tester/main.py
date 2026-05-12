@@ -6,6 +6,8 @@ import uvloop
 
 from lib_sf.lib_sf import TestableEntry
 from tester.event_loop import fuzzing_loop, N_ORACLES
+
+from tester.keyword_coverage import KeywordCoverageRecorder
 from tester.exec import CONCURRENCY_LIMIT, init, run_single_mutation, return_rt_err_rate
 from tester.oracle import oracle_worker
 from tester.persistent_worker import SQLiteWorker
@@ -15,6 +17,11 @@ RNG = 42
 
 
 async def main(args: Namespace):
+    keyword_coverage = (
+        KeywordCoverageRecorder(args.keyword_coverage_to, args.keyword_coverage_report_every)
+        if args.keyword_coverage_to is not None
+        else None
+    )
     if args.timeout_hours is not None:
         start_time = time.time()
         end_time = args.timeout_hours * 3600.0 + start_time
@@ -188,18 +195,23 @@ async def main(args: Namespace):
 
     now = time.time()
 
-    _ = await asyncio.gather(
-        fuzzing_loop(
-            mutation_engine,
-            ipc_queue,
-            oracle_queue,
-            args.stop_at,
-            None if args.timeout_hours is None else end_time,
-            args.test_path,
-            args.eval_requirement,
-        ),
-        *oracle_tasks,
-    )
+    try:
+        _ = await asyncio.gather(
+            fuzzing_loop(
+                mutation_engine,
+                ipc_queue,
+                oracle_queue,
+                args.stop_at,
+                None if args.timeout_hours is None else end_time,
+                args.test_path,
+                args.eval_requirement,
+                keyword_coverage,
+            ),
+            *oracle_tasks,
+        )
+    finally:
+        if keyword_coverage is not None:
+            keyword_coverage.close()
 
     duration = time.time() - now
     qpm = (10000.0 / duration) * 60.0
@@ -220,5 +232,7 @@ if __name__ == "__main__":
     _ = parser.add_argument("--oracle_path", default="/usr/bin/sqlite3-3.39.4")
     _ = parser.add_argument("--timeout_hours", default=None, type=float)
     _ = parser.add_argument("--eval_requirement", default=False, type=bool)
+    _ = parser.add_argument("--keyword_coverage_to", default=None, type=str)
+    _ = parser.add_argument("--keyword_coverage_report_every", default=1000, type=int)
     args = parser.parse_args()
     uvloop.run(main(args))

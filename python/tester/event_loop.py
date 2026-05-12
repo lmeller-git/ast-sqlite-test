@@ -3,6 +3,7 @@ import asyncio
 import time
 
 from lib_sf.lib_sf import TestableEntry
+from tester.keyword_coverage import KeywordCoverageRecorder
 from tester.exec import CONCURRENCY_LIMIT, run_single_mutation
 from tester.persistent_worker import SQLiteWorker, TestCapture
 
@@ -18,6 +19,7 @@ async def fuzzing_loop(
     stop_time: int | None,
     test_path: str,
     eval_requirement: bool = False,
+    keyword_coverage: KeywordCoverageRecorder | None = None,
 ):
     workers: dict[int, SQLiteWorker] = {}
     active_tasks: set[asyncio.Task[None]] = set()
@@ -30,7 +32,11 @@ async def fuzzing_loop(
     while True:
         if len(testable_queries) < QUERY_STASH / 2:
             batch = mutation_engine.mutate_batch(QUERY_STASH - len(testable_queries))
-            testable_queries += batch.into_members()
+            generated_queries = batch.into_members()
+            if keyword_coverage is not None:
+                for query in generated_queries:
+                    keyword_coverage.record(query.to_sql_string())
+            testable_queries += generated_queries
 
         to_spawn = CONCURRENCY_LIMIT - len(active_tasks)
 
@@ -49,6 +55,7 @@ async def fuzzing_loop(
                 # break at 10k
                 is_done = True
                 print("Hit 10k queries")
+                break
 
             if not is_done:
                 task = asyncio.create_task(
@@ -71,7 +78,10 @@ async def fuzzing_loop(
             or mutation_engine.corpus_size() >= stop_at
             or (stop_time is not None and time.time() >= stop_time)
         ):
-            print(f"Hit {mutation_engine.corpus_size()} queries")
+            if eval_requirement:
+                print(f"Hit {total} generated queries")
+            else:
+                print(f"Hit {mutation_engine.corpus_size()} queries")
             _ = await asyncio.gather(*active_tasks, return_exceptions=True)
             for worker in workers.values():
                 await worker.close()

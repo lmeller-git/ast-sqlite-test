@@ -1,0 +1,6 @@
+#! /bin/bash
+
+cd /app
+
+time setarch -R $(uname -m) just run-docker_ --seeds /app/seeds --save_to docker_out/queries --stop_at 10000 --eval_requirement true
+uv run python -m tester.keyword_coverage docker_out/queries --out docker_out/keyword_coverage
