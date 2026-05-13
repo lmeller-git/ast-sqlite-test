@@ -8,7 +8,7 @@ from tester.exec import CONCURRENCY_LIMIT, run_single_mutation
 from tester.persistent_worker import SQLiteWorker, TestCapture
 
 QUERY_STASH = CONCURRENCY_LIMIT * 8
-N_ORACLES = 4
+N_ORACLES = 8
 
 
 async def fuzzing_loop(
@@ -38,10 +38,7 @@ async def fuzzing_loop(
                     keyword_coverage.record(query.to_sql_string())
             testable_queries += generated_queries
 
-        to_spawn = CONCURRENCY_LIMIT - len(active_tasks)
-
-        if len(testable_queries) < to_spawn:
-            continue
+        to_spawn = min(CONCURRENCY_LIMIT - len(active_tasks), len(testable_queries))
 
         for _ in range(to_spawn):
             entry = testable_queries.pop()

@@ -39,8 +39,10 @@ class SQLiteWorker:
         if self.proc is not None:
             if self.proc.returncode is None:
                 self.proc.kill()
-
-            _ = await self.proc.wait()
+            try:
+                _ = await asyncio.wait_for(self.proc.wait(), 0.1)
+            except TimeoutError:
+                pass
             self.proc = None
 
         full_env = os.environ.copy()
@@ -107,7 +109,7 @@ class SQLiteWorker:
 
             # process died
             if not stdout_ok or not stderr_ok:
-                exit_code = await self.proc.wait()
+                exit_code = await asyncio.wait_for(self.proc.wait(), 0.2)
                 self.proc = None
                 return TestCapture(
                     stdout=stdout_bytes,

@@ -31,7 +31,7 @@ async def main(args: Namespace):
     max_edges = await init(args.test_path)
     print("found ", max_edges, " max_edges")
     ipc_queue = engine.IPCTokenQueue(CONCURRENCY_LIMIT, max_edges)
-    oracle_queue = asyncio.Queue(2048)
+    oracle_queue = asyncio.Queue(4096)
 
     scheduler_config = engine.MABConfig.new_default()
 

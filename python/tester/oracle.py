@@ -116,102 +116,103 @@ async def oracle_worker(incoming: asyncio.Queue[TestCapture | None], oracle_path
             incoming.task_done()
             await oracle_worker.close()
             return
+        try:
+            bug_type: str | None = None
+            notes: str = ""
+            ref: TestCapture | None = None
 
-        bug_type: str | None = None
-        notes: str = ""
-        ref: TestCapture | None = None
+            normalized_item_stderr = normalize_output(item.stderr)
 
-        normalized_item_stderr = normalize_output(item.stderr)
-
-        # hang, logic bug are often due to legit stuff like recursive CTE or random. do not care about different variation sof these
-        if item.exit_code == 42:
-            query = get_structural_signature(item.query)
-        else:
-            query = item.query
-        # Create a signature that includes normalized stderr and a hash of the query for better deduplication
-        query_hash = hashlib.md5(query.encode()).hexdigest().encode()
-        signature = normalized_item_stderr + b"|" + query_hash
-        if signature in seen_signatures:
-            incoming.task_done()
-            continue
-        seen_signatures.add(signature)
-
-        if is_unconditional_bug(item):
-            bug_type = "MEMSAFETY"
-
-        # annotated by exec
-        elif item.exit_code == 42:
-            ref = await oracle_worker.execute(item.query)
-            if ref.exit_code != 42:
-                bug_type = "HANG"
-                notes = "Reference completed the query without timeout"
-
-        elif is_interesting_unilateral(item):
-            ref = await oracle_worker.execute(item.query)
-            if not is_interesting_unilateral(ref):
-                bug_type = "INTERNAL_ERROR"
-                notes = "Reference did not produce an internal/corrupt error."
-
-        elif item.exit_code != 0:
-            ref = await oracle_worker.execute(item.query)
-
-            if ref.exit_code == 0:
-                bug_type = "CRASH_OR_ERROR"
-                notes = f"Reference exited 0; target exited {item.exit_code}."
-            else:
-                if is_expected_error(item) and is_expected_error(ref):
-                    pass
-                elif (
-                    normalized_item_stderr.split(b"\n")[0]
-                    != normalize_output(ref.stderr).split(b"\n")[0]
-                ):
-                    bug_type = "DIVERGENCE"
-                    notes = "Both errored, but with different messages (after normalization)."
-
-        elif item.exit_code == 0:
-            ref = await oracle_worker.execute(item.query)
-
-            if ref.exit_code != 0:
-                bug_type = "DIVERGENCE"
-                notes = f"Target exited 0 but reference exited {ref.exit_code}."
-            elif "random" in item.query or "PRIMARY KEY" in item.query or "ANALYZE" in item.query:
-                pass
-
-            elif normalize_output(ref.stdout) != normalize_output(item.stdout):
-                bug_type = "LOGIC_BUG"
-                notes = "Same exit code (0) but stdout differs (after normalization)."
-
-        if bug_type is not None:
             # hang, logic bug are often due to legit stuff like recursive CTE or random. do not care about different variation sof these
-            if bug_type == "LOGIC_BUG":
+            if item.exit_code == 42:
                 query = get_structural_signature(item.query)
-                query_hash = hashlib.md5(query.encode()).hexdigest().encode()
-                signature = normalized_item_stderr + b"|" + query_hash
-                if signature in seen_signatures:
-                    incoming.task_done()
-                    continue
-                seen_signatures.add(signature)
-
-            filename = f"docker_out/crashes/bug_{query_hash.hex()}_{bug_type}.txt"
-            if os.path.exists(filename):
-                incoming.task_done()
+            else:
+                query = item.query
+            # Create a signature that includes normalized stderr and a hash of the query for better deduplication
+            query_hash = hashlib.md5(query.encode()).hexdigest().encode()
+            signature = normalized_item_stderr + b"|" + query_hash
+            if signature in seen_signatures:
                 continue
-            print(f"[!] {bug_type} — saving to {filename}", flush=True)
+            seen_signatures.add(signature)
 
-            ref_block = ""
-            if ref is not None:
-                ref_block = f"\n--- Reference (/usr/bin/sqlite3-3.39.4) ---\n{ref}"
-            try:
-                with open(filename, "x", encoding="utf-8") as f:
-                    _ = f.write(
-                        f"{bug_type} REPORT\n\
-                        Notes: {notes}\n\n\
-                        Query:\n{item.query}\n\
-                        {ref_block}\n\
-                        --- Found (sqlite3_guarded) ---\n{item}"
-                    )
-            except FileExistsError:
-                # Another worker finished the same bug just before us
-                pass
+            if is_unconditional_bug(item):
+                bug_type = "MEMSAFETY"
 
-        incoming.task_done()
+            # annotated by exec
+            elif item.exit_code == 42:
+                ref = await oracle_worker.execute(item.query)
+                if ref.exit_code != 42:
+                    bug_type = "HANG"
+                    notes = "Reference completed the query without timeout"
+
+            elif is_interesting_unilateral(item):
+                ref = await oracle_worker.execute(item.query)
+                if not is_interesting_unilateral(ref):
+                    bug_type = "INTERNAL_ERROR"
+                    notes = "Reference did not produce an internal/corrupt error."
+
+            elif item.exit_code != 0:
+                ref = await oracle_worker.execute(item.query)
+
+                if ref.exit_code == 0:
+                    bug_type = "CRASH_OR_ERROR"
+                    notes = f"Reference exited 0; target exited {item.exit_code}."
+                else:
+                    if is_expected_error(item) and is_expected_error(ref):
+                        pass
+                    elif (
+                        normalized_item_stderr.split(b"\n")[0]
+                        != normalize_output(ref.stderr).split(b"\n")[0]
+                    ):
+                        bug_type = "DIVERGENCE"
+                        notes = "Both errored, but with different messages (after normalization)."
+
+            elif item.exit_code == 0:
+                ref = await oracle_worker.execute(item.query)
+
+                if ref.exit_code != 0:
+                    bug_type = "DIVERGENCE"
+                    notes = f"Target exited 0 but reference exited {ref.exit_code}."
+                elif (
+                    "random" in item.query or "PRIMARY KEY" in item.query or "ANALYZE" in item.query
+                ):
+                    pass
+
+                elif normalize_output(ref.stdout) != normalize_output(item.stdout):
+                    bug_type = "LOGIC_BUG"
+                    notes = "Same exit code (0) but stdout differs (after normalization)."
+
+            if bug_type is not None:
+                # hang, logic bug are often due to legit stuff like recursive CTE or random. do not care about different variation sof these
+                if bug_type == "LOGIC_BUG":
+                    query = get_structural_signature(item.query)
+                    query_hash = hashlib.md5(query.encode()).hexdigest().encode()
+                    signature = normalized_item_stderr + b"|" + query_hash
+                    if signature in seen_signatures:
+                        continue
+                    seen_signatures.add(signature)
+
+                filename = f"docker_out/crashes/bug_{query_hash.hex()}_{bug_type}.txt"
+                if os.path.exists(filename):
+                    continue
+                print(f"[!] {bug_type} — saving to {filename}", flush=True)
+
+                ref_block = ""
+                if ref is not None:
+                    ref_block = f"\n--- Reference (/usr/bin/sqlite3-3.39.4) ---\n{ref}"
+                try:
+                    with open(filename, "x", encoding="utf-8") as f:
+                        _ = f.write(
+                            f"{bug_type} REPORT\n\
+                            Notes: {notes}\n\n\
+                            Query:\n{item.query}\n\
+                            {ref_block}\n\
+                            --- Found (sqlite3_guarded) ---\n{item}"
+                        )
+                except FileExistsError:
+                    # Another worker finished the same bug just before us
+                    pass
+        except Exception as e:
+            print(f"exception in oracle: {e}")
+        finally:
+            incoming.task_done()
