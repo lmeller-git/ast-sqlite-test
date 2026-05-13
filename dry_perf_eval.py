@@ -17,9 +17,18 @@ import argparse
 import numpy as np
 
 QPM_RE = re.compile(r"queries per minute from 10k for (\w+):\s*([\d.]+)")
-CONFIG_RE = re.compile(r"^(long|short) config:")
+CONFIG_RE = re.compile(r"^(long|short|aggressive|generic) config:")
 
-METRICS = [("long", "rules"), ("long", "engine"), ("short", "rules"), ("short", "engine")]
+METRICS = [
+    ("long", "rules"),
+    ("long", "engine"),
+    ("short", "rules"),
+    ("short", "engine"),
+    ("aggressive", "rules"),
+    ("aggressive", "engine"),
+    ("generic", "rules"),
+    ("generic", "engine"),
+]
 
 
 def stats(values: list[float]) -> dict[str, float]:
@@ -92,7 +101,7 @@ def main() -> None:
         description="Run a command N times and summarise QPM stats for all four configs."
     )
     _ = parser.add_argument("cmd", help="Command to execute (quote the whole string)")
-    _ = parser.add_argument("--n", type=int, help="Number of runs", default = 10)
+    _ = parser.add_argument("--n", type=int, help="Number of runs", default=10)
     args = parser.parse_args()
 
     print(f"Command : {args.cmd}")
