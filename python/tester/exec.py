@@ -3,7 +3,7 @@ import re
 
 from lib_sf.lib_sf import RejectionReason, TestOutcome, TestableEntry
 from lib_sf import engine
-from tester.oracle import is_expected_error
+from tester.oracle import is_expected_error, is_unconditional_bug
 from tester.persistent_worker import SQLiteWorker, TestCapture
 
 CONCURRENCY_LIMIT = 16
@@ -39,18 +39,15 @@ async def run_single_mutation(
         sql_str = entry.to_sql_string()
         capture = await worker.execute(sql_str, 1.0 + 0.1 * len(sql_str) / 1000)
         is_hang = (
-            capture.exit_code is not None
-            and capture.exit_code == 42
-            or capture.is_hang_or_crash == "HANG"
-        )
+            capture.exit_code is not None and capture.exit_code == 42
+        ) or capture.is_hang_or_crash == "HANG"
         is_crash = (
             (not is_hang and capture.exit_code is not None and capture.exit_code != 0)
-            or b"AddressSanitizer" in capture.stderr
-            or b"Assertion" in capture.stderr
-            or capture.is_hang_or_crash == "CRASH"
+            or capture.is_hang_or_crash == "crash"
+            or is_unconditional_bug(capture)
         )
 
-        is_syntax_err = is_expected_error(capture)
+        is_syntax_err = not is_crash and not is_hang and is_expected_error(capture)
 
         test_result = engine.TestResult(capture.exec_time, len(capture.query), token)
 
@@ -64,6 +61,7 @@ async def run_single_mutation(
             ipc_queue.send(test_result.token)
         elif is_syntax_err:
             rt_error_count += 1
+            # TODO maybe only discourage sytax errors, not ALL runtime errors
             entry.fire_hooks(TestOutcome.rejected(RejectionReason.invalid_syntax()), test_result)
             ipc_queue.send(test_result.token)
         else:

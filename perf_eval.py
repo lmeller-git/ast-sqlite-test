@@ -70,8 +70,8 @@ def run_once(cmd: str, run_idx: int, total: int) -> tuple[float | None, float | 
     )
 
     for line in proc.stdout:
-        sys.stdout.write(line)
-        sys.stdout.flush()
+        # sys.stdout.write(line)
+        # sys.stdout.flush()
 
         m = COV_RE.search(line)
         if m:

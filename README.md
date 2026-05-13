@@ -2,16 +2,23 @@
 Project 1 for the course "Automated Software Testing" at ETHZ Spring 2026
 
 ## Usage
+The course requirement run (up to 10000 queries) may be run using
+
+```bash
+  docker build -t ast-sqlite-fuzzer . &&
+  docker run --security-opt seccomp=unconfined -v $(pwd)/docker_out:/app/docker_out --init --rm ast-sqlite-fuzzer /usr/bin/test-db
+```
+
 To run on your machine:
 
 ```bash
-just run
+  just run
 ```
 
 To run in a docker container:
 
 ```bash
-just run-docker
+  just run-docker
 ```
 
 This will build a docker container and execute `test-db-internal` inside it
