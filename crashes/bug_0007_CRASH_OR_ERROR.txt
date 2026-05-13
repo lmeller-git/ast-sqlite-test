@@ -1,0 +1,47 @@
+CRASH_OR_ERROR REPORT
+                    Notes: Reference exited 0; target exited 1.
+
+                    Query:
+CREATE TABLE IF NOT EXISTS t1 (w INT GENERATED ALWAYS AS (CAST(1 AS NUMERIC)), x TEXT, y TEXT, a INT, b TEXT, c ANY);CREATE TABLE IF NOT EXISTS t0 (c0 PRIMARY KEY, c1, c2 AS (CAST(1 AS NUMERIC) - c3) REFERENCES t0, c3);PRAGMA foreign_keys = 'ON';CREATE TABLE IF NOT EXISTS t1 (x INTEGER PRIMARY KEY);INSERT INTO t0 VALUES (CAST('1000000 10' AS TEXT), NULL, NULL), (NULL, NULL, CAST(NULL AS NUMERIC));UPDATE t0 SET c1 = CAST('count.test cases for NOT INDEXED' AS REAL), c3 = c0;INSERT INTO t1 (a, b, c) VALUES (CAST(NULL AS NUMERIC), CAST('abcdef' AS REAL), NULL), ('abcdef', NULL, NULL);SELECT NULL, CAST(NULL AS BOOLEAN), y, '|' FROM t1 ORDER BY CAST(NULL AS BOOLEAN);SELECT *, CAST(NULL AS NUMERIC) FROM t0 ORDER BY +c0
+                    
+--- Reference (/usr/bin/sqlite3-3.39.4) ---
+TestCapture {
+stdout: ||||
+||||
+|0.0|||
+1000000 10|0.0|-999999|1000000 10|
+
+stdserr: 
+exit_code: 0
+exec_time:280700
+query: CREATE TABLE IF NOT EXISTS t1 (w INT GENERATED ALWAYS AS (CAST(1 AS NUMERIC)), x TEXT, y TEXT, a INT, b TEXT, c ANY);CREATE TABLE IF NOT EXISTS t0 (c0 PRIMARY KEY, c1, c2 AS (CAST(1 AS NUMERIC) - c3) REFERENCES t0, c3);PRAGMA foreign_keys = 'ON';CREATE TABLE IF NOT EXISTS t1 (x INTEGER PRIMARY KEY);INSERT INTO t0 VALUES (CAST('1000000 10' AS TEXT), NULL, NULL), (NULL, NULL, CAST(NULL AS NUMERIC));UPDATE t0 SET c1 = CAST('count.test cases for NOT INDEXED' AS REAL), c3 = c0;INSERT INTO t1 (a, b, c) VALUES (CAST(NULL AS NUMERIC), CAST('abcdef' AS REAL), NULL), ('abcdef', NULL, NULL);SELECT NULL, CAST(NULL AS BOOLEAN), y, '|' FROM t1 ORDER BY CAST(NULL AS BOOLEAN);SELECT *, CAST(NULL AS NUMERIC) FROM t0 ORDER BY +c0
+}
+                    --- Found (sqlite3_guarded) ---
+TestCapture {
+stdout: 
+stdserr: UndefinedBehaviorSanitizer:DEADLYSIGNAL
+==2012304==ERROR: UndefinedBehaviorSanitizer: SEGV on unknown address 0x00000000007f (pc 0x7f59aef5d8d8 bp 0x000000000001 sp 0x7ffecb0bb8b8 T2012304)
+==2012304==The signal is caused by a READ memory access.
+==2012304==Hint: address points to the zero page.
+    #0 0x7f59aef5d8d8  (/lib/x86_64-linux-gnu/libc.so.6+0x1ae8d8) (BuildId: 095c7ba148aeca81668091f718047078d57efddb)
+    #1 0x55cd11d42d36 in vdbeRecordCompareString sqlite3.c
+    #2 0x55cd11d33178 in sqlite3BtreeIndexMoveto sqlite3.c
+    #3 0x55cd11d1b024 in sqlite3VdbeExec sqlite3.c
+    #4 0x55cd11caad71 in sqlite3_step (/home/test/sqlite3-src/build/sqlite3+0x54d71) (BuildId: c83ed9f0fa1d5c8a3c52dd8e324103c801ffd639)
+    #5 0x55cd11f4eb7a in exec_prepared_stmt shell.c
+    #6 0x55cd11f2dc7b in shell_exec shell.c
+    #7 0x55cd11f52485 in runOneSqlLine shell.c
+    #8 0x55cd11f2e59c in process_input shell.c
+    #9 0x55cd11f1e4da in main (/home/test/sqlite3-src/build/sqlite3+0x2c84da) (BuildId: c83ed9f0fa1d5c8a3c52dd8e324103c801ffd639)
+    #10 0x7f59aedd8d8f  (/lib/x86_64-linux-gnu/libc.so.6+0x29d8f) (BuildId: 095c7ba148aeca81668091f718047078d57efddb)
+    #11 0x7f59aedd8e3f in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x29e3f) (BuildId: 095c7ba148aeca81668091f718047078d57efddb)
+    #12 0x55cd11c70984 in _start (/home/test/sqlite3-src/build/sqlite3+0x1a984) (BuildId: c83ed9f0fa1d5c8a3c52dd8e324103c801ffd639)
+
+UndefinedBehaviorSanitizer can not provide additional info.
+SUMMARY: UndefinedBehaviorSanitizer: SEGV (/lib/x86_64-linux-gnu/libc.so.6+0x1ae8d8) (BuildId: 095c7ba148aeca81668091f718047078d57efddb) 
+==2012304==ABORTING
+
+exit_code: 1
+exec_time:85707338
+query: CREATE TABLE IF NOT EXISTS t1 (w INT GENERATED ALWAYS AS (CAST(1 AS NUMERIC)), x TEXT, y TEXT, a INT, b TEXT, c ANY);CREATE TABLE IF NOT EXISTS t0 (c0 PRIMARY KEY, c1, c2 AS (CAST(1 AS NUMERIC) - c3) REFERENCES t0, c3);PRAGMA foreign_keys = 'ON';CREATE TABLE IF NOT EXISTS t1 (x INTEGER PRIMARY KEY);INSERT INTO t0 VALUES (CAST('1000000 10' AS TEXT), NULL, NULL), (NULL, NULL, CAST(NULL AS NUMERIC));UPDATE t0 SET c1 = CAST('count.test cases for NOT INDEXED' AS REAL), c3 = c0;INSERT INTO t1 (a, b, c) VALUES (CAST(NULL AS NUMERIC), CAST('abcdef' AS REAL), NULL), ('abcdef', NULL, NULL);SELECT NULL, CAST(NULL AS BOOLEAN), y, '|' FROM t1 ORDER BY CAST(NULL AS BOOLEAN);SELECT *, CAST(NULL AS NUMERIC) FROM t0 ORDER BY +c0
+}

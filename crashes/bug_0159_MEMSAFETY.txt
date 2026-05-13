@@ -1,0 +1,38 @@
+MEMSAFETY REPORT
+                    Notes: 
+
+                    Query:
+PRAGMA foreign_keys = 'ON';CREATE TABLE t1 (x INTEGER PRIMARY KEY);INSERT INTO t1 VALUES (CAST(NULL AS BLOB));INSERT INTO t1 VALUES (NULL);CREATE TABLE t2 (y INTEGER REFERENCES t1 (x));INSERT INTO t2 VALUES (NULL);DROP TABLE IF EXISTS t1;CREATE TABLE t1 (w INT GENERATED ALWAYS AS (1), x TEXT, y TEXT, a INT, b TEXT, c ANY);CREATE TABLE t0 (c0 PRIMARY KEY, c1, c2 AS (c0 + CAST(c1 AS BOOLEAN) - CAST(c3 AS NUMERIC)) REFERENCES t0, c3);INSERT INTO t0 VALUES (CAST(9223372036854775807 AS TEXT), CAST(0 AS REAL), NULL), (CAST(NULL AS REAL), 5, CAST(5 AS BOOLEAN));UPDATE t0 SET c1 = c0, c3 = c0;INSERT INTO t1 (a, b, c) VALUES (CAST(1 AS TEXT), CAST('abcdef' AS INTEGER), 5.5), (0, CAST('cantaloupe' AS INTEGER), NULL);SELECT w, NULL, CAST(NULL AS BOOLEAN), NULL FROM t1 ORDER BY CAST(NULL AS REAL);CREATE TABLE t1 (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, PRIMARY KEY (CAST(a AS NUMERIC), b DESC)) WITHOUT ROWID;WITH RECURSIVE c (x) AS (VALUES (1) UNION ALL SELECT x - CAST(2147483647 AS NUMERIC) FROM c WHERE CAST(CAST(x AS TEXT) < CAST(100 AS BLOB) AS REAL)) INSERT INTO t1 (a, b, c, d) SELECT x % 10, x / NULL, CAST(x AS INTEGER), printf('xyz%dabc', NULL) FROM c;SELECT t3.c FROM (SELECT a, max(CAST(NULL AS TEXT)) AS m FROM t1 WHERE CAST(CAST(a AS REAL) >= 1 AS TEXT) GROUP BY CAST(NULL AS TEXT)) AS t2 JOIN t1 AS t3 WHERE t2.a <> CAST(t3.a AS NUMERIC) OR CAST(t2.m = t3.b AS INTEGER) ORDER BY CAST(t3.a AS TEXT);SELECT t3.c FROM (SELECT a, CAST(max(b) AS BLOB) AS m FROM t1 WHERE CAST(a AS INTEGER) > CAST(9223372036854775807 AS INTEGER) GROUP BY a) AS t2 CROSS JOIN t1 AS t3 WHERE t2.a = t3.a AND t2.m <> t3.b ORDER BY t3.a;SELECT CAST(t3.c AS NUMERIC) FROM (SELECT a, max(b) AS m FROM t1 WHERE a > CAST(5 AS BLOB) GROUP BY a) AS t2 LEFT JOIN t1 AS t3 WHERE t2.a <> CAST(t3.a AS BOOLEAN) OR CAST(t2.m = t3.b AS BLOB) ORDER BY t3.a;INSERT INTO t2 VALUES (NULL);INSERT INTO t2 (y) VALUES (CAST(NULL AS BOOLEAN)), (CAST(NULL AS BOOLEAN)), (CAST(NULL AS INTEGER));SELECT CAST(NULL AS BOOLEAN), CAST(x AS NUMERIC) FROM t1;SELECT CAST(-2147483648 AS REAL), CAST(NULL AS TEXT) FROM t2
+                    
+                    --- Found (sqlite3_guarded) ---
+TestCapture {
+stdout: 
+stdserr: =================================================================
+==2180233==ERROR: AddressSanitizer: negative-size-param: (size=-1094795586)
+    #0 0x564bc7aa88e5 in MemcmpInterceptorCommon(void*, int (*)(void const*, void const*, unsigned long), void const*, void const*, unsigned long) (/home/test/sqlite3-src/build/sqlite3+0xaf8e5) (BuildId: f7a71051bc2ccac392fe2933de5b9718f9e5cb82)
+    #1 0x564bc7aa8eb9 in memcmp (/home/test/sqlite3-src/build/sqlite3+0xafeb9) (BuildId: f7a71051bc2ccac392fe2933de5b9718f9e5cb82)
+    #2 0x564bc7cca2ac in vdbeRecordCompareString sqlite3.c
+    #3 0x564bc7ca1857 in sqlite3BtreeIndexMoveto sqlite3.c
+    #4 0x564bc7c6ba8b in sqlite3VdbeExec sqlite3.c
+    #5 0x564bc7b6700d in sqlite3_step (/home/test/sqlite3-src/build/sqlite3+0x16e00d) (BuildId: f7a71051bc2ccac392fe2933de5b9718f9e5cb82)
+    #6 0x564bc8184c90 in exec_prepared_stmt shell.c
+    #7 0x564bc8148787 in shell_exec shell.c
+    #8 0x564bc818b262 in runOneSqlLine shell.c
+    #9 0x564bc8149b33 in process_input shell.c
+    #10 0x564bc812b11b in main (/home/test/sqlite3-src/build/sqlite3+0x73211b) (BuildId: f7a71051bc2ccac392fe2933de5b9718f9e5cb82)
+    #11 0x7f60091ddd8f  (/lib/x86_64-linux-gnu/libc.so.6+0x29d8f) (BuildId: 095c7ba148aeca81668091f718047078d57efddb)
+    #12 0x7f60091dde3f in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x29e3f) (BuildId: 095c7ba148aeca81668091f718047078d57efddb)
+    #13 0x564bc7a8e464 in _start (/home/test/sqlite3-src/build/sqlite3+0x95464) (BuildId: f7a71051bc2ccac392fe2933de5b9718f9e5cb82)
+
+0x6210000498f5 is located 4085 bytes inside of 4368-byte region [0x621000048900,0x621000049a10)
+allocated by thread T0 here:
+    #0 0x564bc7b112ae in __interceptor_malloc (/home/test/sqlite3-src/build/sqlite3+0x1182ae) (BuildId: f7a71051bc2ccac392fe2933de5b9718f9e5cb82)
+    #1 0x564bc7f7b2fe in sqlite3MemMalloc sqlite3.c
+
+SUMMARY: AddressSanitizer: negative-size-param (/home/test/sqlite3-src/build/sqlite3+0xaf8e5) (BuildId: f7a71051bc2ccac392fe2933de5b9718f9e5cb82) in MemcmpInterceptorCommon(void*, int (*)(void const*, void const*, unsigned long), void const*, void const*, unsigned long)
+==2180233==ABORTING
+
+exit_code: 1
+exec_time:27532567
+query: PRAGMA foreign_keys = 'ON';CREATE TABLE t1 (x INTEGER PRIMARY KEY);INSERT INTO t1 VALUES (CAST(NULL AS BLOB));INSERT INTO t1 VALUES (NULL);CREATE TABLE t2 (y INTEGER REFERENCES t1 (x));INSERT INTO t2 VALUES (NULL);DROP TABLE IF EXISTS t1;CREATE TABLE t1 (w INT GENERATED ALWAYS AS (1), x TEXT, y TEXT, a INT, b TEXT, c ANY);CREATE TABLE t0 (c0 PRIMARY KEY, c1, c2 AS (c0 + CAST(c1 AS BOOLEAN) - CAST(c3 AS NUMERIC)) REFERENCES t0, c3);INSERT INTO t0 VALUES (CAST(9223372036854775807 AS TEXT), CAST(0 AS REAL), NULL), (CAST(NULL AS REAL), 5, CAST(5 AS BOOLEAN));UPDATE t0 SET c1 = c0, c3 = c0;INSERT INTO t1 (a, b, c) VALUES (CAST(1 AS TEXT), CAST('abcdef' AS INTEGER), 5.5), (0, CAST('cantaloupe' AS INTEGER), NULL);SELECT w, NULL, CAST(NULL AS BOOLEAN), NULL FROM t1 ORDER BY CAST(NULL AS REAL);CREATE TABLE t1 (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, PRIMARY KEY (CAST(a AS NUMERIC), b DESC)) WITHOUT ROWID;WITH RECURSIVE c (x) AS (VALUES (1) UNION ALL SELECT x - CAST(2147483647 AS NUMERIC) FROM c WHERE CAST(CAST(x AS TEXT) < CAST(100 AS BLOB) AS REAL)) INSERT INTO t1 (a, b, c, d) SELECT x % 10, x / NULL, CAST(x AS INTEGER), printf('xyz%dabc', NULL) FROM c;SELECT t3.c FROM (SELECT a, max(CAST(NULL AS TEXT)) AS m FROM t1 WHERE CAST(CAST(a AS REAL) >= 1 AS TEXT) GROUP BY CAST(NULL AS TEXT)) AS t2 JOIN t1 AS t3 WHERE t2.a <> CAST(t3.a AS NUMERIC) OR CAST(t2.m = t3.b AS INTEGER) ORDER BY CAST(t3.a AS TEXT);SELECT t3.c FROM (SELECT a, CAST(max(b) AS BLOB) AS m FROM t1 WHERE CAST(a AS INTEGER) > CAST(9223372036854775807 AS INTEGER) GROUP BY a) AS t2 CROSS JOIN t1 AS t3 WHERE t2.a = t3.a AND t2.m <> t3.b ORDER BY t3.a;SELECT CAST(t3.c AS NUMERIC) FROM (SELECT a, max(b) AS m FROM t1 WHERE a > CAST(5 AS BLOB) GROUP BY a) AS t2 LEFT JOIN t1 AS t3 WHERE t2.a <> CAST(t3.a AS BOOLEAN) OR CAST(t2.m = t3.b AS BLOB) ORDER BY t3.a;INSERT INTO t2 VALUES (NULL);INSERT INTO t2 (y) VALUES (CAST(NULL AS BOOLEAN)), (CAST(NULL AS BOOLEAN)), (CAST(NULL AS INTEGER));SELECT CAST(NULL AS BOOLEAN), CAST(x AS NUMERIC) FROM t1;SELECT CAST(-2147483648 AS REAL), CAST(NULL AS TEXT) FROM t2
+}

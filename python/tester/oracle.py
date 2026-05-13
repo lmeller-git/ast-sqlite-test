@@ -44,6 +44,7 @@ EXPECTED_SQL_STDERR_PATTERNS: list[bytes] = [
 UNCONDITIONAL_BUG_PATTERNS: list[bytes] = [
     b"AddressSanitizer",
     b"LeakSanitizer",
+    b"UndefinedBehaviorSanitizer",
     b"Assertion failed",
     b"SIGABRT",
     b"SIGSEGV",
