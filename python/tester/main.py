@@ -1,3 +1,4 @@
+import os
 import time
 from lib_sf import engine
 from argparse import ArgumentParser, Namespace
@@ -194,6 +195,9 @@ async def main(args: Namespace):
 
     print("\n===========\ninit done, entering loop\n==================\n")
 
+    if args.eval_requirement and args.save_to is not None:
+        os.mkdir(args.save_to)
+
     now = time.time()
 
     try:
@@ -207,6 +211,7 @@ async def main(args: Namespace):
                 args.test_path,
                 args.eval_requirement,
                 keyword_coverage,
+                args.save_to
             ),
             *oracle_tasks,
         )
