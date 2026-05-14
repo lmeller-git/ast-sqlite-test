@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 import asyncio
 from pathlib import Path
-import signal
+# import signal
 import time
 import os
 import tempfile
@@ -64,15 +64,6 @@ class SQLiteWorker:
     async def _read_until_sentinel(
         self, stream: asyncio.StreamReader, sentinel: bytes
     ) -> tuple[bytes, bool]:
-        # TODO: use readuntil instead
-        # buffer = bytearray()
-        # while True:
-        #     chunk = await stream.read(65535)
-        #     if not chunk:
-        #         return bytes(buffer), False
-        #     buffer.extend(chunk)
-        #     if sentinel in buffer:
-        #         return bytes(buffer), True
         try:
             data = await stream.readuntil(sentinel)
             return data, True
@@ -90,7 +81,7 @@ class SQLiteWorker:
         stderr_stream: asyncio.StreamReader = self.proc.stderr
 
         start_time = time.perf_counter_ns()
-        full_command = f"{query}\n;\n.output stderr\n.print {self.STDERR_SENTINEL.decode()}\n.output stdout\n.print {self.STDOUT_SENTINEL.decode()}\n"
+        full_command = f"\n;\n{query}\n;\n.output stderr\n.print {self.STDERR_SENTINEL.decode()}\n.output stdout\n.print {self.STDOUT_SENTINEL.decode()}\n"
 
         try:
             self.proc.stdin.write(full_command.encode())
@@ -133,18 +124,6 @@ class SQLiteWorker:
                     is_hang_or_crash="CRASH",
                 )
 
-            # process is alive, query ran
-            # need to restore a clean state via kill, since ATTACHED dbs dont get wiped on .open :memory:
-            # if "ATTACH" in query:
-            #     self.proc.kill()
-            #     _ = await self.proc.wait()
-            #     self.proc = None
-            #     for f in os.scandir(self.workdir):
-            #         try:
-            #             os.remove(f.path) if f.is_file() else shutil.rmtree(f.path)
-            #         except OSError:
-            #             pass
-
             return TestCapture(
                 stdout=stdout_bytes,
                 stderr=stderr_bytes,
@@ -155,46 +134,58 @@ class SQLiteWorker:
             )
 
         except asyncio.TimeoutError:
-            err_output = b""
-            try:
-                self.proc.send_signal(signal.SIGINT)
-            except ProcessLookupError:
-                # already dead
-                stdout_remaining, stderr_remaining = await self.proc.communicate()
-                exec_time = time.perf_counter_ns() - start_time
-                await self.hard_reset()
-
-                return TestCapture(
-                    stdout=stdout_remaining,
-                    stderr=stderr_remaining,
-                    exit_code=self.proc.returncode or -1,
-                    query=query,
-                    exec_time=exec_time,
-                    is_hang_or_crash="CRASH",
-                )
-
-            try:
-                err_output = await asyncio.wait_for(self.proc.stderr.readline(), timeout=0.1)
-                if b"interrupted" in err_output:
-                    # interrupted actual hang
-                    pass
-                else:
-                    # maybe it just finished on its own, or some other error
-                    await self.hard_reset()
-            except asyncio.TimeoutError:
-                # SIGINT did not work. likely because of an unclosed qoute upstream
-                #  migth want to reutnr sth indicating a syntax err instead TODO
-                await self.hard_reset()
-
+            # in theory SIGINT should be able to restore most hangs, however in practice we need to restart to prevent state leakage.
+            await self.hard_reset()
             exec_time = time.perf_counter_ns() - start_time
             return TestCapture(
                 stdout=b"",
-                stderr=b"EXECUTION TIMEOUT EXCEEDED, " + err_output,
+                stderr=b"EXECUTION TIMEOUT EXCEEDED",
                 exit_code=42,
                 query=query,
                 exec_time=exec_time,
                 is_hang_or_crash="HANG",
             )
+            # err_output = b""
+            # try:
+            #     self.proc.send_signal(signal.SIGINT)
+            # except ProcessLookupError:
+            #     # already dead
+            #     stdout_remaining, stderr_remaining = await self.proc.communicate()
+            #     exec_time = time.perf_counter_ns() - start_time
+            #     await self.hard_reset()
+
+            #     return TestCapture(
+            #         stdout=stdout_remaining,
+            #         stderr=stderr_remaining,
+            #         exit_code=self.proc.returncode or -1,
+            #         query=query,
+            #         exec_time=exec_time,
+            #         is_hang_or_crash="CRASH",
+            #     )
+
+            # try:
+            #     err_output = await asyncio.wait_for(self.proc.stderr.readline(), timeout=0.1)
+            #     if b"interrupted" in err_output:
+            #         # interrupted actual hang
+            #         await self.hard_reset()
+            #         pass
+            #     else:
+            #         # maybe it just finished on its own, or some other error
+            #         await self.hard_reset()
+            # except asyncio.TimeoutError:
+            #     # SIGINT did not work. likely because of an unclosed qoute upstream
+            #     #  migth want to reutnr sth indicating a syntax err instead TODO
+            #     await self.hard_reset()
+
+            # exec_time = time.perf_counter_ns() - start_time
+            # return TestCapture(
+            #     stdout=b"",
+            #     stderr=b"EXECUTION TIMEOUT EXCEEDED, " + err_output,
+            #     exit_code=42,
+            #     query=query,
+            #     exec_time=exec_time,
+            #     is_hang_or_crash="HANG",
+            # )
 
         except Exception as e:
             print(f"exception {str(e)}\n", flush=True)
@@ -227,7 +218,11 @@ class SQLiteWorker:
 
     async def reset(self) -> None:
         if self.proc is not None and self.proc.returncode is None:
-            marker = f"__RESET_{next(self._reset_counter)}__".encode()
+            epoch = next(self._reset_counter)
+            if epoch % 50 == 0:
+                await self.hard_reset()
+                return
+            marker = f"__RESET_{epoch}__".encode()
             reset_cmd = f".open {self.db_path}\n.bail off\n.log off\n.output stderr\n.print {marker.decode()}\n.output stdout\n.print {marker.decode()}\n"
             self.proc.stdin.write(reset_cmd.encode())
             await self.proc.stdin.drain()
@@ -241,7 +236,7 @@ class SQLiteWorker:
                 )
             except asyncio.TimeoutError:
                 await self.hard_reset()
-            self.clear_workdir_contents()
+        self.clear_workdir_contents()
 
     async def hard_reset(self) -> None:
         try:

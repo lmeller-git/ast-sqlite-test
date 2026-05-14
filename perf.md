@@ -14,25 +14,33 @@ uv run perf_eval.py "setarch -R x86_64 just run-docker_ --seeds /app/seeds --sav
   SUMMARY  (20 runs)
 ════════════════════════════════════════════════════════════
   Coverage  (valid runs: 20/20)
-    mean   : 19.277%
-    stddev : 0.200%
-    min    : 18.660%
-    max    : 19.554%
-    range  : 0.894%
+    mean   : 19.161%
+    stddev : 0.254%
+    min    : 18.480%
+    max    : 19.528%
+    range  : 1.048%
 
   QPM       (valid runs: 20/20)
-    mean   : 66642.960
-    stddev : 13634.761
-    min    : 50472.347
-    max    : 102425.031
-    range  : 51952.684
+    mean   : 105272.544
+    stddev : 21937.308
+    min    : 65367.924
+    max    : 148285.472
+    range  : 82917.548
 
   rt err rates       (valid runs: 20/20)
-    mean   : 0.489
-    stddev : 0.033
-    min    : 0.419
-    max    : 0.536
-    range  : 0.117
+    mean   : 0.517
+    stddev : 0.049
+    min    : 0.429
+    max    : 0.619
+    range  : 0.190
+
+### gcov
+
+Summary coverage rate:
+  source files: 7
+  lines.......: 38.7% (31103 of 80277 lines)
+  functions...: 44.1% (1895 of 4301 functions)
+  branches....: 30.9% (16565 of 53691 branches)
 
 ## long run config
 
@@ -44,25 +52,42 @@ uv run perf_eval.py  "setarch -R $(uname -m) just run-docker_ --seeds /app/seeds
   SUMMARY  (20 runs)
 ════════════════════════════════════════════════════════════
   Coverage  (valid runs: 20/20)
-    mean   : 18.446%
-    stddev : 0.208%
-    min    : 18.067%
-    max    : 18.862%
-    range  : 0.795%
+    mean   : 18.541%
+    stddev : 0.215%
+    min    : 18.098%
+    max    : 18.972%
+    range  : 0.874%
 
   QPM       (valid runs: 20/20)
-    mean   : 111707.403
-    stddev : 24939.489
-    min    : 68546.349
-    max    : 163579.306
-    range  : 95032.957
+    mean   : 154012.358
+    stddev : 19253.010
+    min    : 115728.903
+    max    : 185971.752
+    range  : 70242.849
 
   rt err rates       (valid runs: 20/20)
-    mean   : 0.576
-    stddev : 0.029
-    min    : 0.501
-    max    : 0.619
-    range  : 0.118
+    mean   : 0.677
+    stddev : 0.024
+    min    : 0.639
+    max    : 0.735
+    range  : 0.096
+
+Summary coverage rate:
+  source files: 7
+  lines.......: 35.2% (28278 of 80277 lines)
+  functions...: 41.0% (1764 of 4301 functions)
+  branches....: 27.8% (14907 of 53691 branches)
+
+## Longer run (~2 hours):
+
+~22.5% internal coverage,
+~150k final corpus size
+
+Summary coverage rate:
+  source files: 7
+  lines.......: 41.8% (33589 of 80277 lines)
+  functions...: 46.3% (1993 of 4301 functions)
+  branches....: 34.4% (18472 of 53691 branches)
 
 # Rust engine
 

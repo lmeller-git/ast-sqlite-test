@@ -35,7 +35,7 @@ EXPECTED_SQL_STDERR_PATTERNS: list[bytes] = [
     b"disk I/O error",  # SQLITE_IOERR — env issue
     b"database is locked",  # SQLITE_LOCKED/BUSY — env issue
     b"out of memory",  # SQLITE_NOMEM — env issue
-    b"RuntimeError",  # Python-level error from the CLI harness
+    b"Runtime error",  # Python-level error from the CLI harness
     b"Error: ",  # Generic CLI-level error prefix (catches most SQLITE_ERROR=1)
 ]
 
@@ -46,6 +46,9 @@ UNCONDITIONAL_BUG_PATTERNS: list[bytes] = [
     b"LeakSanitizer",
     b"UndefinedBehaviorSanitizer",
     b"Assertion failed",
+    b"DEADLYSIGNAL",
+    b"ERROR:",
+    b"Segmentation fault",
     b"SIGABRT",
     b"SIGSEGV",
     b"heap-buffer-overflow",
@@ -141,10 +144,12 @@ async def oracle_worker(incoming: asyncio.Queue[TestCapture | None], oracle_path
 
             # annotated by exec
             elif item.exit_code == 42:
-                ref = await oracle_worker.execute(item.query)
-                if ref.exit_code != 42:
-                    bug_type = "HANG"
-                    notes = "Reference completed the query without timeout"
+                # do not care aout hang
+                pass
+                # ref = await oracle_worker.execute(item.query)
+                # if ref.exit_code != 42:
+                #     bug_type = "HANG"
+                #     notes = "Reference completed the query without timeout"
 
             elif is_interesting_unilateral(item):
                 ref = await oracle_worker.execute(item.query)
@@ -171,7 +176,10 @@ async def oracle_worker(incoming: asyncio.Queue[TestCapture | None], oracle_path
             elif item.exit_code == 0:
                 ref = await oracle_worker.execute(item.query)
 
-                if ref.exit_code != 0:
+                if ref.exit_code == 42:
+                    # do not care about hangs
+                    pass
+                elif ref.exit_code != 0:
                     bug_type = "DIVERGENCE"
                     notes = f"Target exited 0 but reference exited {ref.exit_code}."
                 elif (

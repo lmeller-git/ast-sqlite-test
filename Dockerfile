@@ -1,4 +1,4 @@
-ARG USE_ASAN=false
+ARG USE_ASAN=true
 
 # prep
 FROM theosotr/sqlite3-test:latest AS chef
