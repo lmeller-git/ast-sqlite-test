@@ -66,7 +66,15 @@ async def fuzzing_loop(
             print(f"epoch {epoch}\nCorpus size: {mutation_engine.corpus_size()}")
             mutation_engine.chore()
 
-        _done, active_tasks = await asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED)
+        try:
+            _done, active_tasks = await asyncio.wait(
+                active_tasks, return_when=asyncio.FIRST_COMPLETED
+            )
+        except ValueError:
+            # active_tasks was empty
+            pass
+        except Exception as e:
+            print(f"Exception during executor spawning: {e}")
 
         epoch += 1
 
