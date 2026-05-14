@@ -67,3 +67,33 @@ SUMMARY: AddressSanitizer: negative-size-param (/tmp/sqlite3_asan_plain+0xb09e5)
 SQLite should execute the statements or reject them with a normal SQL error or
 constraint error. It should not call `memcmp` with a negative size, crash, or
 trigger an AddressSanitizer memory-safety failure.
+
+## Reproduction Steps
+
+Note: We added an additional section to outline the steps we took to run the minimised query for ease of reproducability.
+
+Start an interactive Docker container from the repository root:
+
+```bash
+just run-docker-it-windows
+```
+
+Inside the container, build a plain AddressSanitizer-instrumented SQLite binary without the fuzzer pc_guard hooks:
+
+```bash
+cd /home/test/sqlite3-src/build
+clang -O1 -g -DSQLITE_ENABLE_MATH_FUNCTIONS=1 -DSQLITE_ENABLE_FTS4=1 -DSQLITE_ENABLE_FTS5=1 -DSQLITE_ENABLE_GEOPOLY=1 -DSQLITE_ENABLE_RTREE=1 -DSQLITE_ENABLE_SESSION=1 -DSQLITE_ENABLE_PREUPDATE_HOOK=1 -DSQLITE_ENABLE_FTS3=1 -DSQLITE_ENABLE_FTS3_PARENTHESIS=1 -DSQLITE_ENABLE_JSON1=1 -DSQLITE_ENABLE_STAT4=1 -DSQLITE_ENABLE_UPDATE_DELETE_LIMIT=1 -DSQLITE_ENABLE_COLUMN_METADATA=1 -DSQLITE_ENABLE_DBSTAT_VTAB=1 -DSQLITE_ENABLE_EXPLAIN_COMMENTS=1 -DSQLITE_ENABLE_UNKNOWN_SQL_FUNCTION=1 -DSQLITE_ENABLE_STMTVTAB=1 -DSQLITE_ENABLE_DBPAGE_VTAB=1 -DSQLITE_ENABLE_BYTECODE_VTAB=1 -DSQLITE_ENABLE_OFFSET_SQL_FUNC=1 -fsanitize=address -fno-omit-frame-pointer -o /tmp/sqlite3_asan_plain sqlite3.c shell.c
+```
+Create the reduced test case:
+
+```bash
+printf '%s\n' "PRAGMA foreign_keys = 'ON';CREATE TABLE t0 (c0 PRIMARY KEY, c1, c2 AS (c0 + c1 - c3) REFERENCES t0, c3);INSERT INTO t0 VALUES ('9223372036854775807', 0, NULL), (NULL, 5, 5);UPDATE t0 SET c3 = c0;" > /tmp/bug2_reduced.sql
+```
+
+Run the reduced test case against a fresh database:
+```bash
+rm -f /tmp/bug2.db
+ASAN_OPTIONS=detect_leaks=0 /tmp/sqlite3_asan_plain /tmp/bug2.db < /tmp/bug2_reduced.sql
+```
+
+This should result in the output stated above.
