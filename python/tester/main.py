@@ -196,7 +196,7 @@ async def main(args: Namespace):
     print("\n===========\ninit done, entering loop\n==================\n")
 
     if args.eval_requirement and args.save_to is not None:
-        os.mkdir(args.save_to)
+        os.makedirs(args.save_to, exist_ok=True)
 
     now = time.time()
 

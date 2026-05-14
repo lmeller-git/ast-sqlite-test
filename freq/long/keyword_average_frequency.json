@@ -1,0 +1,742 @@
+{
+  "total_queries": 10000,
+  "total_keywords": 147,
+  "total_keyword_occurrences": 360358,
+  "keyword_frequencies": [
+    {
+      "keyword": "ABORT",
+      "occurrences": 134,
+      "average_frequency": 0.0134
+    },
+    {
+      "keyword": "ACTION",
+      "occurrences": 13,
+      "average_frequency": 0.0013
+    },
+    {
+      "keyword": "ADD",
+      "occurrences": 1215,
+      "average_frequency": 0.1215
+    },
+    {
+      "keyword": "AFTER",
+      "occurrences": 169,
+      "average_frequency": 0.0169
+    },
+    {
+      "keyword": "ALL",
+      "occurrences": 5017,
+      "average_frequency": 0.5017
+    },
+    {
+      "keyword": "ALTER",
+      "occurrences": 3002,
+      "average_frequency": 0.3002
+    },
+    {
+      "keyword": "ALWAYS",
+      "occurrences": 144,
+      "average_frequency": 0.0144
+    },
+    {
+      "keyword": "ANALYZE",
+      "occurrences": 1807,
+      "average_frequency": 0.1807
+    },
+    {
+      "keyword": "AND",
+      "occurrences": 3502,
+      "average_frequency": 0.3502
+    },
+    {
+      "keyword": "AS",
+      "occurrences": 10033,
+      "average_frequency": 1.0033
+    },
+    {
+      "keyword": "ASC",
+      "occurrences": 107,
+      "average_frequency": 0.0107
+    },
+    {
+      "keyword": "ATTACH",
+      "occurrences": 154,
+      "average_frequency": 0.0154
+    },
+    {
+      "keyword": "AUTOINCREMENT",
+      "occurrences": 251,
+      "average_frequency": 0.0251
+    },
+    {
+      "keyword": "BEFORE",
+      "occurrences": 7,
+      "average_frequency": 0.0007
+    },
+    {
+      "keyword": "BEGIN",
+      "occurrences": 1396,
+      "average_frequency": 0.1396
+    },
+    {
+      "keyword": "BETWEEN",
+      "occurrences": 1108,
+      "average_frequency": 0.1108
+    },
+    {
+      "keyword": "BY",
+      "occurrences": 8489,
+      "average_frequency": 0.8489
+    },
+    {
+      "keyword": "CASCADE",
+      "occurrences": 237,
+      "average_frequency": 0.0237
+    },
+    {
+      "keyword": "CASE",
+      "occurrences": 1111,
+      "average_frequency": 0.1111
+    },
+    {
+      "keyword": "CAST",
+      "occurrences": 144,
+      "average_frequency": 0.0144
+    },
+    {
+      "keyword": "CHECK",
+      "occurrences": 873,
+      "average_frequency": 0.0873
+    },
+    {
+      "keyword": "COLLATE",
+      "occurrences": 3075,
+      "average_frequency": 0.3075
+    },
+    {
+      "keyword": "COLUMN",
+      "occurrences": 1400,
+      "average_frequency": 0.14
+    },
+    {
+      "keyword": "COMMIT",
+      "occurrences": 340,
+      "average_frequency": 0.034
+    },
+    {
+      "keyword": "CONFLICT",
+      "occurrences": 1,
+      "average_frequency": 0.0001
+    },
+    {
+      "keyword": "CONSTRAINT",
+      "occurrences": 386,
+      "average_frequency": 0.0386
+    },
+    {
+      "keyword": "CREATE",
+      "occurrences": 25676,
+      "average_frequency": 2.5676
+    },
+    {
+      "keyword": "CROSS",
+      "occurrences": 381,
+      "average_frequency": 0.0381
+    },
+    {
+      "keyword": "CURRENT",
+      "occurrences": 44,
+      "average_frequency": 0.0044
+    },
+    {
+      "keyword": "CURRENT_DATE",
+      "occurrences": 0,
+      "average_frequency": 0.0
+    },
+    {
+      "keyword": "CURRENT_TIME",
+      "occurrences": 0,
+      "average_frequency": 0.0
+    },
+    {
+      "keyword": "CURRENT_TIMESTAMP",
+      "occurrences": 0,
+      "average_frequency": 0.0
+    },
+    {
+      "keyword": "DATABASE",
+      "occurrences": 404,
+      "average_frequency": 0.0404
+    },
+    {
+      "keyword": "DEFAULT",
+      "occurrences": 647,
+      "average_frequency": 0.0647
+    },
+    {
+      "keyword": "DEFERRABLE",
+      "occurrences": 9,
+      "average_frequency": 0.0009
+    },
+    {
+      "keyword": "DEFERRED",
+      "occurrences": 12,
+      "average_frequency": 0.0012
+    },
+    {
+      "keyword": "DELETE",
+      "occurrences": 224,
+      "average_frequency": 0.0224
+    },
+    {
+      "keyword": "DESC",
+      "occurrences": 358,
+      "average_frequency": 0.0358
+    },
+    {
+      "keyword": "DETACH",
+      "occurrences": 69,
+      "average_frequency": 0.0069
+    },
+    {
+      "keyword": "DISTINCT",
+      "occurrences": 3277,
+      "average_frequency": 0.3277
+    },
+    {
+      "keyword": "DO",
+      "occurrences": 1,
+      "average_frequency": 0.0001
+    },
+    {
+      "keyword": "DROP",
+      "occurrences": 2655,
+      "average_frequency": 0.2655
+    },
+    {
+      "keyword": "EACH",
+      "occurrences": 1,
+      "average_frequency": 0.0001
+    },
+    {
+      "keyword": "ELSE",
+      "occurrences": 377,
+      "average_frequency": 0.0377
+    },
+    {
+      "keyword": "END",
+      "occurrences": 1380,
+      "average_frequency": 0.138
+    },
+    {
+      "keyword": "ESCAPE",
+      "occurrences": 65,
+      "average_frequency": 0.0065
+    },
+    {
+      "keyword": "EXCEPT",
+      "occurrences": 458,
+      "average_frequency": 0.0458
+    },
+    {
+      "keyword": "EXCLUDE",
+      "occurrences": 177,
+      "average_frequency": 0.0177
+    },
+    {
+      "keyword": "EXCLUSIVE",
+      "occurrences": 20,
+      "average_frequency": 0.002
+    },
+    {
+      "keyword": "EXISTS",
+      "occurrences": 19104,
+      "average_frequency": 1.9104
+    },
+    {
+      "keyword": "EXPLAIN",
+      "occurrences": 29,
+      "average_frequency": 0.0029
+    },
+    {
+      "keyword": "FAIL",
+      "occurrences": 9,
+      "average_frequency": 0.0009
+    },
+    {
+      "keyword": "FILTER",
+      "occurrences": 82,
+      "average_frequency": 0.0082
+    },
+    {
+      "keyword": "FIRST",
+      "occurrences": 519,
+      "average_frequency": 0.0519
+    },
+    {
+      "keyword": "FOLLOWING",
+      "occurrences": 1,
+      "average_frequency": 0.0001
+    },
+    {
+      "keyword": "FOR",
+      "occurrences": 947,
+      "average_frequency": 0.0947
+    },
+    {
+      "keyword": "FOREIGN",
+      "occurrences": 384,
+      "average_frequency": 0.0384
+    },
+    {
+      "keyword": "FROM",
+      "occurrences": 22150,
+      "average_frequency": 2.215
+    },
+    {
+      "keyword": "FULL",
+      "occurrences": 169,
+      "average_frequency": 0.0169
+    },
+    {
+      "keyword": "GENERATED",
+      "occurrences": 143,
+      "average_frequency": 0.0143
+    },
+    {
+      "keyword": "GLOB",
+      "occurrences": 0,
+      "average_frequency": 0.0
+    },
+    {
+      "keyword": "GROUP",
+      "occurrences": 4044,
+      "average_frequency": 0.4044
+    },
+    {
+      "keyword": "GROUPS",
+      "occurrences": 0,
+      "average_frequency": 0.0
+    },
+    {
+      "keyword": "HAVING",
+      "occurrences": 53,
+      "average_frequency": 0.0053
+    },
+    {
+      "keyword": "IF",
+      "occurrences": 18216,
+      "average_frequency": 1.8216
+    },
+    {
+      "keyword": "IGNORE",
+      "occurrences": 49,
+      "average_frequency": 0.0049
+    },
+    {
+      "keyword": "IMMEDIATE",
+      "occurrences": 58,
+      "average_frequency": 0.0058
+    },
+    {
+      "keyword": "IN",
+      "occurrences": 5148,
+      "average_frequency": 0.5148
+    },
+    {
+      "keyword": "INDEX",
+      "occurrences": 3607,
+      "average_frequency": 0.3607
+    },
+    {
+      "keyword": "INDEXED",
+      "occurrences": 0,
+      "average_frequency": 0.0
+    },
+    {
+      "keyword": "INITIALLY",
+      "occurrences": 9,
+      "average_frequency": 0.0009
+    },
+    {
+      "keyword": "INNER",
+      "occurrences": 375,
+      "average_frequency": 0.0375
+    },
+    {
+      "keyword": "INSERT",
+      "occurrences": 13982,
+      "average_frequency": 1.3982
+    },
+    {
+      "keyword": "INSTEAD",
+      "occurrences": 5,
+      "average_frequency": 0.0005
+    },
+    {
+      "keyword": "INTERSECT",
+      "occurrences": 644,
+      "average_frequency": 0.0644
+    },
+    {
+      "keyword": "INTO",
+      "occurrences": 14287,
+      "average_frequency": 1.4287
+    },
+    {
+      "keyword": "IS",
+      "occurrences": 10971,
+      "average_frequency": 1.0971
+    },
+    {
+      "keyword": "ISNULL",
+      "occurrences": 0,
+      "average_frequency": 0.0
+    },
+    {
+      "keyword": "JOIN",
+      "occurrences": 3001,
+      "average_frequency": 0.3001
+    },
+    {
+      "keyword": "KEY",
+      "occurrences": 6141,
+      "average_frequency": 0.6141
+    },
+    {
+      "keyword": "LAST",
+      "occurrences": 143,
+      "average_frequency": 0.0143
+    },
+    {
+      "keyword": "LEFT",
+      "occurrences": 1168,
+      "average_frequency": 0.1168
+    },
+    {
+      "keyword": "LIKE",
+      "occurrences": 1451,
+      "average_frequency": 0.1451
+    },
+    {
+      "keyword": "LIMIT",
+      "occurrences": 590,
+      "average_frequency": 0.059
+    },
+    {
+      "keyword": "MATCH",
+      "occurrences": 817,
+      "average_frequency": 0.0817
+    },
+    {
+      "keyword": "MATERIALIZED",
+      "occurrences": 68,
+      "average_frequency": 0.0068
+    },
+    {
+      "keyword": "NATURAL",
+      "occurrences": 127,
+      "average_frequency": 0.0127
+    },
+    {
+      "keyword": "NO",
+      "occurrences": 37,
+      "average_frequency": 0.0037
+    },
+    {
+      "keyword": "NOT",
+      "occurrences": 25692,
+      "average_frequency": 2.5692
+    },
+    {
+      "keyword": "NOTHING",
+      "occurrences": 1,
+      "average_frequency": 0.0001
+    },
+    {
+      "keyword": "NOTNULL",
+      "occurrences": 0,
+      "average_frequency": 0.0
+    },
+    {
+      "keyword": "NULL",
+      "occurrences": 6817,
+      "average_frequency": 0.6817
+    },
+    {
+      "keyword": "NULLS",
+      "occurrences": 356,
+      "average_frequency": 0.0356
+    },
+    {
+      "keyword": "OF",
+      "occurrences": 1296,
+      "average_frequency": 0.1296
+    },
+    {
+      "keyword": "OFFSET",
+      "occurrences": 264,
+      "average_frequency": 0.0264
+    },
+    {
+      "keyword": "ON",
+      "occurrences": 6339,
+      "average_frequency": 0.6339
+    },
+    {
+      "keyword": "OR",
+      "occurrences": 1665,
+      "average_frequency": 0.1665
+    },
+    {
+      "keyword": "ORDER",
+      "occurrences": 3728,
+      "average_frequency": 0.3728
+    },
+    {
+      "keyword": "OTHERS",
+      "occurrences": 0,
+      "average_frequency": 0.0
+    },
+    {
+      "keyword": "OUTER",
+      "occurrences": 0,
+      "average_frequency": 0.0
+    },
+    {
+      "keyword": "OVER",
+      "occurrences": 720,
+      "average_frequency": 0.072
+    },
+    {
+      "keyword": "PARTITION",
+      "occurrences": 736,
+      "average_frequency": 0.0736
+    },
+    {
+      "keyword": "PLAN",
+      "occurrences": 48,
+      "average_frequency": 0.0048
+    },
+    {
+      "keyword": "PRAGMA",
+      "occurrences": 732,
+      "average_frequency": 0.0732
+    },
+    {
+      "keyword": "PRECEDING",
+      "occurrences": 0,
+      "average_frequency": 0.0
+    },
+    {
+      "keyword": "PRIMARY",
+      "occurrences": 5800,
+      "average_frequency": 0.58
+    },
+    {
+      "keyword": "QUERY",
+      "occurrences": 136,
+      "average_frequency": 0.0136
+    },
+    {
+      "keyword": "RAISE",
+      "occurrences": 125,
+      "average_frequency": 0.0125
+    },
+    {
+      "keyword": "RANGE",
+      "occurrences": 100,
+      "average_frequency": 0.01
+    },
+    {
+      "keyword": "RECURSIVE",
+      "occurrences": 1386,
+      "average_frequency": 0.1386
+    },
+    {
+      "keyword": "REFERENCES",
+      "occurrences": 1044,
+      "average_frequency": 0.1044
+    },
+    {
+      "keyword": "REGEXP",
+      "occurrences": 26,
+      "average_frequency": 0.0026
+    },
+    {
+      "keyword": "REINDEX",
+      "occurrences": 35,
+      "average_frequency": 0.0035
+    },
+    {
+      "keyword": "RELEASE",
+      "occurrences": 44,
+      "average_frequency": 0.0044
+    },
+    {
+      "keyword": "RENAME",
+      "occurrences": 917,
+      "average_frequency": 0.0917
+    },
+    {
+      "keyword": "REPLACE",
+      "occurrences": 846,
+      "average_frequency": 0.0846
+    },
+    {
+      "keyword": "RESTRICT",
+      "occurrences": 211,
+      "average_frequency": 0.0211
+    },
+    {
+      "keyword": "RETURNING",
+      "occurrences": 26,
+      "average_frequency": 0.0026
+    },
+    {
+      "keyword": "RIGHT",
+      "occurrences": 172,
+      "average_frequency": 0.0172
+    },
+    {
+      "keyword": "ROLLBACK",
+      "occurrences": 72,
+      "average_frequency": 0.0072
+    },
+    {
+      "keyword": "ROW",
+      "occurrences": 99,
+      "average_frequency": 0.0099
+    },
+    {
+      "keyword": "ROWS",
+      "occurrences": 402,
+      "average_frequency": 0.0402
+    },
+    {
+      "keyword": "SAVEPOINT",
+      "occurrences": 211,
+      "average_frequency": 0.0211
+    },
+    {
+      "keyword": "SELECT",
+      "occurrences": 21608,
+      "average_frequency": 2.1608
+    },
+    {
+      "keyword": "SET",
+      "occurrences": 2068,
+      "average_frequency": 0.2068
+    },
+    {
+      "keyword": "TABLE",
+      "occurrences": 23372,
+      "average_frequency": 2.3372
+    },
+    {
+      "keyword": "TEMP",
+      "occurrences": 12,
+      "average_frequency": 0.0012
+    },
+    {
+      "keyword": "TEMPORARY",
+      "occurrences": 879,
+      "average_frequency": 0.0879
+    },
+    {
+      "keyword": "THEN",
+      "occurrences": 925,
+      "average_frequency": 0.0925
+    },
+    {
+      "keyword": "TIES",
+      "occurrences": 342,
+      "average_frequency": 0.0342
+    },
+    {
+      "keyword": "TO",
+      "occurrences": 3368,
+      "average_frequency": 0.3368
+    },
+    {
+      "keyword": "TRANSACTION",
+      "occurrences": 77,
+      "average_frequency": 0.0077
+    },
+    {
+      "keyword": "TRIGGER",
+      "occurrences": 319,
+      "average_frequency": 0.0319
+    },
+    {
+      "keyword": "UNBOUNDED",
+      "occurrences": 0,
+      "average_frequency": 0.0
+    },
+    {
+      "keyword": "UNION",
+      "occurrences": 1128,
+      "average_frequency": 0.1128
+    },
+    {
+      "keyword": "UNIQUE",
+      "occurrences": 2078,
+      "average_frequency": 0.2078
+    },
+    {
+      "keyword": "UPDATE",
+      "occurrences": 1381,
+      "average_frequency": 0.1381
+    },
+    {
+      "keyword": "USING",
+      "occurrences": 1742,
+      "average_frequency": 0.1742
+    },
+    {
+      "keyword": "VACUUM",
+      "occurrences": 67,
+      "average_frequency": 0.0067
+    },
+    {
+      "keyword": "VALUES",
+      "occurrences": 13635,
+      "average_frequency": 1.3635
+    },
+    {
+      "keyword": "VIEW",
+      "occurrences": 1711,
+      "average_frequency": 0.1711
+    },
+    {
+      "keyword": "VIRTUAL",
+      "occurrences": 541,
+      "average_frequency": 0.0541
+    },
+    {
+      "keyword": "WHEN",
+      "occurrences": 883,
+      "average_frequency": 0.0883
+    },
+    {
+      "keyword": "WHERE",
+      "occurrences": 10501,
+      "average_frequency": 1.0501
+    },
+    {
+      "keyword": "WINDOW",
+      "occurrences": 109,
+      "average_frequency": 0.0109
+    },
+    {
+      "keyword": "WITH",
+      "occurrences": 3684,
+      "average_frequency": 0.3684
+    },
+    {
+      "keyword": "WITHOUT",
+      "occurrences": 1004,
+      "average_frequency": 0.1004
+    }
+  ]
+}
