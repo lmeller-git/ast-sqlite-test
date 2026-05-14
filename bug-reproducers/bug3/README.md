@@ -4,7 +4,7 @@ Executing the query crashes the SQLite process (segmentation fault) under Addres
 
 ## Minimized query
 
-``` sql
+```sql
 CREATE VIRTUAL TABLE t2 USING rtree;
 ```
 
