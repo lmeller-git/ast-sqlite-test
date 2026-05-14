@@ -1,5 +1,5 @@
 {
-  "total_queries": 10088,
+  "total_queries": 10000,
   "total_keywords": 147,
   "covered_keywords": 82,
   "keyword_counts": [
@@ -15,43 +15,43 @@
     },
     {
       "keyword": "ADD",
-      "queries": 1596,
-      "coverage": 0.15820777160983346
+      "queries": 1412,
+      "coverage": 0.1412
     },
     {
       "keyword": "AFTER",
-      "queries": 567,
-      "coverage": 0.05620539254559873
+      "queries": 459,
+      "coverage": 0.0459
     },
     {
       "keyword": "ALL",
-      "queries": 2266,
-      "coverage": 0.2246233148295004
+      "queries": 1405,
+      "coverage": 0.1405
     },
     {
       "keyword": "ALTER",
-      "queries": 2455,
-      "coverage": 0.2433584456780333
+      "queries": 2776,
+      "coverage": 0.2776
     },
     {
       "keyword": "ALWAYS",
-      "queries": 150,
-      "coverage": 0.01486915146708961
+      "queries": 284,
+      "coverage": 0.0284
     },
     {
       "keyword": "ANALYZE",
-      "queries": 776,
-      "coverage": 0.07692307692307693
+      "queries": 683,
+      "coverage": 0.0683
     },
     {
       "keyword": "AND",
-      "queries": 1972,
-      "coverage": 0.19547977795400476
+      "queries": 2405,
+      "coverage": 0.2405
     },
     {
       "keyword": "AS",
-      "queries": 7969,
-      "coverage": 0.7899484536082474
+      "queries": 8220,
+      "coverage": 0.822
     },
     {
       "keyword": "ASC",
@@ -60,13 +60,13 @@
     },
     {
       "keyword": "ATTACH",
-      "queries": 170,
-      "coverage": 0.016851704996034892
+      "queries": 137,
+      "coverage": 0.0137
     },
     {
       "keyword": "AUTOINCREMENT",
-      "queries": 465,
-      "coverage": 0.0460943695479778
+      "queries": 246,
+      "coverage": 0.0246
     },
     {
       "keyword": "BEFORE",
@@ -75,18 +75,18 @@
     },
     {
       "keyword": "BEGIN",
-      "queries": 1040,
-      "coverage": 0.10309278350515463
+      "queries": 1342,
+      "coverage": 0.1342
     },
     {
       "keyword": "BETWEEN",
-      "queries": 295,
-      "coverage": 0.029242664551942903
+      "queries": 288,
+      "coverage": 0.0288
     },
     {
       "keyword": "BY",
-      "queries": 4584,
-      "coverage": 0.4544012688342585
+      "queries": 4577,
+      "coverage": 0.4577
     },
     {
       "keyword": "CASCADE",
@@ -95,33 +95,33 @@
     },
     {
       "keyword": "CASE",
-      "queries": 641,
-      "coverage": 0.06354084060269627
+      "queries": 455,
+      "coverage": 0.0455
     },
     {
       "keyword": "CAST",
-      "queries": 6815,
-      "coverage": 0.6755551149881047
+      "queries": 6840,
+      "coverage": 0.684
     },
     {
       "keyword": "CHECK",
-      "queries": 1044,
-      "coverage": 0.10348929421094369
+      "queries": 1355,
+      "coverage": 0.1355
     },
     {
       "keyword": "COLLATE",
-      "queries": 569,
-      "coverage": 0.05640364789849326
+      "queries": 583,
+      "coverage": 0.0583
     },
     {
       "keyword": "COLUMN",
-      "queries": 1866,
-      "coverage": 0.18497224425059478
+      "queries": 1881,
+      "coverage": 0.1881
     },
     {
       "keyword": "COMMIT",
-      "queries": 180,
-      "coverage": 0.017842981760507533
+      "queries": 383,
+      "coverage": 0.0383
     },
     {
       "keyword": "CONFLICT",
@@ -130,18 +130,18 @@
     },
     {
       "keyword": "CONSTRAINT",
-      "queries": 164,
-      "coverage": 0.01625693893735131
+      "queries": 231,
+      "coverage": 0.0231
     },
     {
       "keyword": "CREATE",
-      "queries": 10029,
-      "coverage": 0.9941514670896114
+      "queries": 9949,
+      "coverage": 0.9949
     },
     {
       "keyword": "CROSS",
-      "queries": 389,
-      "coverage": 0.03856066613798573
+      "queries": 238,
+      "coverage": 0.0238
     },
     {
       "keyword": "CURRENT",
@@ -170,8 +170,8 @@
     },
     {
       "keyword": "DEFAULT",
-      "queries": 533,
-      "coverage": 0.05283505154639175
+      "queries": 572,
+      "coverage": 0.0572
     },
     {
       "keyword": "DEFERRABLE",
@@ -185,13 +185,13 @@
     },
     {
       "keyword": "DELETE",
-      "queries": 541,
-      "coverage": 0.05362807295796986
+      "queries": 550,
+      "coverage": 0.055
     },
     {
       "keyword": "DESC",
-      "queries": 368,
-      "coverage": 0.03647898493259318
+      "queries": 256,
+      "coverage": 0.0256
     },
     {
       "keyword": "DETACH",
@@ -200,8 +200,8 @@
     },
     {
       "keyword": "DISTINCT",
-      "queries": 1757,
-      "coverage": 0.17416732751784297
+      "queries": 1208,
+      "coverage": 0.1208
     },
     {
       "keyword": "DO",
@@ -210,8 +210,8 @@
     },
     {
       "keyword": "DROP",
-      "queries": 1188,
-      "coverage": 0.11776367961934972
+      "queries": 1784,
+      "coverage": 0.1784
     },
     {
       "keyword": "EACH",
@@ -220,13 +220,13 @@
     },
     {
       "keyword": "ELSE",
-      "queries": 389,
-      "coverage": 0.03856066613798573
+      "queries": 276,
+      "coverage": 0.0276
     },
     {
       "keyword": "END",
-      "queries": 1278,
-      "coverage": 0.12668517049960348
+      "queries": 1072,
+      "coverage": 0.1072
     },
     {
       "keyword": "ESCAPE",
@@ -235,8 +235,8 @@
     },
     {
       "keyword": "EXCEPT",
-      "queries": 617,
-      "coverage": 0.06116177636796193
+      "queries": 430,
+      "coverage": 0.043
     },
     {
       "keyword": "EXCLUDE",
@@ -250,8 +250,8 @@
     },
     {
       "keyword": "EXISTS",
-      "queries": 8773,
-      "coverage": 0.8696471054718478
+      "queries": 8715,
+      "coverage": 0.8715
     },
     {
       "keyword": "EXPLAIN",
@@ -285,13 +285,13 @@
     },
     {
       "keyword": "FOREIGN",
-      "queries": 217,
-      "coverage": 0.021510705789056304
+      "queries": 367,
+      "coverage": 0.0367
     },
     {
       "keyword": "FROM",
-      "queries": 8841,
-      "coverage": 0.8763877874702617
+      "queries": 8250,
+      "coverage": 0.825
     },
     {
       "keyword": "FULL",
@@ -300,8 +300,8 @@
     },
     {
       "keyword": "GENERATED",
-      "queries": 150,
-      "coverage": 0.01486915146708961
+      "queries": 284,
+      "coverage": 0.0284
     },
     {
       "keyword": "GLOB",
@@ -310,8 +310,8 @@
     },
     {
       "keyword": "GROUP",
-      "queries": 1375,
-      "coverage": 0.1363005551149881
+      "queries": 2165,
+      "coverage": 0.2165
     },
     {
       "keyword": "GROUPS",
@@ -320,13 +320,13 @@
     },
     {
       "keyword": "HAVING",
-      "queries": 202,
-      "coverage": 0.020023790642347345
+      "queries": 309,
+      "coverage": 0.0309
     },
     {
       "keyword": "IF",
-      "queries": 8709,
-      "coverage": 0.8633029341792229
+      "queries": 8654,
+      "coverage": 0.8654
     },
     {
       "keyword": "IGNORE",
@@ -340,13 +340,13 @@
     },
     {
       "keyword": "IN",
-      "queries": 1259,
-      "coverage": 0.12480174464710547
+      "queries": 1204,
+      "coverage": 0.1204
     },
     {
       "keyword": "INDEX",
-      "queries": 3154,
-      "coverage": 0.3126486915146709
+      "queries": 2781,
+      "coverage": 0.2781
     },
     {
       "keyword": "INDEXED",
@@ -360,13 +360,13 @@
     },
     {
       "keyword": "INNER",
-      "queries": 654,
-      "coverage": 0.06482950039651071
+      "queries": 652,
+      "coverage": 0.0652
     },
     {
       "keyword": "INSERT",
-      "queries": 8994,
-      "coverage": 0.8915543219666932
+      "queries": 8659,
+      "coverage": 0.8659
     },
     {
       "keyword": "INSTEAD",
@@ -375,18 +375,18 @@
     },
     {
       "keyword": "INTERSECT",
-      "queries": 772,
-      "coverage": 0.07652656621728787
+      "queries": 774,
+      "coverage": 0.0774
     },
     {
       "keyword": "INTO",
-      "queries": 8868,
-      "coverage": 0.8790642347343378
+      "queries": 8541,
+      "coverage": 0.8541
     },
     {
       "keyword": "IS",
-      "queries": 2265,
-      "coverage": 0.22452418715305314
+      "queries": 1057,
+      "coverage": 0.1057
     },
     {
       "keyword": "ISNULL",
@@ -395,13 +395,13 @@
     },
     {
       "keyword": "JOIN",
-      "queries": 3161,
-      "coverage": 0.31334258524980174
+      "queries": 2787,
+      "coverage": 0.2787
     },
     {
       "keyword": "KEY",
-      "queries": 4397,
-      "coverage": 0.43586439333862015
+      "queries": 4415,
+      "coverage": 0.4415
     },
     {
       "keyword": "LAST",
@@ -410,13 +410,13 @@
     },
     {
       "keyword": "LEFT",
-      "queries": 1679,
-      "coverage": 0.16643536875495638
+      "queries": 1422,
+      "coverage": 0.1422
     },
     {
       "keyword": "LIKE",
-      "queries": 362,
-      "coverage": 0.03588421887390959
+      "queries": 656,
+      "coverage": 0.0656
     },
     {
       "keyword": "LIMIT",
@@ -445,8 +445,8 @@
     },
     {
       "keyword": "NOT",
-      "queries": 8819,
-      "coverage": 0.8742069785884219
+      "queries": 8663,
+      "coverage": 0.8663
     },
     {
       "keyword": "NOTHING",
@@ -460,8 +460,8 @@
     },
     {
       "keyword": "NULL",
-      "queries": 3170,
-      "coverage": 0.3142347343378271
+      "queries": 2191,
+      "coverage": 0.2191
     },
     {
       "keyword": "NULLS",
@@ -480,18 +480,18 @@
     },
     {
       "keyword": "ON",
-      "queries": 5818,
-      "coverage": 0.5767248215701823
+      "queries": 5272,
+      "coverage": 0.5272
     },
     {
       "keyword": "OR",
-      "queries": 1063,
-      "coverage": 0.10537272006344171
+      "queries": 1200,
+      "coverage": 0.12
     },
     {
       "keyword": "ORDER",
-      "queries": 3804,
-      "coverage": 0.37708168120539254
+      "queries": 3333,
+      "coverage": 0.3333
     },
     {
       "keyword": "OTHERS",
@@ -505,13 +505,13 @@
     },
     {
       "keyword": "OVER",
-      "queries": 1391,
-      "coverage": 0.13788659793814434
+      "queries": 596,
+      "coverage": 0.0596
     },
     {
       "keyword": "PARTITION",
-      "queries": 658,
-      "coverage": 0.06522601110229977
+      "queries": 368,
+      "coverage": 0.0368
     },
     {
       "keyword": "PLAN",
@@ -520,8 +520,8 @@
     },
     {
       "keyword": "PRAGMA",
-      "queries": 2365,
-      "coverage": 0.23443695479777954
+      "queries": 1371,
+      "coverage": 0.1371
     },
     {
       "keyword": "PRECEDING",
@@ -530,8 +530,8 @@
     },
     {
       "keyword": "PRIMARY",
-      "queries": 4252,
-      "coverage": 0.42149088025376685
+      "queries": 4178,
+      "coverage": 0.4178
     },
     {
       "keyword": "QUERY",
@@ -550,13 +550,13 @@
     },
     {
       "keyword": "RECURSIVE",
-      "queries": 1436,
-      "coverage": 0.1423473433782712
+      "queries": 722,
+      "coverage": 0.0722
     },
     {
       "keyword": "REFERENCES",
-      "queries": 839,
-      "coverage": 0.08316812053925456
+      "queries": 886,
+      "coverage": 0.0886
     },
     {
       "keyword": "REGEXP",
@@ -575,13 +575,13 @@
     },
     {
       "keyword": "RENAME",
-      "queries": 952,
-      "coverage": 0.0943695479777954
+      "queries": 920,
+      "coverage": 0.092
     },
     {
       "keyword": "REPLACE",
-      "queries": 126,
-      "coverage": 0.012490087232355274
+      "queries": 30,
+      "coverage": 0.003
     },
     {
       "keyword": "RESTRICT",
@@ -595,8 +595,8 @@
     },
     {
       "keyword": "RIGHT",
-      "queries": 1056,
-      "coverage": 0.10467882632831087
+      "queries": 349,
+      "coverage": 0.0349
     },
     {
       "keyword": "ROLLBACK",
@@ -620,18 +620,18 @@
     },
     {
       "keyword": "SELECT",
-      "queries": 8569,
-      "coverage": 0.8494250594766058
+      "queries": 8006,
+      "coverage": 0.8006
     },
     {
       "keyword": "SET",
-      "queries": 2418,
-      "coverage": 0.23969072164948454
+      "queries": 1280,
+      "coverage": 0.128
     },
     {
       "keyword": "TABLE",
-      "queries": 10019,
-      "coverage": 0.9931601903251388
+      "queries": 9955,
+      "coverage": 0.9955
     },
     {
       "keyword": "TEMP",
@@ -640,13 +640,13 @@
     },
     {
       "keyword": "TEMPORARY",
-      "queries": 223,
-      "coverage": 0.02210547184773989
+      "queries": 433,
+      "coverage": 0.0433
     },
     {
       "keyword": "THEN",
-      "queries": 641,
-      "coverage": 0.06354084060269627
+      "queries": 455,
+      "coverage": 0.0455
     },
     {
       "keyword": "TIES",
@@ -655,18 +655,18 @@
     },
     {
       "keyword": "TO",
-      "queries": 952,
-      "coverage": 0.0943695479777954
+      "queries": 920,
+      "coverage": 0.092
     },
     {
       "keyword": "TRANSACTION",
-      "queries": 34,
-      "coverage": 0.0033703409992069788
+      "queries": 135,
+      "coverage": 0.0135
     },
     {
       "keyword": "TRIGGER",
-      "queries": 567,
-      "coverage": 0.05620539254559873
+      "queries": 459,
+      "coverage": 0.0459
     },
     {
       "keyword": "UNBOUNDED",
@@ -675,23 +675,23 @@
     },
     {
       "keyword": "UNION",
-      "queries": 2359,
-      "coverage": 0.23384218873909596
+      "queries": 1662,
+      "coverage": 0.1662
     },
     {
       "keyword": "UNIQUE",
-      "queries": 2191,
-      "coverage": 0.2171887390959556
+      "queries": 1126,
+      "coverage": 0.1126
     },
     {
       "keyword": "UPDATE",
-      "queries": 2460,
-      "coverage": 0.24385408406026962
+      "queries": 1313,
+      "coverage": 0.1313
     },
     {
       "keyword": "USING",
-      "queries": 693,
-      "coverage": 0.06869547977795401
+      "queries": 489,
+      "coverage": 0.0489
     },
     {
       "keyword": "VACUUM",
@@ -700,43 +700,43 @@
     },
     {
       "keyword": "VALUES",
-      "queries": 8972,
-      "coverage": 0.8893735130848532
+      "queries": 8656,
+      "coverage": 0.8656
     },
     {
       "keyword": "VIEW",
-      "queries": 843,
-      "coverage": 0.08356463124504361
+      "queries": 1398,
+      "coverage": 0.1398
     },
     {
       "keyword": "VIRTUAL",
-      "queries": 559,
-      "coverage": 0.055412371134020616
+      "queries": 368,
+      "coverage": 0.0368
     },
     {
       "keyword": "WHEN",
-      "queries": 641,
-      "coverage": 0.06354084060269627
+      "queries": 455,
+      "coverage": 0.0455
     },
     {
       "keyword": "WHERE",
-      "queries": 7199,
-      "coverage": 0.7136201427438541
+      "queries": 6584,
+      "coverage": 0.6584
     },
     {
       "keyword": "WINDOW",
-      "queries": 778,
-      "coverage": 0.07712133227597145
+      "queries": 231,
+      "coverage": 0.0231
     },
     {
       "keyword": "WITH",
-      "queries": 1591,
-      "coverage": 0.15771213322759714
+      "queries": 868,
+      "coverage": 0.0868
     },
     {
       "keyword": "WITHOUT",
-      "queries": 1341,
-      "coverage": 0.13293021411578113
+      "queries": 1258,
+      "coverage": 0.1258
     }
   ]
 }

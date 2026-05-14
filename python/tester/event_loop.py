@@ -34,9 +34,6 @@ async def fuzzing_loop(
         if len(testable_queries) < QUERY_STASH / 2:
             batch = mutation_engine.mutate_batch(QUERY_STASH - len(testable_queries))
             generated_queries = batch.into_members()
-            if keyword_coverage is not None:
-                for query in generated_queries:
-                    keyword_coverage.record(query.to_sql_string())
             testable_queries += generated_queries
 
         to_spawn = min(CONCURRENCY_LIMIT - len(active_tasks), len(testable_queries))
@@ -44,16 +41,21 @@ async def fuzzing_loop(
         for _ in range(to_spawn):
             entry = testable_queries.pop()
             total += 1
+            sql = entry.to_sql_string()
 
             # save 10k queries, comment out in an actual run. this is only to save the first 10k for grading
             if eval_requirement and total <= 10000 and save_to is not None:
                 with open(f"{save_to}/query_{total}.sql", "w") as f:
-                    _ = f.write(entry.to_sql_string())
+                    _ = f.write(sql)
+                if keyword_coverage is not None:
+                    keyword_coverage.record(sql)
             elif eval_requirement and not is_done:
                 # break at 10k
                 is_done = True
                 print("Hit 10k queries")
                 break
+            elif keyword_coverage is not None:
+                keyword_coverage.record(sql)
 
             if not is_done:
                 task = asyncio.create_task(
