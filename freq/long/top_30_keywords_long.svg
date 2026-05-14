@@ -7,108 +7,108 @@ text { font-family: Arial, sans-serif; fill: #24292f; }
 .axis { stroke: #8c959f; stroke-width: 1; }
 .grid { stroke: #d8dee4; stroke-width: 1; }
 </style>
-<text x="550.0" y="32" text-anchor="middle" class="title">Top 30 SQLite Keywords by Generated Query Coverage (n=10,065)</text>
+<text x="550.0" y="32" text-anchor="middle" class="title">Top 30 SQLite Keywords by Generated Query Coverage (n=10,000)</text>
 <line x1="130" y1="60" x2="130" y2="915" class="axis" />
 <line x1="130.0" y1="60" x2="130.0" y2="915" class="grid" />
 <text x="130.0" y="940" text-anchor="middle" class="value">0</text>
 <line x1="290.0" y1="60" x2="290.0" y2="915" class="grid" />
-<text x="290.0" y="940" text-anchor="middle" class="value">1,898</text>
+<text x="290.0" y="940" text-anchor="middle" class="value">1,893</text>
 <line x1="450.0" y1="60" x2="450.0" y2="915" class="grid" />
-<text x="450.0" y="940" text-anchor="middle" class="value">3,796</text>
+<text x="450.0" y="940" text-anchor="middle" class="value">3,786</text>
 <line x1="610.0" y1="60" x2="610.0" y2="915" class="grid" />
-<text x="610.0" y="940" text-anchor="middle" class="value">5,695</text>
+<text x="610.0" y="940" text-anchor="middle" class="value">5,678</text>
 <line x1="770.0" y1="60" x2="770.0" y2="915" class="grid" />
-<text x="770.0" y="940" text-anchor="middle" class="value">7,593</text>
+<text x="770.0" y="940" text-anchor="middle" class="value">7,571</text>
 <line x1="930.0" y1="60" x2="930.0" y2="915" class="grid" />
-<text x="930.0" y="940" text-anchor="middle" class="value">9,491</text>
-<text x="120" y="87" text-anchor="end" class="label">TABLE</text>
+<text x="930.0" y="940" text-anchor="middle" class="value">9,464</text>
+<text x="120" y="87" text-anchor="end" class="label">CREATE</text>
 <rect x="130" y="74" width="800.0" height="18" fill="#287c8e" />
-<text x="936.0" y="87" class="value">9,491 (94.3%)</text>
-<text x="120" y="115" text-anchor="end" class="label">CREATE</text>
-<rect x="130" y="102" width="798.6" height="18" fill="#287c8e" />
-<text x="934.6" y="115" class="value">9,474 (94.1%)</text>
+<text x="936.0" y="87" class="value">9,464 (94.6%)</text>
+<text x="120" y="115" text-anchor="end" class="label">TABLE</text>
+<rect x="130" y="102" width="796.7" height="18" fill="#287c8e" />
+<text x="932.7" y="115" class="value">9,425 (94.2%)</text>
 <text x="120" y="143" text-anchor="end" class="label">NOT</text>
-<rect x="130" y="130" width="738.6" height="18" fill="#287c8e" />
-<text x="874.6" y="143" class="value">8,762 (87.1%)</text>
+<rect x="130" y="130" width="737.2" height="18" fill="#287c8e" />
+<text x="873.2" y="143" class="value">8,721 (87.2%)</text>
 <text x="120" y="171" text-anchor="end" class="label">EXISTS</text>
-<rect x="130" y="158" width="707.0" height="18" fill="#287c8e" />
-<text x="843.0" y="171" class="value">8,388 (83.3%)</text>
-<text x="120" y="199" text-anchor="end" class="label">FROM</text>
-<rect x="130" y="186" width="698.9" height="18" fill="#287c8e" />
-<text x="834.9" y="199" class="value">8,292 (82.4%)</text>
-<text x="120" y="227" text-anchor="end" class="label">IF</text>
-<rect x="130" y="214" width="684.9" height="18" fill="#287c8e" />
-<text x="820.9" y="227" class="value">8,126 (80.7%)</text>
-<text x="120" y="255" text-anchor="end" class="label">INSERT</text>
-<rect x="130" y="242" width="654.9" height="18" fill="#287c8e" />
-<text x="790.9" y="255" class="value">7,770 (77.2%)</text>
-<text x="120" y="283" text-anchor="end" class="label">VALUES</text>
-<rect x="130" y="270" width="649.1" height="18" fill="#287c8e" />
-<text x="785.1" y="283" class="value">7,701 (76.5%)</text>
+<rect x="130" y="158" width="704.7" height="18" fill="#287c8e" />
+<text x="840.7" y="171" class="value">8,337 (83.4%)</text>
+<text x="120" y="199" text-anchor="end" class="label">IF</text>
+<rect x="130" y="186" width="692.9" height="18" fill="#287c8e" />
+<text x="828.9" y="199" class="value">8,197 (82.0%)</text>
+<text x="120" y="227" text-anchor="end" class="label">FROM</text>
+<rect x="130" y="214" width="642.2" height="18" fill="#287c8e" />
+<text x="778.2" y="227" class="value">7,597 (76.0%)</text>
+<text x="120" y="255" text-anchor="end" class="label">SELECT</text>
+<rect x="130" y="242" width="629.3" height="18" fill="#287c8e" />
+<text x="765.3" y="255" class="value">7,445 (74.5%)</text>
+<text x="120" y="283" text-anchor="end" class="label">INSERT</text>
+<rect x="130" y="270" width="584.0" height="18" fill="#287c8e" />
+<text x="720.0" y="283" class="value">6,909 (69.1%)</text>
 <text x="120" y="311" text-anchor="end" class="label">INTO</text>
-<rect x="130" y="298" width="648.1" height="18" fill="#287c8e" />
-<text x="784.1" y="311" class="value">7,689 (76.4%)</text>
-<text x="120" y="339" text-anchor="end" class="label">SELECT</text>
-<rect x="130" y="326" width="637.3" height="18" fill="#287c8e" />
-<text x="773.3" y="339" class="value">7,561 (75.1%)</text>
-<text x="120" y="367" text-anchor="end" class="label">AS</text>
-<rect x="130" y="354" width="473.3" height="18" fill="#287c8e" />
-<text x="609.3" y="367" class="value">5,615 (55.8%)</text>
-<text x="120" y="395" text-anchor="end" class="label">WHERE</text>
-<rect x="130" y="382" width="449.3" height="18" fill="#287c8e" />
-<text x="585.3" y="395" class="value">5,330 (53.0%)</text>
-<text x="120" y="423" text-anchor="end" class="label">KEY</text>
-<rect x="130" y="410" width="385.1" height="18" fill="#287c8e" />
-<text x="521.1" y="423" class="value">4,569 (45.4%)</text>
-<text x="120" y="451" text-anchor="end" class="label">ON</text>
-<rect x="130" y="438" width="381.2" height="18" fill="#287c8e" />
-<text x="517.2" y="451" class="value">4,523 (44.9%)</text>
-<text x="120" y="479" text-anchor="end" class="label">PRIMARY</text>
-<rect x="130" y="466" width="374.4" height="18" fill="#287c8e" />
-<text x="510.4" y="479" class="value">4,442 (44.1%)</text>
-<text x="120" y="507" text-anchor="end" class="label">BY</text>
-<rect x="130" y="494" width="367.6" height="18" fill="#287c8e" />
-<text x="503.6" y="507" class="value">4,361 (43.3%)</text>
-<text x="120" y="535" text-anchor="end" class="label">IS</text>
-<rect x="130" y="522" width="313.1" height="18" fill="#287c8e" />
-<text x="449.1" y="535" class="value">3,714 (36.9%)</text>
-<text x="120" y="563" text-anchor="end" class="label">NULL</text>
-<rect x="130" y="550" width="306.7" height="18" fill="#287c8e" />
-<text x="442.7" y="563" class="value">3,639 (36.2%)</text>
-<text x="120" y="591" text-anchor="end" class="label">TO</text>
-<rect x="130" y="578" width="297.7" height="18" fill="#287c8e" />
-<text x="433.7" y="591" class="value">3,532 (35.1%)</text>
+<rect x="130" y="298" width="583.0" height="18" fill="#287c8e" />
+<text x="719.0" y="311" class="value">6,897 (69.0%)</text>
+<text x="120" y="339" text-anchor="end" class="label">VALUES</text>
+<rect x="130" y="326" width="571.1" height="18" fill="#287c8e" />
+<text x="707.1" y="339" class="value">6,756 (67.6%)</text>
+<text x="120" y="367" text-anchor="end" class="label">WHERE</text>
+<rect x="130" y="354" width="435.7" height="18" fill="#287c8e" />
+<text x="571.7" y="367" class="value">5,154 (51.5%)</text>
+<text x="120" y="395" text-anchor="end" class="label">AS</text>
+<rect x="130" y="382" width="368.3" height="18" fill="#287c8e" />
+<text x="504.3" y="395" class="value">4,357 (43.6%)</text>
+<text x="120" y="423" text-anchor="end" class="label">BY</text>
+<rect x="130" y="410" width="356.8" height="18" fill="#287c8e" />
+<text x="492.8" y="423" class="value">4,221 (42.2%)</text>
+<text x="120" y="451" text-anchor="end" class="label">KEY</text>
+<rect x="130" y="438" width="342.9" height="18" fill="#287c8e" />
+<text x="478.9" y="451" class="value">4,057 (40.6%)</text>
+<text x="120" y="479" text-anchor="end" class="label">ON</text>
+<rect x="130" y="466" width="332.1" height="18" fill="#287c8e" />
+<text x="468.1" y="479" class="value">3,929 (39.3%)</text>
+<text x="120" y="507" text-anchor="end" class="label">PRIMARY</text>
+<rect x="130" y="494" width="331.7" height="18" fill="#287c8e" />
+<text x="467.7" y="507" class="value">3,924 (39.2%)</text>
+<text x="120" y="535" text-anchor="end" class="label">NULL</text>
+<rect x="130" y="522" width="280.1" height="18" fill="#287c8e" />
+<text x="416.1" y="535" class="value">3,313 (33.1%)</text>
+<text x="120" y="563" text-anchor="end" class="label">IS</text>
+<rect x="130" y="550" width="275.8" height="18" fill="#287c8e" />
+<text x="411.8" y="563" class="value">3,263 (32.6%)</text>
+<text x="120" y="591" text-anchor="end" class="label">ORDER</text>
+<rect x="130" y="578" width="237.6" height="18" fill="#287c8e" />
+<text x="373.6" y="591" class="value">2,811 (28.1%)</text>
 <text x="120" y="619" text-anchor="end" class="label">IN</text>
-<rect x="130" y="606" width="278.9" height="18" fill="#287c8e" />
-<text x="414.9" y="619" class="value">3,309 (32.9%)</text>
+<rect x="130" y="606" width="228.1" height="18" fill="#287c8e" />
+<text x="364.1" y="619" class="value">2,699 (27.0%)</text>
 <text x="120" y="647" text-anchor="end" class="label">ALL</text>
-<rect x="130" y="634" width="270.8" height="18" fill="#287c8e" />
-<text x="406.8" y="647" class="value">3,213 (31.9%)</text>
+<rect x="130" y="634" width="209.2" height="18" fill="#287c8e" />
+<text x="345.2" y="647" class="value">2,475 (24.8%)</text>
 <text x="120" y="675" text-anchor="end" class="label">ALTER</text>
-<rect x="130" y="662" width="264.5" height="18" fill="#287c8e" />
-<text x="400.5" y="675" class="value">3,138 (31.2%)</text>
-<text x="120" y="703" text-anchor="end" class="label">ORDER</text>
-<rect x="130" y="690" width="256.4" height="18" fill="#287c8e" />
-<text x="392.4" y="703" class="value">3,042 (30.2%)</text>
-<text x="120" y="731" text-anchor="end" class="label">DISTINCT</text>
-<rect x="130" y="718" width="209.6" height="18" fill="#287c8e" />
-<text x="345.6" y="731" class="value">2,487 (24.7%)</text>
-<text x="120" y="759" text-anchor="end" class="label">GROUP</text>
-<rect x="130" y="746" width="206.8" height="18" fill="#287c8e" />
-<text x="342.8" y="759" class="value">2,454 (24.4%)</text>
+<rect x="130" y="662" width="201.2" height="18" fill="#287c8e" />
+<text x="337.2" y="675" class="value">2,380 (23.8%)</text>
+<text x="120" y="703" text-anchor="end" class="label">GROUP</text>
+<rect x="130" y="690" width="198.7" height="18" fill="#287c8e" />
+<text x="334.7" y="703" class="value">2,351 (23.5%)</text>
+<text x="120" y="731" text-anchor="end" class="label">AND</text>
+<rect x="130" y="718" width="197.3" height="18" fill="#287c8e" />
+<text x="333.3" y="731" class="value">2,334 (23.3%)</text>
+<text x="120" y="759" text-anchor="end" class="label">JOIN</text>
+<rect x="130" y="746" width="190.1" height="18" fill="#287c8e" />
+<text x="326.1" y="759" class="value">2,249 (22.5%)</text>
 <text x="120" y="787" text-anchor="end" class="label">WITH</text>
-<rect x="130" y="774" width="206.1" height="18" fill="#287c8e" />
-<text x="342.1" y="787" class="value">2,445 (24.3%)</text>
-<text x="120" y="815" text-anchor="end" class="label">INDEX</text>
-<rect x="130" y="802" width="180.5" height="18" fill="#287c8e" />
-<text x="316.5" y="815" class="value">2,141 (21.3%)</text>
-<text x="120" y="843" text-anchor="end" class="label">END</text>
-<rect x="130" y="830" width="167.8" height="18" fill="#287c8e" />
-<text x="303.8" y="843" class="value">1,991 (19.8%)</text>
-<text x="120" y="871" text-anchor="end" class="label">JOIN</text>
-<rect x="130" y="858" width="167.7" height="18" fill="#287c8e" />
-<text x="303.7" y="871" class="value">1,990 (19.8%)</text>
-<text x="120" y="899" text-anchor="end" class="label">AND</text>
-<rect x="130" y="886" width="166.6" height="18" fill="#287c8e" />
-<text x="302.6" y="899" class="value">1,976 (19.6%)</text>
+<rect x="130" y="774" width="186.5" height="18" fill="#287c8e" />
+<text x="322.5" y="787" class="value">2,206 (22.1%)</text>
+<text x="120" y="815" text-anchor="end" class="label">DROP</text>
+<rect x="130" y="802" width="186.2" height="18" fill="#287c8e" />
+<text x="322.2" y="815" class="value">2,203 (22.0%)</text>
+<text x="120" y="843" text-anchor="end" class="label">INDEX</text>
+<rect x="130" y="830" width="185.8" height="18" fill="#287c8e" />
+<text x="321.8" y="843" class="value">2,198 (22.0%)</text>
+<text x="120" y="871" text-anchor="end" class="label">TO</text>
+<rect x="130" y="858" width="185.8" height="18" fill="#287c8e" />
+<text x="321.8" y="871" class="value">2,198 (22.0%)</text>
+<text x="120" y="899" text-anchor="end" class="label">DISTINCT</text>
+<rect x="130" y="886" width="165.3" height="18" fill="#287c8e" />
+<text x="301.3" y="899" class="value">1,955 (19.6%)</text>
 </svg>
