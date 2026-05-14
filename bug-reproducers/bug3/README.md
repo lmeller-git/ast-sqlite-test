@@ -1,15 +1,12 @@
 ## Summary
-<!--
-Explain briefly what goes wrong and explain why you believe this is a
-bug and not the intended behavior of SQLite (if it is not a crash).
--->
+
+Executing the query crashes the SQLite process (segmentation fault) under AddressSanitizer with a null pointer read in `sqlite3GetToken`.
+
 ## Minimized query
 ``` sql
 CREATE VIRTUAL TABLE t2 USING rtree;
 ```
 ## Actual output
-
-Executing the query crashes the SQLite process (segmentation fault) under AddressSanitizer with a null pointer read in `sqlite3GetToken`.
 
 ```sql
 AddressSanitizer:DEADLYSIGNAL                                                                                                             
