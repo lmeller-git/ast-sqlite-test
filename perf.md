@@ -37,10 +37,10 @@ uv run perf_eval.py "setarch -R x86_64 just run-docker_ --seeds /app/seeds --sav
 ### gcov
 
 Summary coverage rate:
-  source files: 4
-  lines.......: 39.4% (30787 of 78157 lines)
-  functions...: 44.7% (1888 of 4228 functions)
-  branches....: 31.7% (16573 of 52334 branches)
+  source files: 7
+  lines.......: 38.7% (31103 of 80277 lines)
+  functions...: 44.1% (1895 of 4301 functions)
+  branches....: 30.9% (16565 of 53691 branches)
 
 ## long run config
 
@@ -73,10 +73,21 @@ uv run perf_eval.py  "setarch -R $(uname -m) just run-docker_ --seeds /app/seeds
     range  : 0.096
 
 Summary coverage rate:
-  source files: 5
-  lines.......: 39.8% (31286 of 78600 lines)
-  functions...: 44.7% (1895 of 4242 functions)
-  branches....: 31.9% (16728 of 52422 branches)
+  source files: 7
+  lines.......: 35.2% (28278 of 80277 lines)
+  functions...: 41.0% (1764 of 4301 functions)
+  branches....: 27.8% (14907 of 53691 branches)
+
+## Longer run (~2 hours):
+
+~22.5% internal coverage,
+~150k final corpus size
+
+Summary coverage rate:
+  source files: 7
+  lines.......: 41.8% (33589 of 80277 lines)
+  functions...: 46.3% (1993 of 4301 functions)
+  branches....: 34.4% (18472 of 53691 branches)
 
 # Rust engine
 

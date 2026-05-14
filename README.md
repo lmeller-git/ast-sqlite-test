@@ -1,4 +1,6 @@
-# ast-sqlite-test
+![CI Test](https://github.com/lmeller-git/ast-sqlite-fuzzer/actions/workflows/test.yml/badge.svg?branch=main)
+
+# ast-sqlite-fuzzer
 Project 1 for the course "Automated Software Testing" at ETHZ Spring 2026
 
 ## Usage

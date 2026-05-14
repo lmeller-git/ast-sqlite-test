@@ -110,7 +110,7 @@ impl Engine {
     }
 
     pub fn return_token(&mut self, mut token: PyRefMut<IPCTokenHandle>) {
-        let token = token.0.take().unwrap();
+        let token = token.0.0.take().unwrap();
         self.0.return_token(token);
     }
 
@@ -216,7 +216,7 @@ pub struct TestResult {
     pub exec_time: u32,
     #[pyo3(get, set)]
     pub query_size: usize,
-    token: Option<Box<IPCToken>>,
+    token: Option<Box<IPCToken>>, // TODO store IPCTokenHandle or the queue also,
 }
 
 #[pymethods]
@@ -234,14 +234,17 @@ impl TestResult {
             triggers_bug,
             is_valid_syntax,
             exec_time,
-            token: token.0.take(),
+            token: token.0.0.take(),
             query_size,
         }
     }
 
     #[getter]
     pub fn token(&mut self) -> IPCTokenHandle {
-        self.token.take().map(|t| IPCTokenHandle(Some(t))).unwrap()
+        self.token
+            .take()
+            .map(|t| IPCTokenHandle((Some(t), None)))
+            .unwrap()
     }
 }
 #[pyclass(from_py_object)]
@@ -612,16 +615,28 @@ impl SeedGeneratorBuilder {
 }
 
 #[pyclass]
-pub struct IPCTokenHandle(Option<Box<IPCToken>>);
+pub struct IPCTokenHandle((Option<Box<IPCToken>>, Option<SharedMemHandle>));
 
 #[pymethods]
 impl IPCTokenHandle {
     pub fn as_env(&self) -> String {
-        self.0.as_ref().map(|t| t.get_path().to_string()).unwrap()
+        self.0.0.as_ref().map(|t| t.get_path().to_string()).unwrap()
     }
 
     pub fn id(&self) -> usize {
-        self.0.as_ref().map(|t| t.id()).unwrap()
+        self.0.0.as_ref().map(|t| t.id()).unwrap()
+    }
+}
+
+impl Drop for IPCTokenHandle {
+    fn drop(&mut self) {
+        if let Some(token) = self.0.0.take() {
+            if let Some(q) = self.0.1.take() {
+                q.send(token);
+            } else {
+                eprintln!("an IPC token was permanentrly leaked. this is a bug.")
+            }
+        }
     }
 }
 
@@ -637,17 +652,17 @@ impl IPCTokenQueue {
     }
 
     pub fn send(&self, py: Python, mut token: PyRefMut<IPCTokenHandle>) {
-        let token = token.0.take().unwrap();
+        let token = token.0.0.take().unwrap();
         py.detach(|| self.0.send(token))
     }
 
     pub fn recv<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rx_clone = self.0.rx().clone();
+        let queue_clone = self.0.clone();
 
         future_into_py(py, async move {
-            let token = rx_clone.recv_async().await;
+            let token = queue_clone.rx().recv_async().await;
             if let Ok(t) = token {
-                Ok(Some(IPCTokenHandle(Some(t))))
+                Ok(Some(IPCTokenHandle((Some(t), Some(queue_clone)))))
             } else {
                 Ok(None)
             }

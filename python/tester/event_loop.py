@@ -20,6 +20,7 @@ async def fuzzing_loop(
     test_path: str,
     eval_requirement: bool = False,
     keyword_coverage: KeywordCoverageRecorder | None = None,
+    save_to: str | None = None
 ):
     workers: dict[int, SQLiteWorker] = {}
     active_tasks: set[asyncio.Task[None]] = set()
@@ -42,12 +43,12 @@ async def fuzzing_loop(
 
         for _ in range(to_spawn):
             entry = testable_queries.pop()
+            total += 1
 
             # save 10k queries, comment out in an actual run. this is only to save the first 10k for grading
-            if eval_requirement and total < 10000:
-                with open(f"docker_out/queries/query_{total}.sql", "w") as f:
+            if eval_requirement and total <= 10000 and save_to is not None:
+                with open(f"{save_to}/query_{total}.sql", "w") as f:
                     _ = f.write(entry.to_sql_string())
-                    total += 1
             elif eval_requirement and not is_done:
                 # break at 10k
                 is_done = True
@@ -66,7 +67,15 @@ async def fuzzing_loop(
             print(f"epoch {epoch}\nCorpus size: {mutation_engine.corpus_size()}")
             mutation_engine.chore()
 
-        _done, active_tasks = await asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED)
+        try:
+            _done, active_tasks = await asyncio.wait(
+                active_tasks, return_when=asyncio.FIRST_COMPLETED
+            )
+        except ValueError:
+            # active_tasks was empty
+            pass
+        except Exception as e:
+            print(f"Exception during executor spawning: {e}")
 
         epoch += 1
 
@@ -75,10 +84,8 @@ async def fuzzing_loop(
             or mutation_engine.corpus_size() >= stop_at
             or (stop_time is not None and time.time() >= stop_time)
         ):
-            if eval_requirement:
-                print(f"Hit {total} generated queries")
-            else:
-                print(f"Hit {mutation_engine.corpus_size()} queries")
+            print(f"Generated {total} total queries")
+            print(f"Corpus size is: {mutation_engine.corpus_size()}")
             _ = await asyncio.gather(*active_tasks, return_exceptions=True)
             for worker in workers.values():
                 await worker.close()
