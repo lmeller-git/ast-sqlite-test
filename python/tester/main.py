@@ -1,14 +1,12 @@
 import os
 import time
+from lib_sf.lib_sf import TestableEntry
 from lib_sf import engine
 from argparse import ArgumentParser, Namespace
 import asyncio
 import uvloop
 
-from lib_sf.lib_sf import TestableEntry
 from tester.event_loop import fuzzing_loop, N_ORACLES
-
-from tester.keyword_coverage import KeywordCoverageRecorder
 from tester.exec import CONCURRENCY_LIMIT, init, run_single_mutation, return_rt_err_rate
 from tester.oracle import oracle_worker
 from tester.persistent_worker import SQLiteWorker
@@ -18,11 +16,6 @@ RNG = 42
 
 
 async def main(args: Namespace):
-    keyword_coverage = (
-        KeywordCoverageRecorder(args.keyword_coverage_to, args.keyword_coverage_report_every)
-        if args.keyword_coverage_to is not None
-        else None
-    )
     if args.timeout_hours is not None:
         start_time = time.time()
         end_time = args.timeout_hours * 3600.0 + start_time
@@ -164,7 +157,7 @@ async def main(args: Namespace):
                 increaser_body,
             ),
             engine.StrategyBuilder.randomize(engine.StrategyBuilder.table_guard(), 0.6),
-            engine.StrategyBuilder.randomize(engine.StrategyBuilder.force_ident(), 0.1)
+            engine.StrategyBuilder.randomize(engine.StrategyBuilder.force_ident(), 0.1),
         ]
     ]
 
@@ -193,36 +186,31 @@ async def main(args: Namespace):
 
     mutation_engine.chore()
 
-    print("\n===========\ninit done, entering loop\n==================\n")
+    print("\n===========\ninit done, entering loop\n==================\n", flush=True)
 
     if args.eval_requirement and args.save_to is not None:
         os.makedirs(args.save_to, exist_ok=True)
 
     now = time.time()
 
-    try:
-        _ = await asyncio.gather(
-            fuzzing_loop(
-                mutation_engine,
-                ipc_queue,
-                oracle_queue,
-                args.stop_at,
-                None if args.timeout_hours is None else end_time,
-                args.test_path,
-                args.eval_requirement,
-                keyword_coverage,
-                args.save_to
-            ),
-            *oracle_tasks,
-        )
-    finally:
-        if keyword_coverage is not None:
-            keyword_coverage.close()
+    _ = await asyncio.gather(
+        fuzzing_loop(
+            mutation_engine,
+            ipc_queue,
+            oracle_queue,
+            args.stop_at,
+            None if args.timeout_hours is None else end_time,
+            args.test_path,
+            args.eval_requirement,
+            args.save_to,
+        ),
+        *oracle_tasks,
+    )
 
     duration = time.time() - now
     qpm = (10000.0 / duration) * 60.0
-    print(f"qpm for complete pipeline: {qpm:.3f}")
-    print(f"runtime error rate is {return_rt_err_rate(10000):.3f}")
+    print(f"qpm for complete pipeline: {qpm:.3f}", flush=True)
+    print(f"runtime error rate is {return_rt_err_rate(10000):.3f}", flush=True)
 
 
 def add(n1: int, n2: int) -> int:
@@ -238,7 +226,5 @@ if __name__ == "__main__":
     _ = parser.add_argument("--oracle_path", default="/usr/bin/sqlite3-3.39.4")
     _ = parser.add_argument("--timeout_hours", default=None, type=float)
     _ = parser.add_argument("--eval_requirement", default=False, type=bool)
-    _ = parser.add_argument("--keyword_coverage_to", default=None, type=str)
-    _ = parser.add_argument("--keyword_coverage_report_every", default=1000, type=int)
     args = parser.parse_args()
     uvloop.run(main(args))

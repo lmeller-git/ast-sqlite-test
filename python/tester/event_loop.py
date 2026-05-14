@@ -1,9 +1,8 @@
+from lib_sf.lib_sf import TestableEntry
 from lib_sf import engine
 import asyncio
 import time
 
-from lib_sf.lib_sf import TestableEntry
-from tester.keyword_coverage import KeywordCoverageRecorder
 from tester.exec import CONCURRENCY_LIMIT, run_single_mutation
 from tester.persistent_worker import SQLiteWorker, TestCapture
 
@@ -19,8 +18,7 @@ async def fuzzing_loop(
     stop_time: int | None,
     test_path: str,
     eval_requirement: bool = False,
-    keyword_coverage: KeywordCoverageRecorder | None = None,
-    save_to: str | None = None
+    save_to: str | None = None,
 ):
     workers: dict[int, SQLiteWorker] = {}
     active_tasks: set[asyncio.Task[None]] = set()
@@ -47,15 +45,11 @@ async def fuzzing_loop(
             if eval_requirement and total <= 10000 and save_to is not None:
                 with open(f"{save_to}/query_{total}.sql", "w") as f:
                     _ = f.write(sql)
-                if keyword_coverage is not None:
-                    keyword_coverage.record(sql)
             elif eval_requirement and not is_done:
                 # break at 10k
                 is_done = True
-                print("Hit 10k queries")
+                print("Hit 10k queries", flush=True)
                 break
-            elif keyword_coverage is not None:
-                keyword_coverage.record(sql)
 
             if not is_done:
                 task = asyncio.create_task(
@@ -66,7 +60,7 @@ async def fuzzing_loop(
                 active_tasks.add(task)
 
         if not short_run and epoch % 2000 == 0:
-            print(f"epoch {epoch}\nCorpus size: {mutation_engine.corpus_size()}")
+            print(f"epoch {epoch}\nCorpus size: {mutation_engine.corpus_size()}", flush=True)
             mutation_engine.chore()
 
         try:
@@ -77,7 +71,7 @@ async def fuzzing_loop(
             # active_tasks was empty
             pass
         except Exception as e:
-            print(f"Exception during executor spawning: {e}")
+            print(f"Exception during executor spawning: {e}", flush=True)
 
         epoch += 1
 
