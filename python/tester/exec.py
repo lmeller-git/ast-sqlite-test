@@ -80,19 +80,25 @@ async def run_single_mutation(
 
 async def init(test_path: str) -> int:
     worker = SQLiteWorker(test_path, {"FUZZER_INIT": "1"})
-
-    res = await worker.execute(".quit")
-    await worker.close()
+    try:
+        res = await worker.execute(".quit")
+    except Exception as e:
+        print(f"Exception {e} occured during init. Returning static fallback value for max_edges")
+        return 70_000
+    finally:
+        await worker.close()
 
     output = res.stdout.decode()
 
     match = re.search(r"FUZZER_INIT: max edges = (\d+)", output)
     if not match:
-        raise RuntimeError(
+        print(
             f"Failed to find max edges in output.\n \
             Return Code: {res.exit_code}\n \
             Stdout: '{output}'\n \
-            Stderr: '{res.stderr.decode()}'"
+            Stderr: '{res.stderr.decode()}'\n \
+            Returning static fallback value"
         )
+        return 70_000
 
     return int(match.group(1))

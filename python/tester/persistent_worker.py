@@ -255,7 +255,7 @@ class SQLiteWorker:
                 shutil.rmtree(child)
 
     async def close(self) -> None:
-        if self.proc is not None and self.proc.returncode is None:
+        if self.proc is not None and self.proc.returncode is None and not self.proc.stdin.is_closing():
             try:
                 self.proc.stdin.write(b".quit\n")
                 await self.proc.stdin.drain()

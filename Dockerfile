@@ -36,6 +36,11 @@ RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
 
+WORKDIR /app
+
+COPY rust-toolchain.toml ./
+RUN rustup show
+
 WORKDIR /home/test/sqlite3-src/build
 
 # prebuild sqlite target
