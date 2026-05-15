@@ -107,9 +107,11 @@ def is_interesting_unilateral(capture: TestCapture) -> bool:
 
 # shared across orcales
 seen_signatures: set[bytes] = set()
+total_bugs: int = 0
 
 
 async def oracle_worker(incoming: asyncio.Queue[TestCapture | None], oracle_path: str):
+    global total_bugs
     # Could in theory also spawn multiple workers here, but 1 should be enough, especially since it should never crash
     oracle_worker = SQLiteWorker(oracle_path)
     os.makedirs("docker_out/crashes", exist_ok=True)
@@ -183,7 +185,10 @@ async def oracle_worker(incoming: asyncio.Queue[TestCapture | None], oracle_path
                     bug_type = "DIVERGENCE"
                     notes = f"Target exited 0 but reference exited {ref.exit_code}."
                 elif (
-                    "random" in item.query or "PRIMARY KEY" in item.query or "ANALYZE" in item.query
+                    "random" in item.query
+                    or "PRIMARY KEY" in item.query
+                    or "ANALYZE" in item.query
+                    or is_expected_error(ref)
                 ):
                     pass
 
@@ -201,14 +206,14 @@ async def oracle_worker(incoming: asyncio.Queue[TestCapture | None], oracle_path
                         continue
                     seen_signatures.add(signature)
 
-                filename = f"docker_out/crashes/bug_{query_hash.hex()}_{bug_type}.txt"
-                if os.path.exists(filename):
-                    continue
+                filename = f"docker_out/crashes/bug_{total_bugs}_{bug_type}.txt"
+                total_bugs += 1
+
                 print(f"[!] {bug_type} — saving to {filename}", flush=True)
 
                 ref_block = ""
                 if ref is not None:
-                    ref_block = f"\n--- Reference (/usr/bin/sqlite3-3.39.4) ---\n{ref}"
+                    ref_block = f"\n--- Reference ({oracle_path}) ---\n{ref}"
                 try:
                     with open(filename, "x", encoding="utf-8") as f:
                         _ = f.write(

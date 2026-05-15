@@ -223,7 +223,7 @@ if __name__ == "__main__":
     _ = parser.add_argument("--stop_at", default=10000, type=int)
     _ = parser.add_argument("--save_to", default=None, type=str)
     _ = parser.add_argument("--test_path", default="/home/test/sqlite3-src/build/sqlite3")
-    _ = parser.add_argument("--oracle_path", default="/usr/bin/sqlite3-3.39.4")
+    _ = parser.add_argument("--oracle_path", default="/usr/bin/sqlite3")
     _ = parser.add_argument("--timeout_hours", default=None, type=float)
     _ = parser.add_argument("--eval_requirement", default=False, type=bool)
     args = parser.parse_args()

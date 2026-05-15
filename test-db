@@ -2,4 +2,4 @@
 
 cd /app
 
-setarch -R $(uname -m) just run-docker_ --seeds /app/seeds --save_to docker_out/queries --eval_requirement true --stop_at 10000
+setarch -R $(uname -m) just run-docker_ --seeds /app/seeds --save_to docker_out/queries --eval_requirement true --stop_at 10000 --oracle_path /usr/bin/sqlite3

@@ -1,0 +1,27 @@
+LOGIC_BUG REPORT
+                            Notes: Same exit code (0) but stdout differs (after normalization).
+
+                            Query:
+CREATE TABLE IF NOT EXISTS t0 (c0);INSERT INTO t0 (c0) VALUES (NULL);CREATE INDEX i0 ON t0(9223372036854775807) WHERE c0 IS NOT NULL;SELECT 1 FROM t0 WHERE t0.c0 IS FALSE IS FALSE;SELECT 1 FROM t0 WHERE (t0.c0 IS FALSE) BETWEEN NULL AND 3.5
+                            
+--- Reference (/usr/bin/sqlite3) ---
+TestCapture {
+stdout: 
+1
+__STDOUT_EOQ__
+stdserr: 
+__STDERR_EOQ__
+exit_code: 0
+exec_time:384625
+query: CREATE TABLE IF NOT EXISTS t0 (c0);INSERT INTO t0 (c0) VALUES (NULL);CREATE INDEX i0 ON t0(9223372036854775807) WHERE c0 IS NOT NULL;SELECT 1 FROM t0 WHERE t0.c0 IS FALSE IS FALSE;SELECT 1 FROM t0 WHERE (t0.c0 IS FALSE) BETWEEN NULL AND 3.5
+}
+                            --- Found (sqlite3_guarded) ---
+TestCapture {
+stdout: 
+__STDOUT_EOQ__
+stdserr: 
+__STDERR_EOQ__
+exit_code: 0
+exec_time:622745
+query: CREATE TABLE IF NOT EXISTS t0 (c0);INSERT INTO t0 (c0) VALUES (NULL);CREATE INDEX i0 ON t0(9223372036854775807) WHERE c0 IS NOT NULL;SELECT 1 FROM t0 WHERE t0.c0 IS FALSE IS FALSE;SELECT 1 FROM t0 WHERE (t0.c0 IS FALSE) BETWEEN NULL AND 3.5
+}

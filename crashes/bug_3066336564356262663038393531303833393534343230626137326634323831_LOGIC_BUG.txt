@@ -1,0 +1,27 @@
+LOGIC_BUG REPORT
+                            Notes: Same exit code (0) but stdout differs (after normalization).
+
+                            Query:
+CREATE TABLE IF NOT EXISTS map_integer (id INT, name);INSERT INTO map_integer VALUES (1, 2);CREATE TABLE IF NOT EXISTS map_text (id TEXT, name);INSERT INTO map_text VALUES ('a', NULL);CREATE TABLE IF NOT EXISTS data (id TEXT, name);INSERT INTO data VALUES (1, NULL);INSERT INTO data VALUES (0, 2);CREATE VIEW idmap AS SELECT * FROM map_integer UNION SELECT * FROM map_text;CREATE TABLE IF NOT EXISTS mzed AS SELECT * FROM idmap;PRAGMA automatic_index = 'ON';SELECT * FROM data JOIN idmap USING(id)
+                            
+--- Reference (/usr/bin/sqlite3) ---
+TestCapture {
+stdout: 
+__STDOUT_EOQ__
+stdserr: 
+__STDERR_EOQ__
+exit_code: 0
+exec_time:949902
+query: CREATE TABLE IF NOT EXISTS map_integer (id INT, name);INSERT INTO map_integer VALUES (1, 2);CREATE TABLE IF NOT EXISTS map_text (id TEXT, name);INSERT INTO map_text VALUES ('a', NULL);CREATE TABLE IF NOT EXISTS data (id TEXT, name);INSERT INTO data VALUES (1, NULL);INSERT INTO data VALUES (0, 2);CREATE VIEW idmap AS SELECT * FROM map_integer UNION SELECT * FROM map_text;CREATE TABLE IF NOT EXISTS mzed AS SELECT * FROM idmap;PRAGMA automatic_index = 'ON';SELECT * FROM data JOIN idmap USING(id)
+}
+                            --- Found (sqlite3_guarded) ---
+TestCapture {
+stdout: 
+1||2
+__STDOUT_EOQ__
+stdserr: 
+__STDERR_EOQ__
+exit_code: 0
+exec_time:1057385
+query: CREATE TABLE IF NOT EXISTS map_integer (id INT, name);INSERT INTO map_integer VALUES (1, 2);CREATE TABLE IF NOT EXISTS map_text (id TEXT, name);INSERT INTO map_text VALUES ('a', NULL);CREATE TABLE IF NOT EXISTS data (id TEXT, name);INSERT INTO data VALUES (1, NULL);INSERT INTO data VALUES (0, 2);CREATE VIEW idmap AS SELECT * FROM map_integer UNION SELECT * FROM map_text;CREATE TABLE IF NOT EXISTS mzed AS SELECT * FROM idmap;PRAGMA automatic_index = 'ON';SELECT * FROM data JOIN idmap USING(id)
+}
